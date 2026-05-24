@@ -42,8 +42,12 @@ class NotificationEngagementService(
 
         notificationScheduleRepository.findByUserId(userId)?.let { schedule ->
             schedule.consecutiveIgnores = 0
-            schedule.suppressedUntil = null
-            schedule.updatedAt = Instant.now()
+            schedule.suppressedUntil    = null
+            // Reset to WARM so the nightly batch re-evaluates from a fresh start
+            schedule.engagementSegment  = "WARM"
+            // Invalidate AI cache — next nightly batch will re-query if user goes cold again
+            schedule.aiDecidedAt        = null
+            schedule.updatedAt          = Instant.now()
             notificationScheduleRepository.save(schedule)
         }
 
@@ -196,6 +200,13 @@ class NotificationEngagementService(
                 typeBreakdown    = typeBreakdown
             )
         )
+    }
+
+    @Transactional(readOnly = true)
+    fun getDaysSinceLastOpen(userId: Long): Long? {
+        val log = notificationLogRepository
+            .findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId) ?: return null
+        return ChronoUnit.DAYS.between(log.openedAt, Instant.now())
     }
 
     data class EngagementStats(

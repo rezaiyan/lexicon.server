@@ -44,6 +44,23 @@ class NotificationSchedule(
     @Column(name = "last_milestone_snapshot", columnDefinition = "jsonb")
     var lastMilestoneSnapshot: String? = null,
 
+    // Engagement segment — computed nightly from notification_log history
+    @Column(name = "engagement_segment", nullable = false)
+    var engagementSegment: String = "WARM",
+
+    // AI advisor fields — populated by NotificationAiAdvisor for COLD/DORMANT users
+    @Column(name = "ai_action")
+    var aiAction: String? = null,
+
+    @Column(name = "ai_interval_days")
+    var aiIntervalDays: Int? = null,
+
+    @Column(name = "ai_content_hint")
+    var aiContentHint: String? = null,
+
+    @Column(name = "ai_decided_at")
+    var aiDecidedAt: Instant? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 

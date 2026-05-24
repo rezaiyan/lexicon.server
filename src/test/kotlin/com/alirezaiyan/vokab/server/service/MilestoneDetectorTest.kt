@@ -48,11 +48,11 @@ class MilestoneDetectorTest {
     }
 
     @Test
-    fun `getPendingMilestone should return words_added milestone when crossing 10 words threshold`() {
+    fun `getPendingMilestone should return words_added milestone when crossing 25 words threshold`() {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, lastMilestoneSnapshot = null)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 10)
+        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 25)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -61,7 +61,7 @@ class MilestoneDetectorTest {
         // Assert
         assertNotNull(result)
         assertEquals("words_added", result!!.type)
-        assertEquals(10L, result.value)
+        assertEquals(25L, result.value)
     }
 
     @Test
@@ -162,7 +162,7 @@ class MilestoneDetectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, lastMilestoneSnapshot = null)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 10)
+        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 25)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act

@@ -8,6 +8,10 @@ import java.time.Instant
 interface NotificationLogRepository : JpaRepository<NotificationLog, Long> {
     fun findTopByUserIdOrderBySentAtDesc(userId: Long): NotificationLog?
 
+    fun findTop3ByUserIdOrderBySentAtDesc(userId: Long): List<NotificationLog>
+
+    fun findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId: Long): NotificationLog?
+
     @Query("""
         SELECT nl FROM NotificationLog nl
         WHERE nl.userId = :userId AND nl.sentAt >= :since

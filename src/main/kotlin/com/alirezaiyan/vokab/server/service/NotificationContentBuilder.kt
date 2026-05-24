@@ -23,7 +23,7 @@ class NotificationContentBuilder(
     private val dailyInsightService: DailyInsightService,
     private val milestoneDetector: MilestoneDetector
 ) {
-    fun build(user: User, type: NotificationType): NotificationPayload {
+    fun build(user: User, type: NotificationType, contentHint: String? = null): NotificationPayload {
         return when (type) {
             STREAK_RISK        -> buildStreakRisk(user)
             PROGRESS_MILESTONE -> buildMilestone(user)
@@ -32,6 +32,7 @@ class NotificationContentBuilder(
             COMEBACK_ALERT     -> buildComebackAlert(user)
             DAILY_INSIGHT      -> buildDailyInsight(user)
             REVIEW_REMINDER    -> buildReviewReminder(user)
+            MOTIVATION         -> buildMotivation(user, contentHint)
             NONE               -> error("Should not build payload for NONE type")
         }
     }
@@ -156,6 +157,65 @@ class NotificationContentBuilder(
                 "deep_link" to "vokab://review"
             ),
             type = REVIEW_REMINDER
+        )
+    }
+
+    /**
+     * AI-advised motivational re-engagement notification.
+     * contentHint selects the emotional angle; all copy is pre-written (no AI generation).
+     */
+    private fun buildMotivation(user: User, contentHint: String?): NotificationPayload {
+        val stats = runCatching { userProgressService.calculateProgressStats(user) }.getOrNull()
+        val dueCards = stats?.dueCards ?: 0
+
+        val (title, body) = when (contentHint) {
+            "loss_aversion" -> {
+                val streak = user.currentStreak
+                if (streak > 0) {
+                    "Your ${streak}-day streak is at risk 🔥" to
+                        "Don't lose the progress you've built. One quick session keeps it alive."
+                } else {
+                    "Your vocabulary is fading 📉" to
+                        "Words you worked hard to learn need a refresh. Come back and lock them in."
+                }
+            }
+            "curiosity" -> {
+                if (dueCards > 0) {
+                    "Something's waiting for you 👀" to
+                        "$dueCards words are piling up. Some you've never gotten right. Ready?"
+                } else {
+                    "Your vocabulary has a gap 🔍" to
+                        "There are words in your list you haven't seen in a while. Curious which ones?"
+                }
+            }
+            "social_proof" ->
+                "Others are getting ahead 📈" to
+                    "Learners like you are reviewing daily. A few minutes today puts you back in the game."
+            "fresh_start" ->
+                "Every expert started somewhere 🌱" to
+                    "It's never too late to pick it up again. Start fresh — no judgment, just progress."
+            "achievement" -> {
+                if (dueCards > 0) {
+                    "You're closer than you think 🏆" to
+                        "Review $dueCards words today and you'll hit your next milestone. That's it."
+                } else {
+                    "A milestone is within reach 🏆" to
+                        "You're just a few reviews away from your next achievement. Don't stop now."
+                }
+            }
+            else ->
+                "Time to get back on track 💪" to
+                    "Your vocabulary is waiting. A short session today makes all the difference."
+        }
+
+        return NotificationPayload(
+            title = title,
+            body = body,
+            data = mapOf(
+                "type" to "motivation",
+                "deep_link" to "vokab://review"
+            ),
+            type = MOTIVATION
         )
     }
 

@@ -425,13 +425,124 @@ class NotificationContentBuilderTest {
 
     @Test
     fun `should throw IllegalStateException when type is NONE`() {
-        // Arrange
         val user = createUser()
 
-        // Act + Assert
         assertThrows<IllegalStateException> {
             notificationContentBuilder.build(user, NotificationType.NONE)
         }
+    }
+
+    // ── MOTIVATION ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `should return loss_aversion payload with streak count when user has a current streak`() {
+        val user  = createUser(currentStreak = 7)
+        val stats = createProgressStats(dueCards = 5)
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "loss_aversion")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.title.contains("7") || result.body.contains("7"))
+        assertEquals("motivation", result.data["type"])
+        assertEquals("vokab://review", result.data["deep_link"])
+    }
+
+    @Test
+    fun `should return loss_aversion payload about fading vocabulary when streak is 0`() {
+        val user  = createUser(currentStreak = 0)
+        val stats = createProgressStats(dueCards = 5)
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "loss_aversion")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+    }
+
+    @Test
+    fun `should return curiosity payload with due card count when cards are due`() {
+        val user  = createUser()
+        val stats = createProgressStats(dueCards = 12)
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "curiosity")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.title.contains("12") || result.body.contains("12"))
+    }
+
+    @Test
+    fun `should return curiosity payload with generic message when no cards are due`() {
+        val user  = createUser()
+        val stats = createProgressStats(dueCards = 0)
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "curiosity")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+    }
+
+    @Test
+    fun `should return social_proof payload`() {
+        val user  = createUser()
+        val stats = createProgressStats()
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "social_proof")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+    }
+
+    @Test
+    fun `should return fresh_start payload`() {
+        val user  = createUser()
+        val stats = createProgressStats()
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "fresh_start")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+    }
+
+    @Test
+    fun `should return achievement payload with due card count`() {
+        val user  = createUser()
+        val stats = createProgressStats(dueCards = 3)
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "achievement")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+    }
+
+    @Test
+    fun `should return generic fallback payload for unknown contentHint`() {
+        val user  = createUser()
+        val stats = createProgressStats()
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "unknown_hint")
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
+        assertEquals("vokab://review", result.data["deep_link"])
+    }
+
+    @Test
+    fun `should return generic fallback payload when contentHint is null`() {
+        val user  = createUser()
+        val stats = createProgressStats()
+        every { userProgressService.calculateProgressStats(user) } returns stats
+
+        val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, null)
+
+        assertEquals(NotificationType.MOTIVATION, result.type)
+        assertTrue(result.body.isNotBlank())
     }
 
     // ── Factory functions ──────────────────────────────────────────────────────

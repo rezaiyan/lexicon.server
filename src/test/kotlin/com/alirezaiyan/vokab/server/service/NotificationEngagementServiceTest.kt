@@ -458,6 +458,68 @@ class NotificationEngagementServiceTest {
         assertEquals(40, insightStats?.openRate)
     }
 
+    // --- recordOpen: segment reset ---
+
+    @Test
+    fun `recordOpen should reset engagementSegment to WARM`() {
+        val userId = 1L
+        val log    = createNotificationLog(id = 10L, userId = userId, openedAt = null)
+        val schedule = createSchedule(createUser(id = userId)).apply { engagementSegment = "COLD" }
+        every { notificationLogRepository.findById(10L) } returns Optional.of(log)
+        every { notificationLogRepository.save(log) } returns log
+        every { notificationScheduleRepository.findByUserId(userId) } returns schedule
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+
+        notificationEngagementService.recordOpen(userId, 10L)
+
+        assertEquals("WARM", schedule.engagementSegment)
+    }
+
+    @Test
+    fun `recordOpen should clear aiDecidedAt`() {
+        val userId   = 1L
+        val log      = createNotificationLog(id = 10L, userId = userId, openedAt = null)
+        val schedule = createSchedule(createUser(id = userId)).apply {
+            aiDecidedAt = Instant.now().minusSeconds(3600)
+        }
+        every { notificationLogRepository.findById(10L) } returns Optional.of(log)
+        every { notificationLogRepository.save(log) } returns log
+        every { notificationScheduleRepository.findByUserId(userId) } returns schedule
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+
+        notificationEngagementService.recordOpen(userId, 10L)
+
+        assertNull(schedule.aiDecidedAt)
+    }
+
+    // --- getDaysSinceLastOpen ---
+
+    @Test
+    fun `getDaysSinceLastOpen should return days since last open`() {
+        val userId     = 1L
+        val fiveDaysAgo = Instant.now().minusSeconds(60L * 60 * 24 * 5)
+        val log        = createNotificationLog(userId = userId, openedAt = fiveDaysAgo)
+        every {
+            notificationLogRepository.findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId)
+        } returns log
+
+        val result = notificationEngagementService.getDaysSinceLastOpen(userId)
+
+        assert(result != null && result >= 4L && result <= 6L) // allow clock drift
+    }
+
+    @Test
+    fun `getDaysSinceLastOpen should return null when user has never opened a notification`() {
+        val userId = 1L
+        every {
+            notificationLogRepository.findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId)
+        } returns null
+
+        val result = notificationEngagementService.getDaysSinceLastOpen(userId)
+
+        assertNull(result)
+    }
+
     // --- Factory functions ---
 
     private fun createUser(

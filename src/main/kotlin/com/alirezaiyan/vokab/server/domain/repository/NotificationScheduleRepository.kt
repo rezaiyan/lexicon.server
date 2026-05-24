@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.domain.entity.User
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import org.springframework.data.repository.query.Param
+import java.time.Instant
 
 interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, Long> {
     fun findByUser(user: User): NotificationSchedule?
@@ -51,4 +52,15 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
           )
     """)
     fun findUsersForReviewReminders(@Param("hour") hour: Int): List<NotificationSchedule>
+
+    /**
+     * Returns schedules for COLD/DORMANT users whose AI decision is stale or missing.
+     * Used by the nightly batch to determine who needs an AI advisor call.
+     */
+    @Query("""
+        SELECT ns FROM NotificationSchedule ns
+        WHERE ns.engagementSegment IN ('COLD', 'DORMANT')
+          AND (ns.aiDecidedAt IS NULL OR ns.aiDecidedAt < :staleCutoff)
+    """)
+    fun findSchedulesNeedingAiRefresh(@Param("staleCutoff") staleCutoff: Instant): List<NotificationSchedule>
 }

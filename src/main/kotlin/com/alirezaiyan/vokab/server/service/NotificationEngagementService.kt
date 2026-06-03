@@ -75,9 +75,12 @@ class NotificationEngagementService(
     ) {
         val userId = schedule.user.id!!
 
-        // Check previous log BEFORE saving the new one
+        // Increment ignore counter if a notification was previously sent and the user didn't open it.
+        // Uses lastSentDate as the "sent-before" signal so suppression works even when saveLog fails.
+        // If a log record IS present and was opened, recordOpen() already reset the counter.
         val previousLog = notificationLogRepository.findTopByUserIdOrderBySentAtDesc(userId)
-        if (previousLog != null && previousLog.openedAt == null) {
+        val wasOpened = previousLog?.openedAt != null
+        if (!wasOpened && schedule.lastSentDate != null) {
             val ignoreCount = schedule.consecutiveIgnores + 1
             schedule.consecutiveIgnores = ignoreCount
             schedule.suppressedUntil = computeSuppressedUntil(ignoreCount)

@@ -74,33 +74,33 @@ interface ReviewEventRepository : JpaRepository<ReviewEvent, Long> {
     fun getAccuracyByLevel(user: User): List<AccuracyByLevelProjection>
 
     @Query(
-        value = """SELECT CAST(EXTRACT(HOUR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "hour",
+        value = """SELECT CAST(EXTRACT(HOUR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "hour",
            COUNT(*) AS total,
            SUM(CASE WHEN rating >= 1 THEN 1 ELSE 0 END) AS correct
            FROM review_events WHERE user_id = :userId
-           GROUP BY CAST(EXTRACT(HOUR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER)
+           GROUP BY CAST(EXTRACT(HOUR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER)
            ORDER BY 1""",
         nativeQuery = true
     )
     fun getAccuracyByHour(@Param("userId") userId: Long): List<HourlyAccuracyProjection>
 
     @Query(
-        value = """SELECT CAST(EXTRACT(DOW FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "dayofweek",
+        value = """SELECT CAST(EXTRACT(DOW FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "dayofweek",
            COUNT(*) AS total,
            SUM(CASE WHEN rating >= 1 THEN 1 ELSE 0 END) AS correct
            FROM review_events WHERE user_id = :userId
-           GROUP BY CAST(EXTRACT(DOW FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER)
+           GROUP BY CAST(EXTRACT(DOW FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER)
            ORDER BY 1""",
         nativeQuery = true
     )
     fun getAccuracyByDayOfWeek(@Param("userId") userId: Long): List<DayOfWeekAccuracyProjection>
 
     @Query(
-        value = """SELECT TO_CHAR(TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS "day",
+        value = """SELECT TO_CHAR(${REVIEWED_AT_TS} AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS "day",
            COUNT(*) AS "count"
            FROM review_events WHERE user_id = :userId
            AND reviewed_at >= :startMs AND reviewed_at <= :endMs
-           GROUP BY TO_CHAR(TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM-DD')
+           GROUP BY TO_CHAR(${REVIEWED_AT_TS} AT TIME ZONE 'UTC', 'YYYY-MM-DD')
            ORDER BY 1""",
         nativeQuery = true
     )
@@ -139,25 +139,25 @@ interface ReviewEventRepository : JpaRepository<ReviewEvent, Long> {
     fun getStatsByLanguagePair(user: User): List<LanguagePairStatsProjection>
 
     @Query(
-        value = """SELECT CAST(EXTRACT(YEAR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "yr",
-           CAST(EXTRACT(MONTH FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "mo",
+        value = """SELECT CAST(EXTRACT(YEAR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "yr",
+           CAST(EXTRACT(MONTH FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "mo",
            COUNT(*) AS total,
            SUM(CASE WHEN rating >= 1 THEN 1 ELSE 0 END) AS correct
            FROM review_events WHERE user_id = :userId
-           GROUP BY CAST(EXTRACT(YEAR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER),
-                    CAST(EXTRACT(MONTH FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER)
+           GROUP BY CAST(EXTRACT(YEAR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER),
+                    CAST(EXTRACT(MONTH FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER)
            ORDER BY 1, 2""",
         nativeQuery = true
     )
     fun getMonthlyStats(@Param("userId") userId: Long): List<MonthlyStatsProjection>
 
     @Query(
-        value = """SELECT CAST(EXTRACT(YEAR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "yr",
-           CAST(EXTRACT(WEEK FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER) AS "wk",
+        value = """SELECT CAST(EXTRACT(YEAR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "yr",
+           CAST(EXTRACT(WEEK FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER) AS "wk",
            AVG(response_time_ms) AS avgms
            FROM review_events WHERE user_id = :userId
-           GROUP BY CAST(EXTRACT(YEAR FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER),
-                    CAST(EXTRACT(WEEK FROM TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC') AS INTEGER)
+           GROUP BY CAST(EXTRACT(YEAR FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER),
+                    CAST(EXTRACT(WEEK FROM ${REVIEWED_AT_TS} AT TIME ZONE 'UTC') AS INTEGER)
            ORDER BY 1, 2""",
         nativeQuery = true
     )
@@ -172,13 +172,13 @@ interface ReviewEventRepository : JpaRepository<ReviewEvent, Long> {
     fun findComebackWords(user: User): List<ComebackWordProjection>
 
     @Query(
-        value = """SELECT TO_CHAR(TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS "day",
+        value = """SELECT TO_CHAR(${REVIEWED_AT_TS} AT TIME ZONE 'UTC', 'YYYY-MM-DD') AS "day",
            COUNT(DISTINCT word_id) AS "uniqueWords",
            SUM(CASE WHEN new_level > previous_level THEN 1 ELSE 0 END) AS "leveledUp",
            SUM(CASE WHEN new_level < previous_level THEN 1 ELSE 0 END) AS "leveledDown"
            FROM review_events WHERE user_id = :userId
            AND reviewed_at >= :startMs AND reviewed_at <= :endMs
-           GROUP BY TO_CHAR(TO_TIMESTAMP(reviewed_at / 1000.0) AT TIME ZONE 'UTC', 'YYYY-MM-DD')
+           GROUP BY TO_CHAR(${REVIEWED_AT_TS} AT TIME ZONE 'UTC', 'YYYY-MM-DD')
            ORDER BY 1""",
         nativeQuery = true
     )

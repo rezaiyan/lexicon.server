@@ -25,7 +25,7 @@ interface StudySessionRepository : JpaRepository<StudySession, Long> {
     fun totalStudyTimeByUser(user: User): Long
 
     @Query(
-        value = """SELECT COUNT(DISTINCT CAST(TO_TIMESTAMP(started_at / 1000.0) AT TIME ZONE 'UTC' AS DATE))
+        value = """SELECT COUNT(DISTINCT CAST(${STARTED_AT_TS} AT TIME ZONE 'UTC' AS DATE))
            FROM study_sessions WHERE user_id = :userId""",
         nativeQuery = true
     )

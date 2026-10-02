@@ -1,6 +1,20 @@
 # Profile for local development with H2 (in-memory).
 # Use: SPRING_PROFILES_ACTIVE=h2 (e.g. in start-dev.sh)
-# Flyway runs H2-compatible migrations only (no PostgreSQL DO $$ blocks).
+#
+# The schema is generated from the JPA entities on every start, so it can't drift from the code.
+# Flyway (PostgreSQL migrations) is off; db/h2-dev-init.sql adds the PostgreSQL shims H2 lacks.
+# Data is in-memory and lost on restart. Production schema changes still go in db/migration.
 spring:
+  datasource:
+    # MODE=PostgreSQL: native queries use PostgreSQL syntax (e.g. ON CONFLICT DO NOTHING).
+    # KEY/VALUE are reserved in H2 2.x but are column names of app_config (fine in PostgreSQL).
+    url: jdbc:h2:mem:vokabdb;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=KEY,VALUE;DB_CLOSE_DELAY=-1
   flyway:
-    locations: classpath:db/migration-h2
+    enabled: false
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:db/h2-dev-init.sql
+  jpa:
+    hibernate:
+      ddl-auto: create-drop

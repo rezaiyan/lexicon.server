@@ -8,6 +8,7 @@ import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
@@ -47,11 +48,12 @@ class PushTokenServiceTest {
     }
 
     @Test
-    fun `registerToken should call upsertToken on repository`() {
+    fun `registerToken ensures the token row exists then assigns it to the user`() {
         // Arrange
         val user = createUser(id = 1L)
         every { userRepository.findById(1L) } returns Optional.of(user)
-        every { pushTokenRepository.upsertToken(any(), any(), any(), any()) } returns 1
+        every { pushTokenRepository.insertTokenIfAbsent(any(), any(), any(), any()) } returns 1
+        every { pushTokenRepository.reassignToken(any(), any(), any(), any()) } returns 1
 
         // Act
         pushTokenService.registerToken(
@@ -62,13 +64,9 @@ class PushTokenServiceTest {
         )
 
         // Assert
-        verify(exactly = 1) {
-            pushTokenRepository.upsertToken(
-                userId = 1L,
-                token = "fcm-token-xyz",
-                platform = Platform.ANDROID.name,
-                deviceId = "device-abc"
-            )
+        verifyOrder {
+            pushTokenRepository.insertTokenIfAbsent(1L, "fcm-token-xyz", Platform.ANDROID.name, "device-abc")
+            pushTokenRepository.reassignToken(1L, "fcm-token-xyz", Platform.ANDROID.name, "device-abc")
         }
     }
 
@@ -77,7 +75,8 @@ class PushTokenServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         every { userRepository.findById(1L) } returns Optional.of(user)
-        every { pushTokenRepository.upsertToken(any(), any(), any(), null) } returns 1
+        every { pushTokenRepository.insertTokenIfAbsent(any(), any(), any(), null) } returns 1
+        every { pushTokenRepository.reassignToken(any(), any(), any(), null) } returns 1
 
         // Act
         pushTokenService.registerToken(
@@ -88,9 +87,8 @@ class PushTokenServiceTest {
         )
 
         // Assert
-        verify(exactly = 1) {
-            pushTokenRepository.upsertToken(1L, "apns-token-123", Platform.IOS.name, null)
-        }
+        verify(exactly = 1) { pushTokenRepository.insertTokenIfAbsent(1L, "apns-token-123", Platform.IOS.name, null) }
+        verify(exactly = 1) { pushTokenRepository.reassignToken(1L, "apns-token-123", Platform.IOS.name, null) }
     }
 
     // --- deactivateToken ---

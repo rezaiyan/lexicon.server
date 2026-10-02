@@ -1,6 +1,3 @@
--- H2 compatibility: PostgreSQL's TO_TIMESTAMP(epoch_seconds) is not built-in
-CREATE ALIAS IF NOT EXISTS TO_TIMESTAMP FOR "com.alirezaiyan.vokab.server.H2CompatFunctions.toTimestamp";
-
 DROP TABLE IF EXISTS processed_webhook_events;
 DROP TABLE IF EXISTS email_log;
 DROP TABLE IF EXISTS email_subscriptions;

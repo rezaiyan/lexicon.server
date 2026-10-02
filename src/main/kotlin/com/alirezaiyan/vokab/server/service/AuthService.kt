@@ -368,7 +368,10 @@ class AuthService(
             }
         }
         val resolvedVersion = appVersion?.takeIf { it.isNotBlank() && it != "unknown" }
-        runCatching { userPlatformRepository.upsertPlatform(userId, platformEnum.name, resolvedVersion) }
+        runCatching {
+            userPlatformRepository.insertPlatformIfAbsent(userId, platformEnum.name, resolvedVersion)
+            userPlatformRepository.touchPlatform(userId, platformEnum.name, resolvedVersion)
+        }
             .onFailure { logger.warn(it) { "Failed to record platform '$platformEnum' for userId=$userId" } }
     }
 

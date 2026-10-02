@@ -26,12 +26,8 @@ class PushTokenService(
         userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User not found") }
 
-        pushTokenRepository.upsertToken(
-            userId = userId,
-            token = token,
-            platform = platform.name,
-            deviceId = deviceId
-        )
+        pushTokenRepository.insertTokenIfAbsent(userId, token, platform.name, deviceId)
+        pushTokenRepository.reassignToken(userId, token, platform.name, deviceId)
         logger.info { "Push token registered for user: $userId, platform: $platform" }
     }
 

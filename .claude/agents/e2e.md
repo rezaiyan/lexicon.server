@@ -98,7 +98,7 @@ git log --oneline -10 -- <affected file>
 **If migration needed:**
 - Check next version: `ls src/main/resources/db/migration | sort | tail -1`
 - Write `V{N+1}__fix_<description>.sql`
-- If using PG-specific syntax, also write H2-compatible version in `db/migration-h2/`
+- No H2 copy needed: the `h2` dev profile builds its schema from the JPA entities. Tests use `src/test/resources/schema.sql` — add new tables there too.
 
 **Client fix (if needed):**
 ```bash

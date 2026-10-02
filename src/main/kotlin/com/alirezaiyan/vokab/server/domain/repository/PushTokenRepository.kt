@@ -15,21 +15,38 @@ interface PushTokenRepository : JpaRepository<PushToken, Long> {
     fun findByUserAndActiveTrue(user: User): List<PushToken>
     fun findByUser(user: User): List<PushToken>
 
+    /**
+     * First half of an upsert keyed on the unique `token`; always follow with [reassignToken].
+     * Split from `ON CONFLICT ... DO UPDATE` so the SQL also runs on H2 (dev profile);
+     * `DO NOTHING` + UPDATE is equally race-safe in PostgreSQL.
+     */
     @Modifying
     @Query(
         """
         INSERT INTO push_tokens (user_id, token, platform, device_id, created_at, updated_at, active)
         VALUES (:userId, :token, :platform, :deviceId, NOW(), NOW(), true)
-        ON CONFLICT (token) DO UPDATE SET
-            user_id = :userId,
-            platform = :platform,
-            device_id = :deviceId,
-            updated_at = NOW(),
-            active = true
+        ON CONFLICT DO NOTHING
         """,
         nativeQuery = true
     )
-    fun upsertToken(
+    fun insertTokenIfAbsent(
+        @Param("userId") userId: Long,
+        @Param("token") token: String,
+        @Param("platform") platform: String,
+        @Param("deviceId") deviceId: String?
+    ): Int
+
+    /** Second half of the upsert: the device's token now belongs to this user and is active. */
+    @Modifying
+    @Query(
+        """
+        UPDATE push_tokens
+        SET user_id = :userId, platform = :platform, device_id = :deviceId, updated_at = NOW(), active = true
+        WHERE token = :token
+        """,
+        nativeQuery = true
+    )
+    fun reassignToken(
         @Param("userId") userId: Long,
         @Param("token") token: String,
         @Param("platform") platform: String,

@@ -235,8 +235,11 @@ class AuthServiceTest {
         // Act
         authService.authenticateForCi(platform = "ios", appVersion = "2.5.0")
 
-        // Assert — platform recorded with resolved version
-        verify { userPlatformRepository.upsertPlatform(existingUser.id!!, "IOS", "2.5.0") }
+        // Assert — platform row ensured, then touched with the resolved version
+        verifyOrder {
+            userPlatformRepository.insertPlatformIfAbsent(existingUser.id!!, "IOS", "2.5.0")
+            userPlatformRepository.touchPlatform(existingUser.id!!, "IOS", "2.5.0")
+        }
     }
 
     @Test
@@ -250,17 +253,18 @@ class AuthServiceTest {
         // Act — unknown platform must not throw
         assertDoesNotThrow { authService.authenticateForCi(platform = "unknown_platform") }
 
-        // Assert — upsertPlatform must NOT be called when platform is unrecognised
-        verify(exactly = 0) { userPlatformRepository.upsertPlatform(any(), any(), any()) }
+        // Assert — nothing recorded when platform is unrecognised
+        verify(exactly = 0) { userPlatformRepository.insertPlatformIfAbsent(any(), any(), any()) }
+        verify(exactly = 0) { userPlatformRepository.touchPlatform(any(), any(), any()) }
     }
 
     @Test
-    fun `authenticateForCi should absorb exception thrown by upsertPlatform`() {
+    fun `authenticateForCi should absorb exception thrown while recording platform`() {
         val existingUser = createUser(id = 63L, email = "ci@test.vokab.dev")
         every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         every { userRepository.save(any()) } returns existingUser
         stubTokenGeneration(existingUser)
-        every { userPlatformRepository.upsertPlatform(any(), any(), any()) } throws RuntimeException("db error")
+        every { userPlatformRepository.insertPlatformIfAbsent(any(), any(), any()) } throws RuntimeException("db error")
 
         // Exception must be absorbed — auth response must still be returned
         assertDoesNotThrow { authService.authenticateForCi(platform = "ios") }

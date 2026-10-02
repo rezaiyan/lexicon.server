@@ -8,6 +8,7 @@ import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -98,7 +99,7 @@ class FeatureAccessServiceTest {
     }
 
     @Test
-    fun `hasActivePremiumAccess should return false when status is CANCELLED`() {
+    fun `hasActivePremiumAccess should return false when status is CANCELLED without expiry`() {
         // Arrange
         val user = createUser(subscriptionStatus = SubscriptionStatus.CANCELLED)
 
@@ -107,6 +108,26 @@ class FeatureAccessServiceTest {
 
         // Assert
         assertFalse(result)
+    }
+
+    @Test
+    fun `hasActivePremiumAccess should return true when status is CANCELLED and paid period not over`() {
+        val user = createUser(
+            subscriptionStatus = SubscriptionStatus.CANCELLED,
+            subscriptionExpiresAt = Instant.now().plusSeconds(86400)
+        )
+
+        assertTrue(featureAccessService.hasActivePremiumAccess(user))
+    }
+
+    @Test
+    fun `hasActivePremiumAccess should return false when status is CANCELLED and paid period over`() {
+        val user = createUser(
+            subscriptionStatus = SubscriptionStatus.CANCELLED,
+            subscriptionExpiresAt = Instant.now().minusSeconds(60)
+        )
+
+        assertFalse(featureAccessService.hasActivePremiumAccess(user))
     }
 
     @Test
@@ -179,14 +200,79 @@ class FeatureAccessServiceTest {
         assertFalse(result.hasPremiumAccess)
     }
 
+    // --- Grants and premium source ---
+
+    @Test
+    fun `active grant gives premium with GRANT source`() {
+        val until = Instant.now().plusSeconds(86400)
+        val user = createUser(premiumGrantUntil = until, premiumGrantReason = "test_email")
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertTrue(access.hasPremiumAccess)
+        assertEquals(PremiumSource.GRANT, access.source)
+        assertEquals(until.toString(), access.expiresAt)
+        assertFalse(access.willRenew)
+    }
+
+    @Test
+    fun `expired grant gives no premium`() {
+        val user = createUser(premiumGrantUntil = Instant.now().minusSeconds(60), premiumGrantReason = "manual")
+
+        assertFalse(featureAccessService.hasActivePremiumAccess(user))
+        assertEquals(PremiumSource.NONE, featureAccessService.getUserFeatureAccess(user).source)
+    }
+
+    @Test
+    fun `store subscription wins over grant and reports renewal details`() {
+        val expiry = Instant.now().plusSeconds(86400)
+        val user = createUser(
+            subscriptionStatus = SubscriptionStatus.TRIAL,
+            subscriptionExpiresAt = expiry,
+            premiumGrantUntil = Instant.now().plusSeconds(999_999),
+        )
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertEquals(PremiumSource.STORE, access.source)
+        assertEquals(expiry.toString(), access.expiresAt)
+        assertTrue(access.isTrial)
+        assertTrue(access.willRenew)
+    }
+
+    @Test
+    fun `cancelled store subscription reports willRenew false`() {
+        val user = createUser(
+            subscriptionStatus = SubscriptionStatus.CANCELLED,
+            subscriptionExpiresAt = Instant.now().plusSeconds(86400),
+        )
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertEquals(PremiumSource.STORE, access.source)
+        assertFalse(access.willRenew)
+    }
+
+    @Test
+    fun `free user without grant has NONE source`() {
+        val access = featureAccessService.getUserFeatureAccess(createUser())
+
+        assertFalse(access.hasPremiumAccess)
+        assertEquals(PremiumSource.NONE, access.source)
+    }
+
     // --- Factory functions ---
 
     private fun createUser(
         id: Long = 1L,
         email: String = "test@example.com",
         subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
-        subscriptionExpiresAt: Instant? = null
+        subscriptionExpiresAt: Instant? = null,
+        premiumGrantUntil: Instant? = null,
+        premiumGrantReason: String? = null,
     ): User = User(
+        premiumGrantUntil = premiumGrantUntil,
+        premiumGrantReason = premiumGrantReason,
         id = id,
         email = email,
         name = "Test User",

@@ -115,7 +115,7 @@ class GlobalExceptionHandlerTest {
             delete("/api/v1/words/99")
                 .with(authentication(auth))
         )
-            .andExpect(jsonPath("$.message").value("Resource not found: Word not found"))
+            .andExpect(jsonPath("$.message").value("Resource not found"))
     }
 
     // ── DataIntegrityViolationException → 409 ────────────────────────────────

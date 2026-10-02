@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller.handler
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.NotificationResponse
@@ -76,7 +77,7 @@ class NotificationControllerHandler(
         } catch (e: Exception) {
             logger.error(e) { "Operation failed" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Operation failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Operation failed")))
         }
     }
 }

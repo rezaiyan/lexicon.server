@@ -25,15 +25,27 @@ data class User(
     @Column(name = "apple_id", unique = true)
     val appleId: String? = null,
     
-    @Column(name = "revenuecat_user_id", unique = true)
+    // Subscription columns are updatable = false on purpose: services save whole `user.copy(...)`
+    // snapshots (login, streaks, profile), which would otherwise silently revert a webhook or
+    // sync that landed in between. Change them only via UserRepository.updateSubscription /
+    // linkRevenueCatUserId.
+    @Column(name = "revenuecat_user_id", unique = true, updatable = false)
     val revenueCatUserId: String? = null,
-    
+
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @Column(nullable = false, updatable = false)
     val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
-    
-    @Column(name = "subscription_expires_at")
+
+    @Column(name = "subscription_expires_at", updatable = false)
     val subscriptionExpiresAt: Instant? = null,
+
+    /** Premium granted outside the store (test users, comps). Written only via UserRepository.updateGrant. */
+    @Column(name = "premium_grant_until", updatable = false)
+    val premiumGrantUntil: Instant? = null,
+
+    /** Why the grant exists: test_email, legacy_grant, manual, ci. */
+    @Column(name = "premium_grant_reason", length = 64, updatable = false)
+    val premiumGrantReason: String? = null,
     
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),

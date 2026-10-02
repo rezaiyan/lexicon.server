@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.WordRushService
@@ -28,7 +29,7 @@ class WordRushController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to sync Word Rush games" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to sync: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to sync")))
         }
     }
 
@@ -42,7 +43,7 @@ class WordRushController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get Word Rush insights" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get insights: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get insights")))
         }
     }
 
@@ -56,7 +57,7 @@ class WordRushController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get Word Rush history" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get history: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get history")))
         }
     }
 }

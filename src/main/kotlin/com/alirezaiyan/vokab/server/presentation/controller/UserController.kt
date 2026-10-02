@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.AvatarResponse
@@ -39,7 +40,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get current user" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get user: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get user")))
         }
     }
     
@@ -54,7 +55,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to update user" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to update user: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to update user")))
         }
     }
 
@@ -69,7 +70,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to upload avatar" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to upload avatar: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to upload avatar")))
         }
     }
 
@@ -83,7 +84,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to delete avatar" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to delete avatar: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to delete avatar")))
         }
     }
     
@@ -97,7 +98,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to delete account" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to delete account: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to delete account")))
         }
     }
     
@@ -122,7 +123,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get feature access" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get feature access: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get feature access")))
         }
     }
     
@@ -137,7 +138,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get feature flags" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get feature flags: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get feature flags")))
         }
     }
 
@@ -151,7 +152,7 @@ class UserController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get profile stats" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get profile stats: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get profile stats")))
         }
     }
 }

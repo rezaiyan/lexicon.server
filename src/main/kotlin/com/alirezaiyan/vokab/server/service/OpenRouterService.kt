@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.exception.UserFacingException
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyItemResponse
@@ -172,18 +173,18 @@ class OpenRouterService(
 
                 if (extractedText.isEmpty()) {
                     logger.warn { "[OpenRouter] Empty response from AI" }
-                    throw RuntimeException("No response from AI. Please try again.")
+                    throw UserFacingException("No response from AI. Please try again.")
                 }
 
                 if (extractedText.contains("ERROR:", ignoreCase = true) ||
                     extractedText.contains("No vocabulary found", ignoreCase = true)) {
                     logger.warn { "[OpenRouter] AI could not find vocabulary in image" }
-                    throw RuntimeException("No vocabulary found in the image. Please use an image with visible text.")
+                    throw UserFacingException("No vocabulary found in the image. Please use an image with visible text.")
                 }
 
                 if (!isValidVocabularyFormat(extractedText)) {
                     logger.warn { "[OpenRouter] Invalid vocabulary format received" }
-                    throw RuntimeException("Failed to extract valid vocabulary format. Please try a clearer image.")
+                    throw UserFacingException("Failed to extract valid vocabulary format. Please try a clearer image.")
                 }
 
                 logger.info { "[OpenRouter] Successfully extracted vocabulary: ${extractedText.take(100)}..." }
@@ -494,7 +495,7 @@ class OpenRouterService(
 
                 if (translation.isEmpty()) {
                     logger.warn { "[OpenRouter] Empty translation response" }
-                    throw RuntimeException("Translation failed. Please try again.")
+                    throw UserFacingException("Translation failed. Please try again.")
                 }
 
                 logger.info { "[OpenRouter] Successfully translated text: ${translation.take(50)}..." }
@@ -597,7 +598,7 @@ class OpenRouterService(
                 }
                 val content = response.choices?.firstOrNull()?.message?.content?.trim() ?: ""
                 if (content.isBlank()) {
-                    throw RuntimeException("No vocabulary generated. Please try again.")
+                    throw UserFacingException("No vocabulary generated. Please try again.")
                 }
                 val items = parseSuggestVocabularyResponse(content)
                 val minExpected = maxOf(20, requestedCount / 2)

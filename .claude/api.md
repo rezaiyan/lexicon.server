@@ -103,9 +103,11 @@ Request body:
 ## Subscriptions — `/subscriptions`
 | Method | Path | Description |
 |---|---|---|
-| GET | `/` | List all subscriptions |
-| GET | `/active` | Active subscription (if any) |
-| POST | `/manage-url` | Get RevenueCat customer management URL |
+| POST | `/sync` | Reconcile the caller's premium with RevenueCat now; returns `FeatureAccessResponse`. Rate limit 2/min |
+
+Premium state for the app comes from `GET /users/feature-access` (`userAccess`: `hasPremiumAccess`, `source` STORE/GRANT/NONE, `expiresAt`, `willRenew`, `isTrial`).
+
+Admin (`X-Admin-Key`): `POST /admin/subscriptions/reconcile?scope=linked|all` or `?userIds=1,2`.
 
 ---
 
@@ -121,7 +123,7 @@ Request body:
 ## Webhooks — `/webhooks`
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/revenuecat` | Signature | RevenueCat subscription lifecycle events |
+| POST | `/revenuecat` | Static `Authorization` header = `REVENUECAT_WEBHOOK_SECRET` | RevenueCat subscription events (deduped by event id) |
 | POST | `/apple` | Signature | Apple server-to-server notifications |
 
 ---

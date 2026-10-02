@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.RateLimitConfig
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -75,7 +76,7 @@ class AiController(
             ResponseEntity.badRequest()
                 .body(ApiResponse<VocabularyExtractionResponse>(
                     success = false,
-                    message = error.message ?: "Failed to extract vocabulary"
+                    message = error.clientMessage("Failed to extract vocabulary")
                 ))
         }
     }
@@ -154,7 +155,7 @@ class AiController(
                 logger.error(error) { "Failed to generate insight for userId=${user.id}" }
                 Mono.just(
                     ResponseEntity.badRequest()
-                        .body(ApiResponse(success = false, message = error.message ?: "Failed to generate insight"))
+                        .body(ApiResponse(success = false, message = error.clientMessage("Failed to generate insight")))
                 )
             }
     }
@@ -207,7 +208,7 @@ class AiController(
             ResponseEntity.badRequest()
                 .body(ApiResponse(
                     success = false,
-                    message = error.message ?: "Failed to translate text"
+                    message = error.clientMessage("Failed to translate text")
                 ))
         }
     }
@@ -270,7 +271,7 @@ class AiController(
         } catch (error: Exception) {
             logger.error(error) { "Failed to suggest vocabulary for userId=${user.id}" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = error.message ?: "Failed to generate vocabulary"))
+                .body(ApiResponse(success = false, message = error.clientMessage("Failed to generate vocabulary")))
         }
     }
 

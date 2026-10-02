@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.*
@@ -36,7 +37,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Google authentication failed" }
             ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = "Authentication failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Authentication failed")))
         }
     }
 
@@ -62,7 +63,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Apple authentication failed" }
             ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = "Authentication failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Authentication failed")))
         }
     }
     
@@ -89,7 +90,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "CI authentication failed" }
             ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse(success = false, message = "CI authentication failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("CI authentication failed")))
         }
     }
 
@@ -103,7 +104,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Token refresh failed" }
             ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = "Token refresh failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Token refresh failed")))
         }
     }
     
@@ -118,7 +119,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Logout failed" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Logout failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Logout failed")))
         }
     }
     
@@ -149,7 +150,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Logout all failed" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Logout all failed: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Logout all failed")))
         }
     }
     
@@ -164,7 +165,7 @@ class AuthController(
         } catch (e: Exception) {
             logger.error(e) { "Delete account failed" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to delete account: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to delete account")))
         }
     }
 }

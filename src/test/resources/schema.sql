@@ -1,6 +1,7 @@
 -- H2 compatibility: PostgreSQL's TO_TIMESTAMP(epoch_seconds) is not built-in
 CREATE ALIAS IF NOT EXISTS TO_TIMESTAMP FOR "com.alirezaiyan.vokab.server.H2CompatFunctions.toTimestamp";
 
+DROP TABLE IF EXISTS processed_webhook_events;
 DROP TABLE IF EXISTS word_rush_games;
 DROP TABLE IF EXISTS review_events;
 DROP TABLE IF EXISTS study_sessions;
@@ -27,6 +28,8 @@ CREATE TABLE users (
     revenuecat_user_id VARCHAR(255) UNIQUE,
     subscription_status VARCHAR(32) NOT NULL DEFAULT 'FREE',
     subscription_expires_at TIMESTAMP,
+    premium_grant_until TIMESTAMP,
+    premium_grant_reason VARCHAR(64),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_login_at TIMESTAMP,
@@ -252,3 +255,9 @@ CREATE TABLE word_rush_games (
 CREATE INDEX IF NOT EXISTS idx_word_rush_user ON word_rush_games(user_id);
 CREATE INDEX IF NOT EXISTS idx_word_rush_user_played ON word_rush_games(user_id, played_at DESC);
 CREATE INDEX IF NOT EXISTS idx_word_rush_user_streak ON word_rush_games(user_id, best_streak DESC);
+
+CREATE TABLE processed_webhook_events (
+    event_id VARCHAR(255) PRIMARY KEY,
+    event_type VARCHAR(64) NOT NULL,
+    processed_at TIMESTAMP NOT NULL
+);

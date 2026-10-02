@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.AnalyticsService
@@ -28,7 +29,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to sync analytics" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to sync: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to sync")))
         }
     }
 
@@ -42,7 +43,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get insights" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get insights: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get insights")))
         }
     }
 
@@ -58,7 +59,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get daily stats" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get daily stats: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get daily stats")))
         }
     }
 
@@ -74,7 +75,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get difficult words" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get difficult words: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get difficult words")))
         }
     }
 
@@ -89,7 +90,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get most reviewed words" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get most reviewed words: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get most reviewed words")))
         }
     }
 
@@ -103,7 +104,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get accuracy by level" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get accuracy by level: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get accuracy by level")))
         }
     }
 
@@ -117,7 +118,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get accuracy by hour" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get accuracy by hour: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get accuracy by hour")))
         }
     }
 
@@ -131,7 +132,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get accuracy by day of week" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get accuracy by day of week: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get accuracy by day of week")))
         }
     }
 
@@ -146,7 +147,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get recent sessions" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get sessions: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get sessions")))
         }
     }
 
@@ -162,7 +163,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get heatmap" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get heatmap: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get heatmap")))
         }
     }
 
@@ -176,7 +177,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get level transitions" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get level transitions: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get level transitions")))
         }
     }
 
@@ -191,7 +192,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get mastered words" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get mastered words: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get mastered words")))
         }
     }
 
@@ -205,7 +206,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get language stats" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get language stats: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get language stats")))
         }
     }
 
@@ -219,7 +220,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get monthly stats" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get monthly stats: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get monthly stats")))
         }
     }
 
@@ -233,7 +234,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get response time trend" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get response time trend: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get response time trend")))
         }
     }
 
@@ -247,7 +248,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get comeback words" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get comeback words: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get comeback words")))
         }
     }
 
@@ -261,7 +262,7 @@ class AnalyticsController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get weekly report" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get weekly report: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get weekly report")))
         }
     }
 }

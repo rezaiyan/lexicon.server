@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.RateLimitConfig
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
@@ -100,7 +101,7 @@ class OnboardingController(
         } catch (error: Exception) {
             logger.error(error) { "Onboarding vocabulary generation failed for $clientIp" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = error.message ?: "Failed to generate vocabulary"))
+                .body(ApiResponse(success = false, message = error.clientMessage("Failed to generate vocabulary")))
         }
     }
 

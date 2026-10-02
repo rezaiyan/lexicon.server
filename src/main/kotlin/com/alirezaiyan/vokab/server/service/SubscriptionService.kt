@@ -1,15 +1,22 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
+import com.alirezaiyan.vokab.server.domain.entity.ProcessedWebhookEvent
 import com.alirezaiyan.vokab.server.domain.entity.Subscription
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.ProcessedWebhookEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.SubscriptionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatEvent
 import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatWebhookEvent
-import com.alirezaiyan.vokab.server.presentation.dto.SubscriptionDto
+import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionSynchronization
+import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Duration
 import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
@@ -19,238 +26,322 @@ class SubscriptionService(
     private val subscriptionRepository: SubscriptionRepository,
     private val userRepository: UserRepository,
     private val eventService: EventService,
+    private val processedWebhookEventRepository: ProcessedWebhookEventRepository,
+    private val revenueCatClient: RevenueCatClient,
+    private val pushNotificationService: PushNotificationService,
 ) {
-    
+
+    /**
+     * Applies a RevenueCat webhook to our user/subscription state.
+     *
+     * The mobile client calls `Purchases.logIn(user.id)`, so `app_user_id` is our numeric user id.
+     * Events for unknown or anonymous customers are acknowledged and ignored — creating placeholder
+     * users would grant premium to an account nobody can sign in to.
+     * Each event id is applied once (RevenueCat redelivers until it gets a 2xx).
+     */
     @Transactional
-    fun handleRevenueCatWebhook(event: RevenueCatWebhookEvent) {
-        logger.info { "Processing RevenueCat webhook event: ${event.event.type}" }
-        
-        val user = getUserByRevenueCatId(event.app_user_id)
-            ?: createUserForRevenueCat(event.app_user_id)
-        
-        when (event.event.type) {
-            "INITIAL_PURCHASE" -> handleInitialPurchase(user, event)
-            "RENEWAL" -> handleRenewal(user, event)
+    fun handleRevenueCatWebhook(webhook: RevenueCatWebhookEvent) {
+        val event = webhook.event
+        logger.info { "Processing RevenueCat webhook: type=${event.type}, env=${event.environment}" }
+
+        if (event.type == "TEST") return
+        if (processedWebhookEventRepository.existsById(event.id)) {
+            logger.info { "Skipping already processed RevenueCat event ${event.id}" }
+            return
+        }
+
+        if (event.type == "TRANSFER") {
+            handleTransfer(event)
+            processedWebhookEventRepository.save(ProcessedWebhookEvent(eventId = event.id, eventType = event.type))
+            return
+        }
+
+        val user = resolveUser(event)
+        if (user == null) {
+            logger.warn { "RevenueCat webhook for unknown user ids=${event.candidateUserIds}, type=${event.type}" }
+        } else {
+            applyEvent(user, event)
+        }
+        processedWebhookEventRepository.save(ProcessedWebhookEvent(eventId = event.id, eventType = event.type))
+    }
+
+    private fun applyEvent(user: User, event: RevenueCatEvent) {
+        when (event.type) {
+            "INITIAL_PURCHASE" -> activate(user, event, autoRenew = true, analyticsEvent = initialPurchaseEvent(event))
+            "RENEWAL" -> activate(user, event, autoRenew = true, analyticsEvent = "subscription_renewed")
+            "UNCANCELLATION" -> activate(user, event, autoRenew = true, analyticsEvent = null)
+            "NON_RENEWING_PURCHASE" -> activate(user, event, autoRenew = false, analyticsEvent = null)
             "CANCELLATION" -> handleCancellation(user, event)
-            "UNCANCELLATION" -> handleUncancellation(user, event)
-            "NON_RENEWING_PURCHASE" -> handleNonRenewingPurchase(user, event)
             "EXPIRATION" -> handleExpiration(user, event)
             "BILLING_ISSUE" -> handleBillingIssue(user, event)
-            "SUBSCRIBER_ALIAS" -> handleSubscriberAlias(user, event)
-            else -> logger.warn { "Unknown webhook event type: ${event.event.type}" }
+            // Entitlement is unchanged by these; RevenueCat follows up with the events above when it is.
+            "PRODUCT_CHANGE", "SUBSCRIBER_ALIAS", "SUBSCRIPTION_PAUSED" ->
+                logger.info { "RevenueCat ${event.type} for userId=${user.id}, no state change" }
+            else -> logger.warn { "Unknown webhook event type: ${event.type}" }
         }
     }
-    
-    @Transactional(readOnly = true)
-    fun getUserSubscriptions(userId: Long): List<SubscriptionDto> {
-        val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("User not found") }
-        
-        return subscriptionRepository.findByUser(user)
-            .map { it.toDto() }
-    }
-    
-    @Transactional(readOnly = true)
-    fun getActiveSubscription(userId: Long): SubscriptionDto? {
-        val user = userRepository.findById(userId)
-            .orElseThrow { IllegalArgumentException("User not found") }
-        
-        return subscriptionRepository.findActiveSubscription(user)
-            .map { it.toDto() }
-            .orElse(null)
-    }
-    
-    private fun handleInitialPurchase(user: User, event: RevenueCatWebhookEvent) {
-        val productId = event.product_id ?: return
-        val startedAt = Instant.ofEpochMilli(event.purchased_at_ms ?: System.currentTimeMillis())
-        val expiresAt = event.expiration_at_ms?.let { Instant.ofEpochMilli(it) }
-        
-        val subscription = Subscription(
-            user = user,
-            revenueCatSubscriptionId = event.event.id,
-            productId = productId,
-            status = SubscriptionStatus.ACTIVE,
-            startedAt = startedAt,
-            expiresAt = expiresAt,
-            isTrial = event.is_trial_conversion == true
-        )
-        
-        subscriptionRepository.save(subscription)
-        
-        // Update user subscription status
-        updateUserSubscriptionStatus(user, SubscriptionStatus.ACTIVE, expiresAt)
 
-        val isTrial = event.is_trial_conversion == true
-        eventService.trackAsync(
-            user.id!!,
-            if (isTrial) "trial_started" else "subscription_started",
-            mapOf("product_id" to productId, "is_trial" to isTrial.toString())
-        )
+    // ── Store sync (reconciliation path that doesn't depend on webhooks) ─────────────────────
 
-        logger.info { "Initial purchase processed for userId=${user.id}, product: $productId" }
+    /**
+     * Pulls the customer's entitlements from RevenueCat and makes our user state match.
+     * Network/config failures never downgrade — the current state is kept. Premium grants live in
+     * separate columns and are unaffected.
+     */
+    fun syncFromRevenueCat(userId: Long): SyncOutcome {
+        val user = userRepository.findById(userId).orElse(null) ?: return SyncOutcome.UNKNOWN_USER
+        val appUserId = user.revenueCatUserId ?: user.id.toString()
+        val state = revenueCatClient.fetchEntitlementState(appUserId) ?: return SyncOutcome.UNAVAILABLE
+
+        if (state.hasPurchaseHistory && user.revenueCatUserId == null) {
+            userRepository.linkRevenueCatUserId(userId, appUserId, Instant.now())
+        }
+
+        val target = targetState(user, state) ?: return SyncOutcome.UNCHANGED
+        if (target.first == user.subscriptionStatus && target.second == user.subscriptionExpiresAt) {
+            return SyncOutcome.UNCHANGED
+        }
+
+        userRepository.updateSubscription(userId, target.first, target.second, Instant.now())
+        logger.info {
+            "RevenueCat sync updated userId=$userId: ${user.subscriptionStatus} -> ${target.first}, expiresAt=${target.second}"
+        }
+        return SyncOutcome.UPDATED
     }
-    
-    private fun handleRenewal(user: User, event: RevenueCatWebhookEvent) {
-        val expiresAt = event.expiration_at_ms?.let { Instant.ofEpochMilli(it) }
-        
-        val subscription = subscriptionRepository.findByRevenueCatSubscriptionId(event.event.id)
-            .orElse(null)
-        
-        if (subscription != null) {
-            val updated = subscription.copy(
-                status = SubscriptionStatus.ACTIVE,
-                expiresAt = expiresAt,
-                updatedAt = Instant.now()
+
+    /** Status/expiry our DB should hold for this store state, or null to leave it alone. */
+    private fun targetState(user: User, state: StoreEntitlementState): Pair<SubscriptionStatus, Instant?>? = when {
+        state.isActive -> {
+            val status = when {
+                state.isTrial -> SubscriptionStatus.TRIAL
+                !state.willRenew && state.expiresAt != null -> SubscriptionStatus.CANCELLED
+                else -> SubscriptionStatus.ACTIVE
+            }
+            status to state.expiresAt
+        }
+        user.subscriptionStatus in STORE_DERIVED_STATUSES -> SubscriptionStatus.EXPIRED to null
+        else -> null
+    }
+
+    /**
+     * Re-syncs the given users against RevenueCat, then expires lapsed statuses.
+     * Used by the nightly job and the admin backfill.
+     */
+    fun reconcile(userIds: List<Long>, pause: Duration = Duration.ofMillis(200)): ReconcileReport {
+        val outcomes = mutableMapOf<SyncOutcome, Int>()
+        if (revenueCatClient.isConfigured) {
+            userIds.forEach { id ->
+                val outcome = syncFromRevenueCat(id)
+                outcomes.merge(outcome, 1, Int::plus)
+                if (!pause.isZero) Thread.sleep(pause.toMillis())
+            }
+        } else {
+            logger.warn { "RevenueCat API key not configured; skipping store sync for ${userIds.size} users" }
+        }
+        val expired = expireLapsedSubscriptions()
+        return ReconcileReport(checked = userIds.size, outcomes = outcomes, expired = expired)
+    }
+
+    fun expireLapsedSubscriptions(): Int =
+        userRepository.expireLapsedSubscriptions(Instant.now(), STORE_DERIVED_STATUSES, SubscriptionStatus.EXPIRED)
+
+    // ── Webhook handlers ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Finds the user by a previously linked RevenueCat id, or by our numeric user id
+     * (which the client uses as the RevenueCat app user id) and links it on first sight.
+     */
+    private fun resolveUser(event: RevenueCatEvent): User? =
+        event.candidateUserIds.firstNotNullOfOrNull(::resolveCandidate)
+
+    private fun resolveCandidate(candidate: String): User? {
+        userRepository.findByRevenueCatUserId(candidate).orElse(null)?.let { return it }
+
+        val user = candidate.toLongOrNull()
+            ?.let { userRepository.findById(it).orElse(null) }
+            ?: return null
+
+        if (user.revenueCatUserId == null) {
+            logger.info { "Linking RevenueCat id to userId=${user.id}" }
+            userRepository.linkRevenueCatUserId(user.id!!, candidate, Instant.now())
+            return user.copy(revenueCatUserId = candidate)
+        }
+        return user
+    }
+
+    /**
+     * A restore on another account moved the entitlement. TRANSFER carries no app_user_id, only
+     * both sides, so re-sync every known user involved: the source loses premium, the target gains it.
+     */
+    private fun handleTransfer(event: RevenueCatEvent) {
+        val users = event.transferUserIds.mapNotNull(::resolveCandidate).distinctBy { it.id }
+        if (users.isEmpty()) {
+            logger.warn { "RevenueCat TRANSFER with no known users, ids=${event.transferUserIds}" }
+            return
+        }
+        users.forEach { user ->
+            val outcome = syncFromRevenueCat(user.id!!)
+            logger.info { "RevenueCat TRANSFER re-synced userId=${user.id}: $outcome" }
+        }
+    }
+
+    /**
+     * Renewal payment failed. RevenueCat keeps the entitlement through the store's grace period,
+     * so access doesn't change, but the user should fix their payment method before it lapses.
+     * The push is sent after commit so a rolled-back (and later redelivered) event can't notify twice.
+     */
+    private fun handleBillingIssue(user: User, event: RevenueCatEvent) {
+        val userId = user.id!!
+        eventService.trackAsync(userId, "subscription_billing_issue", mapOf("product_id" to event.product_id.orEmpty()))
+        afterCommit {
+            runCatching {
+                pushNotificationService.sendNotificationToUser(
+                    userId = userId,
+                    title = BILLING_ISSUE_TITLE,
+                    body = BILLING_ISSUE_BODY,
+                    data = mapOf("type" to BILLING_ISSUE_PUSH_TYPE),
+                    category = NotificationCategory.SYSTEM,
+                )
+            }.onFailure { logger.warn(it) { "Billing issue push failed for userId=$userId" } }
+        }
+    }
+
+    private fun afterCommit(action: () -> Unit) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) return action()
+        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
+            override fun afterCommit() = action()
+        })
+    }
+
+    private fun activate(user: User, event: RevenueCatEvent, autoRenew: Boolean, analyticsEvent: String?) {
+        val expiresAt = event.expiresAt()
+        val productId = event.product_id
+
+        if (productId != null) {
+            val now = Instant.now()
+            val subscription = findSubscription(event)
+                ?: Subscription(
+                    user = user,
+                    revenueCatSubscriptionId = event.subscriptionKey,
+                    productId = productId,
+                    status = SubscriptionStatus.ACTIVE,
+                    startedAt = event.purchased_at_ms?.let { Instant.ofEpochMilli(it) } ?: now,
+                )
+            subscriptionRepository.save(
+                subscription.copy(
+                    productId = productId,
+                    status = SubscriptionStatus.ACTIVE,
+                    expiresAt = expiresAt,
+                    cancelledAt = null,
+                    isTrial = event.isTrial,
+                    autoRenew = autoRenew,
+                    updatedAt = now,
+                )
             )
-            subscriptionRepository.save(updated)
+        } else {
+            logger.warn { "RevenueCat ${event.type} without product_id for userId=${user.id}" }
         }
-        
-        updateUserSubscriptionStatus(user, SubscriptionStatus.ACTIVE, expiresAt)
-        eventService.trackAsync(user.id!!, "subscription_renewed",
-            mapOf("product_id" to (event.product_id ?: "")))
 
-        logger.info { "Subscription renewed for userId=${user.id}" }
-    }
-    
-    private fun handleCancellation(user: User, event: RevenueCatWebhookEvent) {
-        val cancelledAt = event.cancellation_at_ms?.let { Instant.ofEpochMilli(it) } ?: Instant.now()
-        val expiresAt = event.expiration_at_ms?.let { Instant.ofEpochMilli(it) }
-        
-        val subscription = subscriptionRepository.findByRevenueCatSubscriptionId(event.event.id)
-            .orElse(null)
-        
-        if (subscription != null) {
-            val updated = subscription.copy(
-                status = SubscriptionStatus.CANCELLED,
-                cancelledAt = cancelledAt,
-                autoRenew = false,
-                updatedAt = Instant.now()
+        val status = if (event.isTrial) SubscriptionStatus.TRIAL else SubscriptionStatus.ACTIVE
+        updateUserSubscriptionStatus(user, status, expiresAt)
+
+        if (analyticsEvent != null) {
+            eventService.trackAsync(
+                user.id!!,
+                analyticsEvent,
+                mapOf("product_id" to productId.orEmpty(), "is_trial" to event.isTrial.toString())
             )
-            subscriptionRepository.save(updated)
         }
-        
-        // User still has access until expiration
-        val status = if (expiresAt != null && expiresAt.isAfter(Instant.now())) {
+        logger.info { "RevenueCat ${event.type} applied for userId=${user.id}, status=$status, expiresAt=$expiresAt" }
+    }
+
+    /**
+     * CANCELLATION means auto-renew was turned off (or a refund happened). The user keeps
+     * premium until [RevenueCatEvent.expiration_at_ms]; [FeatureAccessService] honours that.
+     */
+    private fun handleCancellation(user: User, event: RevenueCatEvent) {
+        val now = Instant.now()
+        val expiresAt = event.expiresAt()
+
+        findSubscription(event)?.let { subscription ->
+            subscriptionRepository.save(
+                subscription.copy(
+                    status = SubscriptionStatus.CANCELLED,
+                    cancelledAt = now,
+                    autoRenew = false,
+                    expiresAt = expiresAt ?: subscription.expiresAt,
+                    updatedAt = now,
+                )
+            )
+        }
+
+        val status = if (expiresAt != null && expiresAt.isAfter(now)) {
             SubscriptionStatus.CANCELLED
         } else {
             SubscriptionStatus.EXPIRED
         }
-        
         updateUserSubscriptionStatus(user, status, expiresAt)
-        eventService.trackAsync(user.id!!, "subscription_cancelled",
-            mapOf("product_id" to (event.product_id ?: "")))
-
-        logger.info { "Subscription cancelled for userId=${user.id}" }
-    }
-    
-    private fun handleUncancellation(user: User, event: RevenueCatWebhookEvent) {
-        val expiresAt = event.expiration_at_ms?.let { Instant.ofEpochMilli(it) }
-        
-        val subscription = subscriptionRepository.findByRevenueCatSubscriptionId(event.event.id)
-            .orElse(null)
-        
-        if (subscription != null) {
-            val updated = subscription.copy(
-                status = SubscriptionStatus.ACTIVE,
-                cancelledAt = null,
-                autoRenew = true,
-                updatedAt = Instant.now()
-            )
-            subscriptionRepository.save(updated)
-        }
-        
-        updateUserSubscriptionStatus(user, SubscriptionStatus.ACTIVE, expiresAt)
-        
-        logger.info { "Subscription uncancelled for userId=${user.id}" }
-    }
-    
-    private fun handleNonRenewingPurchase(user: User, event: RevenueCatWebhookEvent) {
-        val productId = event.product_id ?: return
-        val startedAt = Instant.ofEpochMilli(event.purchased_at_ms ?: System.currentTimeMillis())
-        val expiresAt = event.expiration_at_ms?.let { Instant.ofEpochMilli(it) }
-        
-        val subscription = Subscription(
-            user = user,
-            revenueCatSubscriptionId = event.event.id,
-            productId = productId,
-            status = SubscriptionStatus.ACTIVE,
-            startedAt = startedAt,
-            expiresAt = expiresAt,
-            autoRenew = false
+        eventService.trackAsync(
+            user.id!!,
+            "subscription_cancelled",
+            mapOf("product_id" to event.product_id.orEmpty(), "reason" to event.cancel_reason.orEmpty())
         )
-        
-        subscriptionRepository.save(subscription)
-        updateUserSubscriptionStatus(user, SubscriptionStatus.ACTIVE, expiresAt)
-        
-        logger.info { "Non-renewing purchase processed for userId=${user.id}" }
+
+        logger.info { "Subscription cancelled for userId=${user.id}, access until $expiresAt" }
     }
-    
-    private fun handleExpiration(user: User, event: RevenueCatWebhookEvent) {
-        val subscription = subscriptionRepository.findByRevenueCatSubscriptionId(event.event.id)
-            .orElse(null)
-        
-        if (subscription != null) {
-            val updated = subscription.copy(
-                status = SubscriptionStatus.EXPIRED,
-                updatedAt = Instant.now()
+
+    private fun handleExpiration(user: User, event: RevenueCatEvent) {
+        findSubscription(event)?.let { subscription ->
+            subscriptionRepository.save(
+                subscription.copy(status = SubscriptionStatus.EXPIRED, updatedAt = Instant.now())
             )
-            subscriptionRepository.save(updated)
         }
-        
+
+        // Events can arrive out of order; don't let an old subscription's expiry revoke a newer one.
+        val eventExpiry = event.expiresAt()
+        val userExpiry = user.subscriptionExpiresAt
+        if (eventExpiry != null && userExpiry != null && userExpiry.isAfter(eventExpiry)) {
+            logger.info { "Ignoring stale EXPIRATION for userId=${user.id}: access runs until $userExpiry" }
+            return
+        }
+
         updateUserSubscriptionStatus(user, SubscriptionStatus.EXPIRED, null)
-        eventService.trackAsync(user.id!!, "subscription_expired",
-            mapOf("product_id" to (event.product_id ?: "")))
+        eventService.trackAsync(
+            user.id!!,
+            "subscription_expired",
+            mapOf("product_id" to event.product_id.orEmpty())
+        )
 
         logger.info { "Subscription expired for userId=${user.id}" }
     }
-    
-    private fun handleBillingIssue(user: User, event: RevenueCatWebhookEvent) {
-        logger.warn { "Billing issue for userId=${user.id}" }
-        // Could send notification to user about billing issue
+
+    private fun findSubscription(event: RevenueCatEvent): Subscription? =
+        subscriptionRepository.findByRevenueCatSubscriptionId(event.subscriptionKey).orElse(null)
+
+    private fun updateUserSubscriptionStatus(user: User, status: SubscriptionStatus, expiresAt: Instant?) {
+        userRepository.updateSubscription(user.id!!, status, expiresAt, Instant.now())
     }
-    
-    private fun handleSubscriberAlias(user: User, event: RevenueCatWebhookEvent) {
-        logger.info { "Subscriber alias event for userId=${user.id}" }
-        // Handle subscriber alias if needed
-    }
-    
-    private fun getUserByRevenueCatId(revenueCatUserId: String): User? {
-        return userRepository.findByRevenueCatUserId(revenueCatUserId).orElse(null)
-    }
-    
-    private fun createUserForRevenueCat(revenueCatUserId: String): User {
-        val user = User(
-            email = "$revenueCatUserId@revenuecat.temporary",
-            name = "RevenueCat User",
-            revenueCatUserId = revenueCatUserId
-        )
-        return userRepository.save(user)
-    }
-    
-    private fun updateUserSubscriptionStatus(
-        user: User,
-        status: SubscriptionStatus,
-        expiresAt: Instant?
-    ) {
-        val updated = user.copy(
-            subscriptionStatus = status,
-            subscriptionExpiresAt = expiresAt,
-            updatedAt = Instant.now()
-        )
-        userRepository.save(updated)
-    }
-    
-    private fun Subscription.toDto(): SubscriptionDto {
-        return SubscriptionDto(
-            id = this.id!!,
-            productId = this.productId,
-            status = this.status,
-            startedAt = this.startedAt.toString(),
-            expiresAt = this.expiresAt?.toString(),
-            cancelledAt = this.cancelledAt?.toString(),
-            isTrial = this.isTrial,
-            autoRenew = this.autoRenew
-        )
+
+    private fun initialPurchaseEvent(event: RevenueCatEvent): String =
+        if (event.isTrial) "trial_started" else "subscription_started"
+
+    private fun RevenueCatEvent.expiresAt(): Instant? = expiration_at_ms?.let { Instant.ofEpochMilli(it) }
+
+    companion object {
+        const val BILLING_ISSUE_PUSH_TYPE = "billing_issue"
+        private const val BILLING_ISSUE_TITLE = "Payment problem"
+        private const val BILLING_ISSUE_BODY =
+            "We couldn't renew your Lexicon Premium. Update your payment method in the store to keep it."
+
+        /** Statuses that come from the store (and so may be lapsed/expired by it). */
+        val STORE_DERIVED_STATUSES = listOf(SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL, SubscriptionStatus.CANCELLED)
     }
 }
 
+enum class SyncOutcome { UPDATED, UNCHANGED, UNAVAILABLE, UNKNOWN_USER }
+
+data class ReconcileReport(
+    val checked: Int,
+    val outcomes: Map<SyncOutcome, Int>,
+    val expired: Int,
+)

@@ -1,24 +1,30 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.ProcessedWebhookEvent
 import com.alirezaiyan.vokab.server.domain.entity.Subscription
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.ProcessedWebhookEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.SubscriptionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatEvent
 import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatWebhookEvent
+import com.alirezaiyan.vokab.server.service.push.PushNotificationService
+import io.mockk.Runs
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
-import io.mockk.Runs
-import io.mockk.slot
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Nested
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
+import java.time.Duration
 import java.time.Instant
 import java.util.Optional
 
@@ -27,434 +33,543 @@ class SubscriptionServiceTest {
     private lateinit var subscriptionRepository: SubscriptionRepository
     private lateinit var userRepository: UserRepository
     private lateinit var eventService: EventService
+    private lateinit var processedEvents: ProcessedWebhookEventRepository
+    private lateinit var revenueCatClient: RevenueCatClient
+    private lateinit var pushNotificationService: PushNotificationService
 
     private lateinit var subscriptionService: SubscriptionService
+
+    private data class StatusUpdate(val userId: Long, val status: SubscriptionStatus, val expiresAt: Instant?)
+
+    private val statusUpdates = mutableListOf<StatusUpdate>()
+    private val links = mutableListOf<Pair<Long, String>>()
+    private val savedSubscriptions = mutableListOf<Subscription>()
+    private val receipts = mutableListOf<ProcessedWebhookEvent>()
 
     @BeforeEach
     fun setUp() {
         subscriptionRepository = mockk()
         userRepository = mockk()
         eventService = mockk()
+        processedEvents = mockk()
+        revenueCatClient = mockk()
+        pushNotificationService = mockk()
 
-        subscriptionService = SubscriptionService(subscriptionRepository, userRepository, eventService)
+        subscriptionService = SubscriptionService(
+            subscriptionRepository, userRepository, eventService, processedEvents, revenueCatClient,
+            pushNotificationService,
+        )
 
-        // Default stubs used by many tests — assign id=1L to newly saved users so id!! won't NPE
-        every { userRepository.save(any()) } answers {
-            val u = firstArg<User>()
-            if (u.id == null) u.copy(id = 1L) else u
+        every { userRepository.updateSubscription(any(), any(), any(), any()) } answers {
+            statusUpdates += StatusUpdate(firstArg(), secondArg(), thirdArg())
+            1
         }
-        every { subscriptionRepository.save(any()) } answers { firstArg() }
+        every { userRepository.linkRevenueCatUserId(any(), any(), any()) } answers {
+            links += firstArg<Long>() to secondArg<String>()
+            1
+        }
+        every { userRepository.expireLapsedSubscriptions(any(), any(), any()) } returns 0
+        every { subscriptionRepository.save(any()) } answers { firstArg<Subscription>().also { savedSubscriptions += it } }
+        every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
+        every { userRepository.findByRevenueCatUserId(any()) } returns Optional.empty()
+        every { userRepository.findById(any()) } returns Optional.empty()
         every { eventService.trackAsync(any(), any(), any()) } just Runs
+        every { processedEvents.existsById(any()) } returns false
+        every { processedEvents.save(any()) } answers { firstArg<ProcessedWebhookEvent>().also { receipts += it } }
+        every { revenueCatClient.isConfigured } returns true
+        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) } returns emptyList()
     }
 
-    // ── handleRevenueCatWebhook: user resolution ───────────────────────────────
+    private fun lastUpdate() = statusUpdates.last()
+
+    // ── user resolution ────────────────────────────────────────────────────────
 
     @Test
-    fun `should use existing user when revenueCatUserId is found`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
+    fun `should use user already linked by revenueCatUserId`() {
+        linkedUser()
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "RENEWAL"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
 
-        verify(exactly = 0) { userRepository.save(match { it.email.endsWith("@revenuecat.temporary") }) }
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.ACTIVE, lastUpdate().expiresAt), lastUpdate())
+        assertTrue(links.isEmpty())
     }
 
     @Test
-    fun `should create new user when revenueCatUserId is not found`() {
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.empty()
-        every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
+    fun `should resolve user by numeric app_user_id and link revenueCatUserId`() {
+        every { userRepository.findById(1L) } returns Optional.of(createUser(revenueCatUserId = null))
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "RENEWAL"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
 
-        verify(atLeast = 1) {
-            userRepository.save(match {
-                it.email == "rc-user-1@revenuecat.temporary" && it.revenueCatUserId == "rc-user-1"
-            })
-        }
+        assertEquals(listOf(1L to "1"), links)
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+    }
+
+    @Test
+    fun `should resolve user via alias when app_user_id is anonymous`() {
+        every { userRepository.findById(1L) } returns Optional.of(createUser(revenueCatUserId = null))
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "INITIAL_PURCHASE", appUserId = "\$RCAnonymousID:abc", aliases = listOf("1"))
+        )
+
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+    }
+
+    @Test
+    fun `should not create placeholder user when no user matches but still record receipt`() {
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE", appUserId = "999"))
+
+        verify(exactly = 0) { userRepository.save(any()) }
+        assertTrue(statusUpdates.isEmpty())
+        assertTrue(savedSubscriptions.isEmpty())
+        assertEquals(1, receipts.size)
+    }
+
+    @Test
+    fun `should ignore anonymous-only customers`() {
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "INITIAL_PURCHASE", appUserId = "\$RCAnonymousID:abc")
+        )
+
+        verify(exactly = 0) { userRepository.findByRevenueCatUserId(any()) }
+        assertTrue(statusUpdates.isEmpty())
+    }
+
+    @Test
+    fun `should ignore TEST events without receipt`() {
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "TEST"))
+
+        verify(exactly = 0) { userRepository.findByRevenueCatUserId(any()) }
+        assertTrue(receipts.isEmpty())
+    }
+
+    // ── redelivery ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `should record receipt for applied event`() {
+        linkedUser()
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
+
+        assertEquals("event-initial_purchase", receipts.single().eventId)
+        assertEquals("INITIAL_PURCHASE", receipts.single().eventType)
+    }
+
+    @Test
+    fun `should skip already processed event so analytics fire once`() {
+        linkedUser()
+        every { processedEvents.existsById("event-initial_purchase") } returns true
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
+
+        assertTrue(statusUpdates.isEmpty())
+        verify(exactly = 0) { eventService.trackAsync(any(), any(), any()) }
     }
 
     // ── INITIAL_PURCHASE ───────────────────────────────────────────────────────
 
     @Test
-    fun `should save subscription and activate user on INITIAL_PURCHASE`() {
-        val user = createUser()
-        val futureExpiry = Instant.now().plusSeconds(86400)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `should save subscription keyed by original transaction and activate user on INITIAL_PURCHASE`() {
+        linkedUser()
+        val expiry = Instant.now().plusSeconds(86400).toEpochMilli()
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(
-                type = "INITIAL_PURCHASE",
-                productId = "premium_monthly",
-                purchasedAtMs = System.currentTimeMillis(),
-                expirationAtMs = futureExpiry.toEpochMilli(),
-                isTrial = false,
-            )
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE", expirationAtMs = expiry))
 
-        val savedSubscription = slot<Subscription>()
-        verify(exactly = 1) { subscriptionRepository.save(capture(savedSubscription)) }
-        assertEquals(SubscriptionStatus.ACTIVE, savedSubscription.captured.status)
-        assertEquals("premium_monthly", savedSubscription.captured.productId)
-        assertEquals(false, savedSubscription.captured.isTrial)
-
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.ACTIVE }) }
+        val sub = savedSubscriptions.single()
+        assertEquals("orig-tx-1", sub.revenueCatSubscriptionId)
+        assertEquals("premium_monthly", sub.productId)
+        assertTrue(sub.autoRenew)
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.ACTIVE, Instant.ofEpochMilli(expiry)), lastUpdate())
+        verify { eventService.trackAsync(1L, "subscription_started", any()) }
     }
 
     @Test
-    fun `should track subscription_started event on INITIAL_PURCHASE when not trial`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `should never write subscription fields through a whole-user save`() {
+        linkedUser()
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "INITIAL_PURCHASE", productId = "premium_monthly", isTrial = false)
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
 
-        verify(exactly = 1) { eventService.trackAsync(1L, "subscription_started", any()) }
+        verify(exactly = 0) { userRepository.save(any()) }
     }
 
     @Test
-    fun `should track trial_started event on INITIAL_PURCHASE when isTrial is true`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `should set user TRIAL and track trial_started when period_type is TRIAL`() {
+        linkedUser()
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "INITIAL_PURCHASE", productId = "premium_monthly", isTrial = true)
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE", periodType = "TRIAL"))
 
-        verify(exactly = 1) { eventService.trackAsync(1L, "trial_started", any()) }
+        assertEquals(SubscriptionStatus.TRIAL, lastUpdate().status)
+        assertTrue(savedSubscriptions.single().isTrial)
+        verify { eventService.trackAsync(1L, "trial_started", any()) }
     }
 
     @Test
-    fun `should skip INITIAL_PURCHASE processing when productId is null`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `should update existing row when INITIAL_PURCHASE row already exists`() {
+        val user = linkedUser()
+        every { subscriptionRepository.findByRevenueCatSubscriptionId("orig-tx-1") } returns
+            Optional.of(createSubscription(user, id = 7L))
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "INITIAL_PURCHASE", productId = null)
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
 
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
-    }
-
-    // ── RENEWAL ────────────────────────────────────────────────────────────────
-
-    @Test
-    fun `should update existing subscription to ACTIVE on RENEWAL`() {
-        val user = createUser()
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.CANCELLED)
-        val futureExpiry = Instant.now().plusSeconds(86400)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
-
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "RENEWAL", expirationAtMs = futureExpiry.toEpochMilli())
-        )
-
-        verify(exactly = 1) {
-            subscriptionRepository.save(match {
-                it.status == SubscriptionStatus.ACTIVE &&
-                    it.expiresAt?.toEpochMilli() == futureExpiry.toEpochMilli()
-            })
-        }
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.ACTIVE }) }
+        assertEquals(7L, savedSubscriptions.single().id)
     }
 
     @Test
-    fun `should still update user on RENEWAL when no existing subscription found`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.empty()
+    fun `should still activate user when product_id is missing`() {
+        linkedUser()
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "RENEWAL"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE", productId = null))
 
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.ACTIVE }) }
+        assertTrue(savedSubscriptions.isEmpty())
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+    }
+
+    // ── RENEWAL / UNCANCELLATION / NON_RENEWING_PURCHASE ───────────────────────
+
+    @Test
+    fun `should extend existing subscription on RENEWAL`() {
+        val user = linkedUser()
+        every { subscriptionRepository.findByRevenueCatSubscriptionId("orig-tx-1") } returns
+            Optional.of(createSubscription(user, id = 7L, status = SubscriptionStatus.EXPIRED))
+        val newExpiry = Instant.now().plusSeconds(30L * 86400).toEpochMilli()
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "RENEWAL", expirationAtMs = newExpiry))
+
+        val sub = savedSubscriptions.single()
+        assertEquals(7L, sub.id)
+        assertEquals(SubscriptionStatus.ACTIVE, sub.status)
+        assertEquals(Instant.ofEpochMilli(newExpiry), sub.expiresAt)
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+        verify { eventService.trackAsync(1L, "subscription_renewed", any()) }
     }
 
     @Test
-    fun `should track subscription_renewed event on RENEWAL`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
+    fun `should convert trial to ACTIVE on RENEWAL with NORMAL period`() {
+        linkedUser(status = SubscriptionStatus.TRIAL)
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "RENEWAL"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "RENEWAL", periodType = "NORMAL"))
 
-        verify(exactly = 1) { eventService.trackAsync(1L, "subscription_renewed", any()) }
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+        assertFalse(savedSubscriptions.single().isTrial)
+    }
+
+    @Test
+    fun `should restore autoRenew on UNCANCELLATION`() {
+        val user = linkedUser(status = SubscriptionStatus.CANCELLED)
+        every { subscriptionRepository.findByRevenueCatSubscriptionId("orig-tx-1") } returns
+            Optional.of(createSubscription(user, status = SubscriptionStatus.CANCELLED).copy(autoRenew = false))
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "UNCANCELLATION"))
+
+        assertTrue(savedSubscriptions.single().autoRenew)
+        assertNull(savedSubscriptions.single().cancelledAt)
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+    }
+
+    @Test
+    fun `should save non renewing purchase with autoRenew false`() {
+        linkedUser()
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "NON_RENEWING_PURCHASE"))
+
+        assertFalse(savedSubscriptions.single().autoRenew)
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
     }
 
     // ── CANCELLATION ───────────────────────────────────────────────────────────
 
     @Test
-    fun `should set status to CANCELLED when expiresAt is in the future on CANCELLATION`() {
-        val user = createUser()
-        val futureExpiry = Instant.now().plusSeconds(86400)
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.ACTIVE)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
+    fun `should keep paid period on CANCELLATION with future expiry`() {
+        val user = linkedUser(status = SubscriptionStatus.ACTIVE)
+        every { subscriptionRepository.findByRevenueCatSubscriptionId("orig-tx-1") } returns
+            Optional.of(createSubscription(user))
+        val expiry = Instant.now().plusSeconds(86400).toEpochMilli()
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "CANCELLATION", expirationAtMs = futureExpiry.toEpochMilli())
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "CANCELLATION", expirationAtMs = expiry))
 
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.CANCELLED }) }
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.CANCELLED, Instant.ofEpochMilli(expiry)), lastUpdate())
+        assertFalse(savedSubscriptions.single().autoRenew)
+        assertNotNull(savedSubscriptions.single().cancelledAt)
     }
 
     @Test
-    fun `should set status to EXPIRED when expiresAt is in the past on CANCELLATION`() {
-        val user = createUser()
-        val pastExpiry = Instant.now().minusSeconds(86400)
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.ACTIVE)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
+    fun `should expire user on CANCELLATION with past expiry like a refund`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE)
+        val past = Instant.now().minusSeconds(60).toEpochMilli()
 
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "CANCELLATION", expirationAtMs = pastExpiry.toEpochMilli())
-        )
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "CANCELLATION", expirationAtMs = past))
 
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.EXPIRED }) }
-    }
-
-    @Test
-    fun `should set subscription to CANCELLED with autoRenew false on CANCELLATION`() {
-        val user = createUser()
-        val futureExpiry = Instant.now().plusSeconds(86400)
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.ACTIVE)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
-
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "CANCELLATION", expirationAtMs = futureExpiry.toEpochMilli())
-        )
-
-        verify(exactly = 1) {
-            subscriptionRepository.save(match {
-                it.status == SubscriptionStatus.CANCELLED && !it.autoRenew
-            })
-        }
-    }
-
-    // ── UNCANCELLATION ─────────────────────────────────────────────────────────
-
-    @Test
-    fun `should set subscription to ACTIVE with autoRenew true on UNCANCELLATION`() {
-        val user = createUser()
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.CANCELLED)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
-
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "UNCANCELLATION"))
-
-        verify(exactly = 1) {
-            subscriptionRepository.save(match {
-                it.status == SubscriptionStatus.ACTIVE && it.autoRenew && it.cancelledAt == null
-            })
-        }
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.ACTIVE }) }
-    }
-
-    // ── NON_RENEWING_PURCHASE ──────────────────────────────────────────────────
-
-    @Test
-    fun `should save subscription with autoRenew false on NON_RENEWING_PURCHASE`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "NON_RENEWING_PURCHASE", productId = "lifetime_access")
-        )
-
-        verify(exactly = 1) {
-            subscriptionRepository.save(match {
-                it.productId == "lifetime_access" && !it.autoRenew && it.status == SubscriptionStatus.ACTIVE
-            })
-        }
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.ACTIVE }) }
-    }
-
-    @Test
-    fun `should skip NON_RENEWING_PURCHASE processing when productId is null`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-
-        subscriptionService.handleRevenueCatWebhook(
-            createWebhookEvent(type = "NON_RENEWING_PURCHASE", productId = null)
-        )
-
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
+        assertEquals(SubscriptionStatus.EXPIRED, lastUpdate().status)
     }
 
     // ── EXPIRATION ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `should set subscription and user to EXPIRED on EXPIRATION`() {
-        val user = createUser()
-        val existingSubscription = createSubscription(user, status = SubscriptionStatus.ACTIVE)
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId("event-id-1") } returns Optional.of(existingSubscription)
+    fun `should expire subscription and user on EXPIRATION`() {
+        val expiredAtMs = Instant.now().minusSeconds(10).toEpochMilli()
+        val user = linkedUser(status = SubscriptionStatus.CANCELLED, expiresAt = Instant.ofEpochMilli(expiredAtMs))
+        every { subscriptionRepository.findByRevenueCatSubscriptionId("orig-tx-1") } returns
+            Optional.of(createSubscription(user))
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "EXPIRATION"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "EXPIRATION", expirationAtMs = expiredAtMs))
 
+        assertEquals(SubscriptionStatus.EXPIRED, savedSubscriptions.single().status)
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.EXPIRED, null), lastUpdate())
+        verify { eventService.trackAsync(1L, "subscription_expired", any()) }
+    }
+
+    @Test
+    fun `should not downgrade user on stale EXPIRATION when newer access exists`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = Instant.now().plusSeconds(30L * 86400))
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "EXPIRATION", expirationAtMs = Instant.now().minusSeconds(86400).toEpochMilli())
+        )
+
+        assertTrue(statusUpdates.isEmpty())
+    }
+
+    // ── no-op / sync-triggering events ─────────────────────────────────────────
+
+    @Test
+    fun `should not change state on PRODUCT_CHANGE alias or unknown types`() {
+        linkedUser()
+
+        listOf("PRODUCT_CHANGE", "SUBSCRIBER_ALIAS", "SOMETHING_NEW").forEach { type ->
+            subscriptionService.handleRevenueCatWebhook(webhook(type = type))
+        }
+
+        assertTrue(statusUpdates.isEmpty())
+        assertTrue(savedSubscriptions.isEmpty())
+    }
+
+    @Test
+    fun `BILLING_ISSUE keeps access and pushes a payment reminder`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = Instant.now().plusSeconds(86400))
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE"))
+
+        assertTrue(statusUpdates.isEmpty())
         verify(exactly = 1) {
-            subscriptionRepository.save(match { it.status == SubscriptionStatus.EXPIRED })
+            pushNotificationService.sendNotificationToUser(
+                1L, any(), any(), mapOf("type" to SubscriptionService.BILLING_ISSUE_PUSH_TYPE), any(), any()
+            )
         }
-        verify(exactly = 1) { userRepository.save(match { it.subscriptionStatus == SubscriptionStatus.EXPIRED }) }
+        verify { eventService.trackAsync(1L, "subscription_billing_issue", any()) }
     }
 
     @Test
-    fun `should track subscription_expired event on EXPIRATION`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-        every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
+    fun `BILLING_ISSUE push failure does not fail the webhook`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = Instant.now().plusSeconds(86400))
+        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) } throws
+            IllegalStateException("FCM down")
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "EXPIRATION"))
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE"))
 
-        verify(exactly = 1) { eventService.trackAsync(1L, "subscription_expired", any()) }
-    }
-
-    // ── BILLING_ISSUE ──────────────────────────────────────────────────────────
-
-    @Test
-    fun `should not save subscription on BILLING_ISSUE`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
-
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "BILLING_ISSUE"))
-
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
+        assertEquals(1, receipts.size)
     }
 
     @Test
-    fun `should not update user subscription status on BILLING_ISSUE`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `BILLING_ISSUE redelivery does not push twice`() {
+        linkedUser()
+        every { processedEvents.existsById("event-billing_issue") } returnsMany listOf(false, true)
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "BILLING_ISSUE"))
+        repeat(2) { subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE")) }
 
-        verify(exactly = 0) { userRepository.save(any()) }
+        verify(exactly = 1) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) }
     }
 
-    // ── SUBSCRIBER_ALIAS ───────────────────────────────────────────────────────
-
     @Test
-    fun `should not save subscription on SUBSCRIBER_ALIAS`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `TRANSFER re-syncs both the source and the target user`() {
+        val source = createUser(id = 1L, revenueCatUserId = "1", subscriptionStatus = SubscriptionStatus.ACTIVE,
+            expiresAt = Instant.now().plusSeconds(86400))
+        val target = createUser(id = 2L, revenueCatUserId = "2")
+        every { userRepository.findByRevenueCatUserId("1") } returns Optional.of(source)
+        every { userRepository.findByRevenueCatUserId("2") } returns Optional.of(target)
+        every { userRepository.findById(1L) } returns Optional.of(source)
+        every { userRepository.findById(2L) } returns Optional.of(target)
+        val targetExpiry = Instant.ofEpochMilli(Instant.now().plusSeconds(86400).toEpochMilli())
+        every { revenueCatClient.fetchEntitlementState("1") } returns inactiveState(hasHistory = true)
+        every { revenueCatClient.fetchEntitlementState("2") } returns activeState(expiresAt = targetExpiry)
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "SUBSCRIBER_ALIAS"))
+        subscriptionService.handleRevenueCatWebhook(transferWebhook(from = listOf("1"), to = listOf("2")))
 
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
+        assertTrue(StatusUpdate(1L, SubscriptionStatus.EXPIRED, null) in statusUpdates)
+        assertTrue(StatusUpdate(2L, SubscriptionStatus.ACTIVE, targetExpiry) in statusUpdates)
+        assertEquals(listOf("event-transfer"), receipts.map { it.eventId })
     }
 
-    // ── Unknown event type ─────────────────────────────────────────────────────
+    @Test
+    fun `TRANSFER ignores anonymous and unknown ids`() {
+        subscriptionService.handleRevenueCatWebhook(
+            transferWebhook(from = listOf("\$RCAnonymousID:abc"), to = listOf("999"))
+        )
+
+        assertTrue(statusUpdates.isEmpty())
+        verify(exactly = 0) { revenueCatClient.fetchEntitlementState(any()) }
+        assertEquals(1, receipts.size)
+    }
+
+    // ── syncFromRevenueCat ─────────────────────────────────────────────────────
+
+    @Nested
+    inner class Sync {
+
+        @Test
+        fun `activates FREE user whose purchase the store knows about`() {
+            unlinkedUser()
+            val expiry = Instant.now().plus(Duration.ofDays(30))
+            every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry)
+
+            val outcome = subscriptionService.syncFromRevenueCat(1L)
+
+            assertEquals(SyncOutcome.UPDATED, outcome)
+            assertEquals(StatusUpdate(1L, SubscriptionStatus.ACTIVE, expiry), lastUpdate())
+            assertEquals(listOf(1L to "1"), links)
+        }
+
+        @Test
+        fun `maps store trial to TRIAL and auto-renew off to CANCELLED`() {
+            unlinkedUser()
+            val expiry = Instant.now().plus(Duration.ofDays(7))
+            every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry, isTrial = true)
+            subscriptionService.syncFromRevenueCat(1L)
+            assertEquals(SubscriptionStatus.TRIAL, lastUpdate().status)
+
+            every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry, willRenew = false)
+            subscriptionService.syncFromRevenueCat(1L)
+            assertEquals(SubscriptionStatus.CANCELLED, lastUpdate().status)
+        }
+
+        @Test
+        fun `expires store-derived status the store no longer backs`() {
+            linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = Instant.now().plus(Duration.ofDays(3)))
+            every { revenueCatClient.fetchEntitlementState("1") } returns inactiveState(hasHistory = true)
+
+            assertEquals(SyncOutcome.UPDATED, subscriptionService.syncFromRevenueCat(1L))
+            assertEquals(StatusUpdate(1L, SubscriptionStatus.EXPIRED, null), lastUpdate())
+        }
+
+        @Test
+        fun `leaves FREE user alone and does not link when store has no history`() {
+            unlinkedUser()
+            every { revenueCatClient.fetchEntitlementState("1") } returns inactiveState(hasHistory = false)
+
+            assertEquals(SyncOutcome.UNCHANGED, subscriptionService.syncFromRevenueCat(1L))
+            assertTrue(statusUpdates.isEmpty())
+            assertTrue(links.isEmpty())
+        }
+
+        @Test
+        fun `never downgrades when the store is unreachable`() {
+            linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = Instant.now().plus(Duration.ofDays(3)))
+            every { revenueCatClient.fetchEntitlementState("1") } returns null
+
+            assertEquals(SyncOutcome.UNAVAILABLE, subscriptionService.syncFromRevenueCat(1L))
+            assertTrue(statusUpdates.isEmpty())
+        }
+
+        @Test
+        fun `reports unchanged when state already matches`() {
+            val expiry = Instant.now().plus(Duration.ofDays(30))
+            linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = expiry)
+            every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry)
+
+            assertEquals(SyncOutcome.UNCHANGED, subscriptionService.syncFromRevenueCat(1L))
+            assertTrue(statusUpdates.isEmpty())
+        }
+
+        @Test
+        fun `reports unknown user`() {
+            assertEquals(SyncOutcome.UNKNOWN_USER, subscriptionService.syncFromRevenueCat(42L))
+        }
+    }
+
+    // ── reconcile ──────────────────────────────────────────────────────────────
 
     @Test
-    fun `should not throw on unknown event type`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `reconcile syncs each user and expires lapsed statuses`() {
+        unlinkedUser()
+        every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = Instant.now().plus(Duration.ofDays(30)))
+        every { userRepository.expireLapsedSubscriptions(any(), any(), any()) } returns 3
 
-        org.junit.jupiter.api.assertDoesNotThrow {
-            subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "UNKNOWN_FUTURE_TYPE"))
+        val report = subscriptionService.reconcile(listOf(1L, 2L), pause = Duration.ZERO)
+
+        assertEquals(2, report.checked)
+        assertEquals(mapOf(SyncOutcome.UPDATED to 1, SyncOutcome.UNKNOWN_USER to 1), report.outcomes)
+        assertEquals(3, report.expired)
+        verify {
+            userRepository.expireLapsedSubscriptions(
+                any(),
+                SubscriptionService.STORE_DERIVED_STATUSES,
+                SubscriptionStatus.EXPIRED
+            )
         }
     }
 
     @Test
-    fun `should not save anything on unknown event type`() {
-        val user = createUser()
-        every { userRepository.findByRevenueCatUserId("rc-user-1") } returns Optional.of(user)
+    fun `reconcile only expires lapsed statuses when store API is not configured`() {
+        every { revenueCatClient.isConfigured } returns false
 
-        subscriptionService.handleRevenueCatWebhook(createWebhookEvent(type = "UNKNOWN_FUTURE_TYPE"))
+        val report = subscriptionService.reconcile(listOf(1L), pause = Duration.ZERO)
 
-        verify(exactly = 0) { subscriptionRepository.save(any()) }
-        verify(exactly = 0) { userRepository.save(any()) }
-    }
-
-    // ── getUserSubscriptions ───────────────────────────────────────────────────
-
-    @Test
-    fun `should return list of subscription dtos for valid user`() {
-        val user = createUser()
-        val subscription = createSubscription(user, id = 10L)
-        every { userRepository.findById(1L) } returns Optional.of(user)
-        every { subscriptionRepository.findByUser(user) } returns listOf(subscription)
-
-        val result = subscriptionService.getUserSubscriptions(1L)
-
-        assertEquals(1, result.size)
-        assertEquals(10L, result[0].id)
-        assertEquals("premium_monthly", result[0].productId)
-        assertEquals(SubscriptionStatus.ACTIVE, result[0].status)
-    }
-
-    @Test
-    fun `should return empty list when user has no subscriptions`() {
-        val user = createUser()
-        every { userRepository.findById(1L) } returns Optional.of(user)
-        every { subscriptionRepository.findByUser(user) } returns emptyList()
-
-        val result = subscriptionService.getUserSubscriptions(1L)
-
-        assertEquals(0, result.size)
-    }
-
-    @Test
-    fun `should throw IllegalArgumentException when user not found in getUserSubscriptions`() {
-        every { userRepository.findById(99L) } returns Optional.empty()
-
-        assertThrows<IllegalArgumentException> {
-            subscriptionService.getUserSubscriptions(99L)
-        }
-    }
-
-    // ── getActiveSubscription ──────────────────────────────────────────────────
-
-    @Test
-    fun `should return active subscription dto when one exists`() {
-        val user = createUser()
-        val subscription = createSubscription(user, id = 20L, status = SubscriptionStatus.ACTIVE)
-        every { userRepository.findById(1L) } returns Optional.of(user)
-        every { subscriptionRepository.findActiveSubscription(user) } returns Optional.of(subscription)
-
-        val result = subscriptionService.getActiveSubscription(1L)
-
-        assertNotNull(result)
-        assertEquals(20L, result!!.id)
-        assertEquals(SubscriptionStatus.ACTIVE, result.status)
-    }
-
-    @Test
-    fun `should return null when no active subscription exists`() {
-        val user = createUser()
-        every { userRepository.findById(1L) } returns Optional.of(user)
-        every { subscriptionRepository.findActiveSubscription(user) } returns Optional.empty()
-
-        val result = subscriptionService.getActiveSubscription(1L)
-
-        assertNull(result)
-    }
-
-    @Test
-    fun `should throw IllegalArgumentException when user not found in getActiveSubscription`() {
-        every { userRepository.findById(99L) } returns Optional.empty()
-
-        assertThrows<IllegalArgumentException> {
-            subscriptionService.getActiveSubscription(99L)
-        }
+        assertTrue(report.outcomes.isEmpty())
+        verify(exactly = 0) { revenueCatClient.fetchEntitlementState(any()) }
+        verify { userRepository.expireLapsedSubscriptions(any(), any(), any()) }
     }
 
     // ── factory functions ──────────────────────────────────────────────────────
 
+    private fun linkedUser(
+        status: SubscriptionStatus = SubscriptionStatus.FREE,
+        expiresAt: Instant? = null,
+    ): User {
+        val user = createUser(revenueCatUserId = "1", subscriptionStatus = status, expiresAt = expiresAt)
+        every { userRepository.findByRevenueCatUserId("1") } returns Optional.of(user)
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        return user
+    }
+
+    private fun unlinkedUser(
+        status: SubscriptionStatus = SubscriptionStatus.FREE,
+        expiresAt: Instant? = null,
+    ): User {
+        val user = createUser(revenueCatUserId = null, subscriptionStatus = status, expiresAt = expiresAt)
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        return user
+    }
+
+    private fun activeState(expiresAt: Instant?, isTrial: Boolean = false, willRenew: Boolean = true) =
+        StoreEntitlementState(
+            hasPurchaseHistory = true,
+            isActive = true,
+            expiresAt = expiresAt,
+            productId = "premium_monthly",
+            isTrial = isTrial,
+            willRenew = willRenew,
+        )
+
+    private fun inactiveState(hasHistory: Boolean) = StoreEntitlementState(
+        hasPurchaseHistory = hasHistory,
+        isActive = false,
+        expiresAt = null,
+        productId = null,
+        isTrial = false,
+        willRenew = false,
+    )
+
     private fun createUser(
         id: Long = 1L,
-        email: String = "test@example.com",
-        revenueCatUserId: String = "rc-user-1",
+        revenueCatUserId: String? = "1",
         subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
+        expiresAt: Instant? = null,
     ): User = User(
         id = id,
-        email = email,
+        email = "test@example.com",
         name = "Test User",
         revenueCatUserId = revenueCatUserId,
         subscriptionStatus = subscriptionStatus,
+        subscriptionExpiresAt = expiresAt,
         currentStreak = 0,
         longestStreak = 0,
     )
@@ -462,42 +577,47 @@ class SubscriptionServiceTest {
     private fun createSubscription(
         user: User,
         id: Long = 1L,
-        productId: String = "premium_monthly",
         status: SubscriptionStatus = SubscriptionStatus.ACTIVE,
-        revenueCatSubscriptionId: String = "event-id-1",
     ): Subscription = Subscription(
         id = id,
         user = user,
-        revenueCatSubscriptionId = revenueCatSubscriptionId,
-        productId = productId,
+        revenueCatSubscriptionId = "orig-tx-1",
+        productId = "premium_monthly",
         status = status,
         startedAt = Instant.now().minusSeconds(3600),
         expiresAt = Instant.now().plusSeconds(86400),
     )
 
-    private fun createWebhookEvent(
+    private fun webhook(
         type: String,
-        appUserId: String = "rc-user-1",
-        eventId: String = "event-id-1",
+        appUserId: String = "1",
+        aliases: List<String>? = null,
         productId: String? = "premium_monthly",
-        purchasedAtMs: Long? = System.currentTimeMillis(),
-        expirationAtMs: Long? = null,
-        isTrial: Boolean? = false,
-        cancellationAtMs: Long? = null,
+        periodType: String = "NORMAL",
+        expirationAtMs: Long? = Instant.now().plusSeconds(86400).toEpochMilli(),
     ): RevenueCatWebhookEvent = RevenueCatWebhookEvent(
+        api_version = "1.0",
         event = RevenueCatEvent(
-            id = eventId,
+            id = "event-${type.lowercase()}",
             type = type,
             app_user_id = appUserId,
-            aliases = null,
+            aliases = aliases,
+            product_id = productId,
+            period_type = periodType,
+            purchased_at_ms = System.currentTimeMillis(),
+            expiration_at_ms = expirationAtMs,
+            original_transaction_id = "orig-tx-1",
         ),
+    )
+
+    /** Shaped like RevenueCat's TRANSFER payload: no app_user_id, only both sides. */
+    private fun transferWebhook(from: List<String>, to: List<String>) = RevenueCatWebhookEvent(
         api_version = "1.0",
-        app_user_id = appUserId,
-        product_id = productId,
-        purchased_at_ms = purchasedAtMs,
-        expiration_at_ms = expirationAtMs,
-        is_trial_conversion = isTrial,
-        cancellation_at_ms = cancellationAtMs,
-        auto_resume_at_ms = null,
+        event = RevenueCatEvent(
+            id = "event-transfer",
+            type = "TRANSFER",
+            transferred_from = from,
+            transferred_to = to,
+        ),
     )
 }

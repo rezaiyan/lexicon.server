@@ -80,7 +80,8 @@ app:
 
   revenuecat:
     webhook-secret: ${REVENUECAT_WEBHOOK_SECRET:your-revenuecat-webhook-secret}
-    api-key: ${REVENUECAT_API_KEY:your-revenuecat-api-key}
+    # Secret (sk_) key. Empty disables subscription sync + reconcile.
+    api-key: ${REVENUECAT_API_KEY:}
 
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8081}

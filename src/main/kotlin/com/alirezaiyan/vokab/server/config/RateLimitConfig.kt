@@ -40,6 +40,20 @@ class RateLimitConfig {
     }
     
     /**
+     * Get rate limit bucket for subscription sync (calls RevenueCat's API)
+     * Limit: 2 syncs per minute per user
+     */
+    fun getSubscriptionSyncBucket(userId: String): Bucket {
+        val key = "subscription_sync_$userId"
+        return cache.computeIfAbsent(key) {
+            val limit = Bandwidth.classic(2, Refill.intervally(2, Duration.ofMinutes(1)))
+            Bucket.builder()
+                .addLimit(limit)
+                .build()
+        }
+    }
+
+    /**
      * Get rate limit bucket for authentication endpoints (IP-based)
      * Limit: 5 login attempts per minute per IP
      */

@@ -25,6 +25,8 @@ import java.util.*
 
 private val logger = KotlinLogging.logger {}
 
+private const val GRANT_REASON_TEST_EMAIL = "test_email"
+
 /**
  * Service responsible for user authentication and token management.
  * Uses Firebase ID tokens for Google Sign-In authentication.
@@ -208,8 +210,9 @@ class AuthService(
      * The CI endpoint is gated by a shared secret header, so no OAuth flow is needed.
      * Finds or creates the CI test user and returns JWT tokens.
      *
-     * @param premium When true (default), grants ACTIVE subscription. When false, sets
-     *   subscription to FREE so non-premium gating can be tested.
+     * @param premium When true (default), applies the test-user premium grant (the CI email must
+     *   be on the test-email list). When false, clears grant and subscription so non-premium
+     *   gating can be tested.
      */
     @Transactional
     fun authenticateForCi(premium: Boolean = true, platform: String? = null, appVersion: String? = null): AuthResponse {
@@ -281,36 +284,53 @@ class AuthService(
     }
 
     /**
-     * Apply premium access to test users
-     * If user's email is in the test emails list, grant them ACTIVE subscription status
-     * with a far future expiry date (100 years from now)
+     * Keeps a test user's premium grant in line with the test-email list on every login:
+     * on the list -> 100-year `test_email` grant; removed from the list -> that grant is revoked.
+     * Only `test_email` grants are revoked; `legacy_grant`/`manual` grants are left alone.
+     * Grants live in their own columns, so they never touch store subscription state.
      */
     private fun applyTestUserPremiumAccess(user: User): User {
-        if (!isTestUser(user.email)) {
-            return user
+        if (isTestUser(user.email)) {
+            logger.info { "Granting premium access to test user: userId=${user.id}" }
+            val farFuture = Instant.now().plusSeconds(100L * 365 * 24 * 60 * 60)
+            return withGrant(user, farFuture, GRANT_REASON_TEST_EMAIL)
         }
-
-        logger.info { "Granting premium access to test user: userId=${user.id}" }
-
-        // Set subscription to ACTIVE with a far future expiry date (100 years from now)
-        val farFutureExpiry = Instant.now().plusSeconds(100L * 365 * 24 * 60 * 60)
-
-        return user.copy(
-            subscriptionStatus = com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus.ACTIVE,
-            subscriptionExpiresAt = farFutureExpiry
-        )
+        if (user.premiumGrantReason == GRANT_REASON_TEST_EMAIL) {
+            logger.info { "Revoking test premium grant (no longer a test email): userId=${user.id}" }
+            return withGrant(user, null, null)
+        }
+        return user
     }
 
     /**
-     * Explicitly removes premium access for non-premium CI tests.
-     * Sets subscription to FREE regardless of any prior state, so the
-     * feature-access endpoint returns hasPremiumAccess=false.
+     * Grant and subscription columns are `updatable = false` (see User), so a later `save(user)`
+     * won't persist them for an existing row — write them with targeted updates here. New users
+     * (id == null) get them through the INSERT.
+     */
+    private fun withGrant(user: User, until: Instant?, reason: String?): User {
+        user.id?.let { userRepository.updateGrant(it, until, reason, Instant.now()) }
+        return user.copy(premiumGrantUntil = until, premiumGrantReason = reason)
+    }
+
+    private fun withSubscription(
+        user: User,
+        status: com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus,
+        expiresAt: Instant?
+    ): User {
+        user.id?.let { userRepository.updateSubscription(it, status, expiresAt, Instant.now()) }
+        return user.copy(subscriptionStatus = status, subscriptionExpiresAt = expiresAt)
+    }
+
+    /**
+     * Explicitly removes premium access for non-premium CI tests: clears any grant and sets the
+     * subscription to FREE, so the feature-access endpoint returns hasPremiumAccess=false.
      */
     private fun stripPremiumAccess(user: User): User {
         logger.info { "Stripping premium access for non-premium CI test: userId=${user.id}" }
-        return user.copy(
-            subscriptionStatus = com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus.FREE,
-            subscriptionExpiresAt = null
+        return withSubscription(
+            withGrant(user, null, null),
+            com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus.FREE,
+            null
         )
     }
 

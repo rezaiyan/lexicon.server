@@ -32,7 +32,7 @@ class GlobalExceptionHandler {
         logger.warn { "AuthenticationException: ${ex.message}" }
         return ResponseEntity
             .status(HttpStatus.UNAUTHORIZED)
-            .body(ApiResponse(success = false, message = "Authentication failed: ${ex.message}"))
+            .body(ApiResponse(success = false, message = "Authentication failed"))
     }
 
     @ExceptionHandler(BadCredentialsException::class)
@@ -69,7 +69,7 @@ class GlobalExceptionHandler {
         logger.warn { "NoSuchElementException: ${ex.message}" }
         return ResponseEntity
             .status(HttpStatus.NOT_FOUND)
-            .body(ApiResponse(success = false, message = "Resource not found: ${ex.message}"))
+            .body(ApiResponse(success = false, message = "Resource not found"))
     }
 
     @ExceptionHandler(DataIntegrityViolationException::class)
@@ -87,7 +87,7 @@ class GlobalExceptionHandler {
             .status(HttpStatus.INTERNAL_SERVER_ERROR)
             .body(ApiResponse(
                 success = false,
-                message = "An unexpected error occurred: ${ex.message ?: "Unknown error"}"
+                message = "An unexpected error occurred"
             ))
     }
 

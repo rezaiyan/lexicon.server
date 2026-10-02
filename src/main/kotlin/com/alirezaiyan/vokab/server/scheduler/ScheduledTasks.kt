@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.service.EngagementSegmentScheduler
 import com.alirezaiyan.vokab.server.service.NotificationTimingService
 import com.alirezaiyan.vokab.server.service.ReviewReminderDispatcher
 import com.alirezaiyan.vokab.server.service.SmartNotificationDispatcher
+import com.alirezaiyan.vokab.server.service.SubscriptionService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -17,8 +18,20 @@ class ScheduledTasks(
     private val notificationTimingService: NotificationTimingService,
     private val smartNotificationDispatcher: SmartNotificationDispatcher,
     private val reviewReminderDispatcher: ReviewReminderDispatcher,
-    private val engagementSegmentScheduler: EngagementSegmentScheduler
+    private val engagementSegmentScheduler: EngagementSegmentScheduler,
+    private val subscriptionService: SubscriptionService,
 ) {
+    /** Catches missed RevenueCat webhooks and expires lapsed statuses before notification planning. */
+    @Scheduled(cron = "0 10 0 * * *")          // 00:10 UTC nightly (before notification refresh)
+    fun reconcileSubscriptions() {
+        try {
+            val report = subscriptionService.reconcile(userRepository.findIdsLinkedToRevenueCat())
+            logger.info { "Subscription reconcile complete: $report" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error in subscription reconcile" }
+        }
+    }
+
     @Scheduled(cron = "0 30 0 * * *")          // 00:30 UTC nightly
     fun refreshNotificationSchedules() {
         logger.info { "Starting nightly notification schedule refresh" }

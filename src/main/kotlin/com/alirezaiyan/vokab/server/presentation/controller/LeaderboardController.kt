@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.LeaderboardResponse
@@ -31,7 +32,7 @@ class LeaderboardController(
         } catch (e: Exception) {
             logger.error(e) { "Failed to get leaderboard" }
             ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "Failed to get leaderboard: ${e.message}"))
+                .body(ApiResponse(success = false, message = e.clientMessage("Failed to get leaderboard")))
         }
     }
 }

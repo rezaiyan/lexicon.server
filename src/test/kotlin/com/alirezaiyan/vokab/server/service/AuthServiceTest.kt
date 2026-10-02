@@ -132,9 +132,24 @@ class AuthServiceTest {
             webClientBuilder = webClientBuilder,
             appConfigService = appConfigService
         )
+        every { userRepository.updateSubscription(any(), any(), any(), any()) } returns 1
+        every { userRepository.updateGrant(any(), any(), any(), any()) } returns 1
     }
 
     // ── authenticateForCi ─────────────────────────────────────────────────────
+
+    @Test
+    fun `authenticateForCi persists premium for existing user via targeted update`() {
+        val existingUser = createUser(id = 61L, email = "ci@test.vokab.dev", subscriptionStatus = SubscriptionStatus.FREE)
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existingUser)
+
+        authService.authenticateForCi(premium = false)
+
+        // Subscription columns are not updatable through save(); the targeted update must run.
+        verify { userRepository.updateSubscription(61L, SubscriptionStatus.FREE, null, any()) }
+    }
 
     @Test
     fun `authenticateForCi should return auth response for existing CI user`() {
@@ -214,8 +229,10 @@ class AuthServiceTest {
 
         // Assert
         assertNotNull(savedUser)
-        assertEquals(SubscriptionStatus.ACTIVE, savedUser!!.subscriptionStatus)
-        assertNotNull(savedUser!!.subscriptionExpiresAt)
+        assertEquals("test_email", savedUser!!.premiumGrantReason)
+        assertNotNull(savedUser!!.premiumGrantUntil)
+        assertEquals(SubscriptionStatus.FREE, savedUser!!.subscriptionStatus) // grants never touch store state
+        verify { userRepository.updateGrant(20L, any(), "test_email", any()) }
     }
 
     @Test
@@ -736,11 +753,11 @@ class AuthServiceTest {
 
         // Assert
         assertNotNull(savedUser)
-        assertEquals(SubscriptionStatus.ACTIVE, savedUser!!.subscriptionStatus)
-        // Expiry should be roughly 100 years from now — at least 50 years in the future
+        assertEquals("test_email", savedUser!!.premiumGrantReason)
+        // Grant should last roughly 100 years — at least 50 years in the future
         val fiftyYearsFromNow = Instant.now().plusSeconds(50L * 365 * 24 * 3600)
-        assert(savedUser!!.subscriptionExpiresAt!!.isAfter(fiftyYearsFromNow)) {
-            "Expected subscription to expire far in the future"
+        assert(savedUser!!.premiumGrantUntil!!.isAfter(fiftyYearsFromNow)) {
+            "Expected grant to last far into the future"
         }
     }
 
@@ -769,7 +786,51 @@ class AuthServiceTest {
 
         // Assert
         assertNotNull(savedUser)
-        assertEquals(SubscriptionStatus.ACTIVE, savedUser!!.subscriptionStatus)
+        assertEquals("test_email", savedUser!!.premiumGrantReason)
+    }
+
+    @Test
+    fun `test grant is revoked when email is removed from the test list`() {
+        val existingUser = createUser(id = 52L, email = "ci@test.vokab.dev")
+            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "test_email")
+        every { appConfigService.getTestEmails() } returns emptySet()
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
+        var savedUser: User? = null
+        every { userRepository.save(any()) } answers { savedUser = firstArg(); firstArg() }
+        stubTokenGeneration(existingUser)
+
+        authService.authenticateForCi()
+
+        assertNull(savedUser!!.premiumGrantUntil)
+        verify { userRepository.updateGrant(52L, null, null, any()) }
+    }
+
+    @Test
+    fun `legacy or manual grants are not revoked by the test list`() {
+        val existingUser = createUser(id = 53L, email = "ci@test.vokab.dev")
+            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "legacy_grant")
+        every { appConfigService.getTestEmails() } returns emptySet()
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existingUser)
+
+        authService.authenticateForCi()
+
+        verify(exactly = 0) { userRepository.updateGrant(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `authenticateForCi non-premium clears grant as well as subscription`() {
+        val existingUser = createUser(id = 54L, email = "ci@test.vokab.dev")
+            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "test_email")
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existingUser)
+
+        authService.authenticateForCi(premium = false)
+
+        verify { userRepository.updateGrant(54L, null, null, any()) }
+        verify { userRepository.updateSubscription(54L, SubscriptionStatus.FREE, null, any()) }
     }
 
     // ── private helpers ───────────────────────────────────────────────────────

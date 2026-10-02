@@ -10,8 +10,10 @@ import com.alirezaiyan.vokab.server.service.FeatureAccessService
 import com.alirezaiyan.vokab.server.service.OpenRouterService
 import com.alirezaiyan.vokab.server.service.UserProgressService
 import com.alirezaiyan.vokab.server.service.WordService
+import io.github.bucket4j.Bucket
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.validation.Valid
+import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
@@ -39,21 +41,9 @@ class AiController(
     ): ResponseEntity<ApiResponse<VocabularyExtractionResponse>> {
         logger.info { "userId=${user.id} requesting vocabulary extraction" }
 
-        if (!featureAccessService.hasActivePremiumAccess(user)) {
-            logger.warn { "userId=${user.id} attempted AI image extraction without premium access" }
-            return ResponseEntity.status(403)
-                .body(ApiResponse(
-                    success = false,
-                    message = "Premium subscription required to use AI image extraction"
-                ))
-        }
-
-        val bucket = rateLimitConfig.getImageProcessingBucket(user.id.toString())
-        if (!bucket.tryConsume(1)) {
-            logger.warn { "Rate limit exceeded for userId=${user.id} on image processing" }
-            return ResponseEntity.status(429)
-                .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again later."))
-        }
+        premiumRequired<VocabularyExtractionResponse>(user, "AI image extraction")?.let { return it }
+        rateLimited<VocabularyExtractionResponse>(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
+            ?.let { return it }
 
         return try {
             val extractedText = openRouterService.extractVocabularyFromImage(
@@ -87,28 +77,10 @@ class AiController(
     ): Mono<ResponseEntity<ApiResponse<InsightResponse>>> {
         logger.info { "userId=${user.id} requesting daily insight (fallback)" }
 
-        // Check if user has premium access
-        if (!featureAccessService.hasActivePremiumAccess(user)) {
-            logger.warn { "userId=${user.id} attempted to use AI daily insight without premium access" }
-            return Mono.just(
-                ResponseEntity.status(403)
-                    .body(ApiResponse(
-                        success = false,
-                        message = "Premium subscription required to use AI insights"
-                    ))
-            )
-        }
-        
-        // Check rate limit
-        val bucket = rateLimitConfig.getAiBucket(user.id.toString())
-        if (!bucket.tryConsume(1)) {
-            logger.warn { "Rate limit exceeded for userId=${user.id} on AI service" }
-            return Mono.just(
-                ResponseEntity.status(429)
-                    .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again later."))
-            )
-        }
-        
+        (premiumRequired<InsightResponse>(user, "AI insights")
+            ?: rateLimited(user, rateLimitConfig.getAiBucket(user.id.toString()), "AI insight"))
+            ?.let { return Mono.just(it) }
+
         // Try to get today's insight first (if it was already generated)
         val todaysInsight = dailyInsightService.getTodaysInsightForUser(user)
         if (todaysInsight != null) {
@@ -185,12 +157,8 @@ class AiController(
                 .body(ApiResponse(success = false, message = "Text cannot exceed 2 lines"))
         }
 
-        val bucket = rateLimitConfig.getAiBucket(user.id.toString())
-        if (!bucket.tryConsume(1)) {
-            logger.warn { "Rate limit exceeded for userId=${user.id} on text translation" }
-            return ResponseEntity.status(429)
-                .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again later."))
-        }
+        rateLimited<TranslateTextResponse>(user, rateLimitConfig.getAiBucket(user.id.toString()), "text translation")
+            ?.let { return it }
 
         return try {
             val translation = openRouterService.translateText(
@@ -220,13 +188,9 @@ class AiController(
     ): ResponseEntity<ApiResponse<SuggestVocabularyResponse>> {
         logger.info { "userId=${user.id} requesting suggested vocabulary: target=${request.targetLanguage}, level=${request.currentLevel}, native=${request.nativeLanguage}" }
 
-        val bucket = rateLimitConfig.getAiBucket(user.id.toString())
-        if (!bucket.tryConsume(1)) {
-            logger.warn { "Rate limit exceeded for userId=${user.id} on suggest-vocabulary" }
-            return ResponseEntity.status(429)
-                .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again later."))
-        }
-        
+        rateLimited<SuggestVocabularyResponse>(user, rateLimitConfig.getAiBucket(user.id.toString()), "suggest-vocabulary")
+            ?.let { return it }
+
         return try {
             val targetLanguage = request.targetLanguage.trim()
             val nativeLanguage = request.nativeLanguage.trim()
@@ -283,10 +247,26 @@ class AiController(
                 data = mapOf(
                     "service" to "AI Service",
                     "status" to "operational",
-                    "model" to "anthropic/claude-3.5-sonnet"
+                    "model" to appProperties.openrouter.model
                 )
             )
         )
+    }
+
+    /** 403 response when the feature needs premium and the user lacks it; null when allowed. */
+    private fun <T> premiumRequired(user: User, feature: String): ResponseEntity<ApiResponse<T>>? {
+        if (featureAccessService.hasActivePremiumAccess(user)) return null
+        logger.warn { "userId=${user.id} attempted $feature without premium access" }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+            .body(ApiResponse(success = false, message = "Premium subscription required to use $feature"))
+    }
+
+    /** 429 response when [bucket] has no token left; null when the request may proceed. */
+    private fun <T> rateLimited(user: User, bucket: Bucket, endpoint: String): ResponseEntity<ApiResponse<T>>? {
+        if (bucket.tryConsume(1)) return null
+        logger.warn { "Rate limit exceeded for userId=${user.id} on $endpoint" }
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+            .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again later."))
     }
 }
 

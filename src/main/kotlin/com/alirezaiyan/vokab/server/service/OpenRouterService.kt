@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.exception.UserFacingException
 import com.alirezaiyan.vokab.server.config.AppProperties
+import com.alirezaiyan.vokab.server.exception.UserFacingException
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyItemResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -11,85 +11,106 @@ import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.bodyToMono
 import reactor.core.publisher.Mono
+import java.time.Duration
 
 private val logger = KotlinLogging.logger {}
 
+private const val CHAT_COMPLETIONS = "/chat/completions"
+private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
+
+/** OpenRouter returned an error, or the call failed at the HTTP level. Message is not user-facing. */
+class OpenRouterException(message: String) : RuntimeException(message)
+
+/**
+ * LLM features backed by OpenRouter's chat-completions API. Every public method builds a prompt and
+ * goes through [chat]; they differ only in prompt and in what an empty answer means
+ * (a fallback text or an error).
+ */
 @Service
 class OpenRouterService(
-    private val appProperties: AppProperties
+    webClientBuilder: WebClient.Builder,
+    private val appProperties: AppProperties,
 ) {
-    
-    private val webClient: WebClient by lazy {
-        WebClient.builder()
-            .baseUrl(appProperties.openrouter.baseUrl)
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${appProperties.openrouter.apiKey}")
-            .defaultHeader("HTTP-Referer", "https://vokab.app")
-            .defaultHeader("X-Title", "Vokab")
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build()
-    }
-    
+    // clone(): the injected builder is a shared singleton; don't leak our base URL/headers into it.
+    private val webClient: WebClient = webClientBuilder.clone()
+        .baseUrl(appProperties.openrouter.baseUrl)
+        .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${appProperties.openrouter.apiKey}")
+        .defaultHeader("HTTP-Referer", "https://vokab.app")
+        .defaultHeader("X-Title", "Vokab")
+        .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .build()
+
+    private val timeout: Duration = Duration.ofSeconds(appProperties.openrouter.timeoutSeconds)
+
+    val model: String get() = appProperties.openrouter.model
+
     data class OpenRouterRequest(
-        val model: String = "anthropic/claude-haiku-4.5",
+        val model: String,
         val messages: List<Message>
     )
-    
+
     data class Message(
         val role: String,
         val content: List<Content>
     )
-    
+
     data class Content(
         val type: String,
         val text: String? = null,
         val image_url: ImageUrl? = null
     )
-    
+
     data class ImageUrl(
         val url: String
     )
-    
+
     data class OpenRouterResponse(
         val choices: List<Choice>?,
         val error: ErrorDetail?
     )
-    
+
     data class Choice(
         val message: MessageContent
     )
-    
+
     data class MessageContent(
         val content: String
     )
-    
+
     data class ErrorDetail(
         val message: String
     )
-    
+
+    data class DailyInsightContext(
+        val stats: ProgressStatsDto,
+        val userName: String?,
+        val optimalStudyHour: Int?,
+        val accuracyTrend: Float?,
+        val topDifficultWord: String?,
+        val primaryLanguage: String?,
+        val sessionCompletionRate: Float?,
+        val currentStreak: Int
+    )
+
     fun extractVocabularyFromImage(
         imageBase64: String,
         targetLanguage: String,
         extractWords: Boolean = true,
         extractSentences: Boolean = false
     ): Mono<String> {
-        logger.info { "Extracting vocabulary from image, target language: $targetLanguage" }
-        
-        // Validate image size (base64 encoded, so roughly 1.33x original size)
+        // Base64 inflates by ~4/3.
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
-        val maxSizeBytes = 5 * 1024 * 1024 // 5MB
-        if (estimatedSizeBytes > maxSizeBytes) {
+        if (estimatedSizeBytes > MAX_IMAGE_BYTES) {
             return Mono.error(IllegalArgumentException("Image too large. Maximum size is 5MB."))
         }
-        
-        val dataUrl = "data:image/jpeg;base64,$imageBase64"
-        
+        logger.info { "[OpenRouter] Image extraction: size=~${estimatedSizeBytes / 1024}KB, language=$targetLanguage" }
+
         val extractionType = when {
             extractWords && extractSentences -> "both individual vocabulary words AND example sentences"
-            extractWords -> "individual vocabulary words only"
             extractSentences -> "example sentences only"
             else -> "individual vocabulary words only"
         }
-        
+
         val prompt = buildString {
             appendLine("You are a vocabulary extraction specialist. Extract $extractionType from this image.")
             appendLine()
@@ -131,104 +152,33 @@ class OpenRouterService(
             appendLine("Valid Example:")
             appendLine("Hallo,hello;Guten Morgen,good morning;danke,thanks,thank you very much")
         }
-        
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(
-                            type = "image_url",
-                            image_url = ImageUrl(url = dataUrl)
-                        ),
-                        Content(
-                            type = "text",
-                            text = prompt
-                        )
-                    )
-                )
-            )
+
+        val content = listOf(
+            Content(type = "image_url", image_url = ImageUrl(url = "data:image/jpeg;base64,$imageBase64")),
+            Content(type = "text", text = prompt),
         )
-        
-        logger.info { "[OpenRouter] Sending image extraction request: model=${request.model}, size=~${estimatedSizeBytes / 1024}KB, language=$targetLanguage" }
-        
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .onStatus({ status -> status.isError }) { response ->
-                response.bodyToMono<String>().flatMap { errorBody ->
-                    logger.error { "[OpenRouter] HTTP ${response.statusCode()}: $errorBody" }
-                    Mono.error(RuntimeException("OpenRouter API error: ${response.statusCode()} - $errorBody"))
+        return chat(content, "image extraction")
+            .orUserError("No response from AI. Please try again.")
+            .map { text ->
+                when {
+                    text.contains("ERROR:", ignoreCase = true) || text.contains("No vocabulary found", ignoreCase = true) ->
+                        throw UserFacingException("No vocabulary found in the image. Please use an image with visible text.")
+                    !isValidVocabularyFormat(text) ->
+                        throw UserFacingException("Failed to extract valid vocabulary format. Please try a clearer image.")
+                    else -> text
                 }
-            }
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    logger.error { "[OpenRouter] API returned error: ${response.error.message}" }
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-
-                val extractedText = response.choices?.firstOrNull()?.message?.content?.trim() ?: ""
-
-                if (extractedText.isEmpty()) {
-                    logger.warn { "[OpenRouter] Empty response from AI" }
-                    throw UserFacingException("No response from AI. Please try again.")
-                }
-
-                if (extractedText.contains("ERROR:", ignoreCase = true) ||
-                    extractedText.contains("No vocabulary found", ignoreCase = true)) {
-                    logger.warn { "[OpenRouter] AI could not find vocabulary in image" }
-                    throw UserFacingException("No vocabulary found in the image. Please use an image with visible text.")
-                }
-
-                if (!isValidVocabularyFormat(extractedText)) {
-                    logger.warn { "[OpenRouter] Invalid vocabulary format received" }
-                    throw UserFacingException("Failed to extract valid vocabulary format. Please try a clearer image.")
-                }
-
-                logger.info { "[OpenRouter] Successfully extracted vocabulary: ${extractedText.take(100)}..." }
-                extractedText
-            }
-            .doOnError { error ->
-                logger.error(error) { "[OpenRouter] Failed to extract vocabulary from image" }
             }
     }
-    
-    fun generateCelebrationInsight(stats: ProgressStatsDto, userName: String?): Mono<String> {
-        logger.info { "Generating celebration insight for ${userName ?: "user"}" }
 
+    fun generateCelebrationInsight(stats: ProgressStatsDto, userName: String?): Mono<String> {
         val prompt = buildString {
             appendLine("The user ${userName ?: "a learner"} just completed their vocabulary review session today.")
             appendLine("They have ${stats.totalWords} words total, ${stats.level6Count} fully mastered.")
             appendLine("Write a 1-sentence celebration acknowledging their consistency. Max 2 emojis. Be specific and warm, not generic.")
             appendLine("Return ONLY the message, no quotes or extra formatting.")
         }
-
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(Content(type = "text", text = prompt))
-                )
-            )
-        )
-
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-                response.choices?.firstOrNull()?.message?.content?.trim()
-                    ?: "Great work today! 🎉 You're building something real."
-            }
-            .doOnError { error ->
-                logger.error(error) { "Failed to generate celebration insight" }
-            }
+        return chat(prompt, "celebration insight")
+            .defaultIfEmpty("Great work today! 🎉 You're building something real.")
     }
 
     fun generateStreakResetWarning(
@@ -236,8 +186,6 @@ class OpenRouterService(
         progressStats: ProgressStatsDto,
         userName: String
     ): Mono<String> {
-        logger.info { "Generating streak reset warning for $userName, streak: $currentStreak" }
-        
         val prompt = buildString {
             appendLine("You are an enthusiastic vocabulary learning coach with a friendly, motivational personality.")
             appendLine("Generate ONE brief, personalized message to motivate the user to log in and maintain their streak.")
@@ -253,92 +201,39 @@ class OpenRouterService(
             appendLine("1. Be urgent but encouraging - remind them their streak is at risk")
             appendLine("2. Mention their current streak number prominently")
             appendLine("3. Celebrate their achievement so far")
-            appendLine("4. keep it short in 1 sentence")
-            appendLine("6. Make it personal and cool - reference their progress if relevant")
-            appendLine("7. Create a sense of urgency but stay positive")
+            appendLine("4. Keep it short in 1 sentence")
+            appendLine("5. Make it personal and cool - reference their progress if relevant")
+            appendLine("6. Create a sense of urgency but stay positive")
             appendLine()
             appendLine("Return ONLY the motivational message, no quotes or extra formatting.")
         }
-        
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(
-                            type = "text",
-                            text = prompt
-                        )
-                    )
-                )
-            )
-        )
-        
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-                
-                val message = response.choices?.firstOrNull()?.message?.content?.trim()
-                    ?: "Don't lose your $currentStreak-day streak! 🔥 Log in now to keep it going!"
-                
-                logger.info { "Successfully generated streak reset warning" }
-                message
-            }
-            .doOnError { error ->
-                logger.error(error) { "Failed to generate streak reset warning" }
-            }
+        return chat(prompt, "streak reset warning")
+            .defaultIfEmpty("Don't lose your $currentStreak-day streak! 🔥 Log in now to keep it going!")
     }
-    
-    data class DailyInsightContext(
-        val stats: ProgressStatsDto,
-        val userName: String?,
-        val optimalStudyHour: Int?,
-        val accuracyTrend: Float?,
-        val topDifficultWord: String?,
-        val primaryLanguage: String?,
-        val sessionCompletionRate: Float?,
-        val currentStreak: Int
-    )
 
     fun generateDailyInsight(ctx: DailyInsightContext): Mono<String> {
-        logger.info { "Generating enriched daily insight for ${ctx.userName ?: "user"}" }
-
         val prompt = buildString {
             append("You are writing a personal vocabulary learning insight for ${ctx.userName ?: "a learner"}.\n\n")
             append("Their current stats:\n")
             append("- Total words: ${ctx.stats.totalWords}, fully mastered: ${ctx.stats.level6Count}\n")
             append("- Words due for review: ${ctx.stats.dueCards}\n")
             append("- Current streak: ${ctx.currentStreak} days\n")
-            ctx.primaryLanguage?.let  { append("- Learning: $it\n") }
+            ctx.primaryLanguage?.let { append("- Learning: $it\n") }
             ctx.topDifficultWord?.let { append("- Most challenging word recently: \"$it\"\n") }
             ctx.accuracyTrend?.let { trend ->
                 val dir = if (trend > 0) "improving (up ${trend.toInt()}%)" else "declining (down ${(-trend).toInt()}%)"
                 append("- Accuracy is $dir vs last week\n")
             }
-            ctx.sessionCompletionRate?.let { rate ->
-                append("- Session completion: ${(rate * 100).toInt()}%\n")
-            }
-            ctx.optimalStudyHour?.let { hour ->
-                append("- They tend to study best around $hour:00\n")
-            }
+            ctx.sessionCompletionRate?.let { rate -> append("- Session completion: ${(rate * 100).toInt()}%\n") }
+            ctx.optimalStudyHour?.let { hour -> append("- They tend to study best around $hour:00\n") }
             append("\nWrite exactly 1–2 sentences. Be specific to their data — do NOT write generic encouragement. ")
             append("Reference one concrete number or the specific word if available. Add 1–2 relevant emojis.\n")
             append("Return ONLY the message, no quotes or extra formatting.")
         }
-
-        return callOpenRouter(prompt)
-            .doOnError { error -> logger.error(error) { "Failed to generate enriched daily insight" } }
+        return chat(prompt, "daily insight").orFail()
     }
 
     fun generateReEngagementInsight(stats: ProgressStatsDto, daysSinceOpen: Int, userName: String?): Mono<String> {
-        logger.info { "Generating re-engagement insight for ${userName ?: "user"}, daysSinceOpen=$daysSinceOpen" }
-
         val prompt = """
             ${userName ?: "A learner"} hasn't opened a notification in $daysSinceOpen days.
             They have ${stats.totalWords} vocabulary words, ${stats.dueCards} due for review.
@@ -346,50 +241,21 @@ class OpenRouterService(
             Acknowledge the gap positively. 1 emoji. Don't say "we miss you".
             Return ONLY the message, no quotes or extra formatting.
         """.trimIndent()
-
-        return callOpenRouter(prompt)
-            .doOnError { error -> logger.error(error) { "Failed to generate re-engagement insight" } }
+        return chat(prompt, "re-engagement insight").orFail()
     }
 
     fun generateMilestoneMessage(
         milestone: MilestoneDetector.MilestoneEvent,
-        stats: ProgressStatsDto,
+        @Suppress("UNUSED_PARAMETER") stats: ProgressStatsDto,
         userName: String?
     ): Mono<String> {
-        logger.info { "Generating milestone message for ${userName ?: "user"}: ${milestone.type}" }
-
         val prompt = """
             ${userName ?: "A learner"} just hit ${milestone.description}.
             Write 1 sentence celebrating this achievement. Warm but not over-the-top. 1 emoji max.
             Do not mention any specific numbers or word counts.
             Return ONLY the message, no quotes or extra formatting.
         """.trimIndent()
-
-        return callOpenRouter(prompt)
-            .doOnError { error -> logger.error(error) { "Failed to generate milestone message" } }
-    }
-
-    private fun callOpenRouter(prompt: String): Mono<String> {
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(Content(type = "text", text = prompt))
-                )
-            )
-        )
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-                response.choices?.firstOrNull()?.message?.content?.trim()
-                    ?: throw RuntimeException("Empty response from OpenRouter")
-            }
+        return chat(prompt, "milestone message").orFail()
     }
 
     fun generateStreakReminderMessage(
@@ -397,8 +263,6 @@ class OpenRouterService(
         userName: String,
         progressStats: ProgressStatsDto? = null
     ): Mono<String> {
-        logger.info { "Generating personalized streak reminder message for $userName, streak: $currentStreak" }
-        
         val prompt = buildString {
             appendLine("You are a supportive vocabulary learning coach with an encouraging, friendly personality.")
             appendLine("Generate ONE brief, personalized push notification message to remind the user to complete their review today to maintain their streak.")
@@ -414,7 +278,7 @@ class OpenRouterService(
             appendLine()
             appendLine("Message Requirements:")
             appendLine("1. Create urgency but stay positive and encouraging")
-            appendLine("2. Mention the streak number prominently (${currentStreak} days)")
+            appendLine("2. Mention the streak number prominently ($currentStreak days)")
             appendLine("3. Keep it concise - ideal for push notification (max 1-2 sentences)")
             appendLine("4. Make it personal and motivating")
             appendLine("5. Include 1-2 relevant emojis")
@@ -425,91 +289,19 @@ class OpenRouterService(
             appendLine()
             appendLine("Return ONLY the notification message, no quotes or extra formatting.")
         }
-        
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(
-                            type = "text",
-                            text = prompt
-                        )
-                    )
-                )
-            )
-        )
-        
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-                
-                val message = response.choices?.firstOrNull()?.message?.content?.trim()
-                    ?: "You have a $currentStreak-day streak! 🔥 Complete your review today to keep it going!"
-                
-                logger.info { "Successfully generated personalized streak reminder message" }
-                message
-            }
-            .doOnError { error ->
-                logger.error(error) { "Failed to generate streak reminder message" }
-            }
+        return chat(prompt, "streak reminder")
+            .defaultIfEmpty("You have a $currentStreak-day streak! 🔥 Complete your review today to keep it going!")
     }
-    
+
     fun translateText(text: String, targetLanguage: String): Mono<String> {
-        logger.info { "Translating text to $targetLanguage" }
-        
-        val prompt = "Translate the following text to $targetLanguage. Return only the translation, no explanations, no quotes, no additional text. Just the translation:\n\n$text"
-        
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(
-                            type = "text",
-                            text = prompt
-                        )
-                    )
-                )
-            )
-        )
-        
-        return webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .map { response ->
-                if (response.error != null) {
-                    logger.error { "[OpenRouter] API returned error: ${response.error.message}" }
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
-                }
-
-                val translation = response.choices?.firstOrNull()?.message?.content?.trim() ?: ""
-
-                if (translation.isEmpty()) {
-                    logger.warn { "[OpenRouter] Empty translation response" }
-                    throw UserFacingException("Translation failed. Please try again.")
-                }
-
-                logger.info { "[OpenRouter] Successfully translated text: ${translation.take(50)}..." }
-                translation
-            }
-            .doOnError { error ->
-                logger.error(error) { "[OpenRouter] Failed to translate text" }
-            }
+        val prompt = "Translate the following text to $targetLanguage. Return only the translation, no explanations, " +
+            "no quotes, no additional text. Just the translation:\n\n$text"
+        return chat(prompt, "translation").orUserError("Translation failed. Please try again.")
     }
-    
+
     /**
-     * Generate a configurable number of vocabulary items based on user's language preferences.
-     * Words are in target language with translations in native language, appropriate for currentLevel.
-     * The number of items is controlled by app.vocabulary.suggestionCount (default 100).
+     * Generates `app.vocabulary.suggestionCount` (+10 headroom for dedup) vocabulary items in
+     * [targetLanguage] with [nativeLanguage] translations, pitched at [currentLevel].
      */
     fun generateVocabularyFromPreferences(
         targetLanguage: String,
@@ -517,16 +309,10 @@ class OpenRouterService(
         nativeLanguage: String,
         interests: List<String> = emptyList()
     ): Mono<List<SuggestVocabularyItemResponse>> {
-        val itemCount = appProperties.vocabulary.suggestionCount
-        val requestedCount = itemCount + 10
+        val requestedCount = appProperties.vocabulary.suggestionCount + 10
         logger.info {
-            val interestsSummary = if (interests.isEmpty()) {
-                "none"
-            } else {
-                interests.joinToString(limit = 5)
-            }
-            "Generating vocabulary: target=$targetLanguage, level=$currentLevel, " +
-                "native=$nativeLanguage, itemsRequested=$requestedCount (base=$itemCount), interests=$interestsSummary"
+            "Generating vocabulary: target=$targetLanguage, level=$currentLevel, native=$nativeLanguage, " +
+                "itemsRequested=$requestedCount, interests=${interests.joinToString(limit = 5).ifEmpty { "none" }}"
         }
 
         val prompt = buildString {
@@ -570,79 +356,84 @@ class OpenRouterService(
             appendLine("Output exactly $requestedCount lines in the format above, nothing else.")
         }
 
-        val request = OpenRouterRequest(
-            messages = listOf(
-                Message(
-                    role = "user",
-                    content = listOf(
-                        Content(type = "text", text = prompt)
-                    )
-                )
-            )
-        )
+        return chat(prompt, "suggest vocabulary")
+            .orUserError("No vocabulary generated. Please try again.")
+            .map { raw ->
+                val items = parseSuggestVocabularyResponse(raw)
+                if (items.size < maxOf(20, requestedCount / 2)) {
+                    logger.warn { "AI returned only ${items.size} items; expected around $requestedCount" }
+                }
+                logger.info { "Generated ${items.size} vocabulary items for $targetLanguage ($currentLevel)" }
+                items.take(requestedCount)
+            }
+    }
 
+    // ── Transport ────────────────────────────────────────────────────────────────
+
+    private fun chat(prompt: String, operation: String): Mono<String> =
+        chat(listOf(Content(type = "text", text = prompt)), operation)
+
+    /**
+     * Sends one user message and emits the trimmed answer, or completes empty when the model
+     * returned no text. HTTP errors, API errors and timeouts surface as [OpenRouterException]
+     * (or a TimeoutException); response bodies are logged, never put into exception messages.
+     */
+    private fun chat(content: List<Content>, operation: String): Mono<String> {
+        val request = OpenRouterRequest(model = model, messages = listOf(Message(role = "user", content = content)))
         return webClient.post()
-            .uri("/chat/completions")
+            .uri(CHAT_COMPLETIONS)
             .bodyValue(request)
             .retrieve()
             .onStatus({ it.isError }) { response ->
-                response.bodyToMono<String>().flatMap { errorBody ->
-                    logger.error { "OpenRouter suggest-vocabulary HTTP ${response.statusCode()}: $errorBody" }
-                    Mono.error(RuntimeException("OpenRouter API error: ${response.statusCode()} - $errorBody"))
+                response.bodyToMono<String>().defaultIfEmpty("").flatMap { body ->
+                    logger.error { "[OpenRouter] $operation HTTP ${response.statusCode()}: $body" }
+                    Mono.error(OpenRouterException("OpenRouter API error: ${response.statusCode()}"))
                 }
             }
             .bodyToMono<OpenRouterResponse>()
-            .map { response ->
+            .timeout(timeout)
+            .flatMap { response ->
                 if (response.error != null) {
-                    throw RuntimeException("OpenRouter error: ${response.error.message}")
+                    Mono.error(OpenRouterException("OpenRouter error: ${response.error.message}"))
+                } else {
+                    Mono.justOrEmpty(response.choices?.firstOrNull()?.message?.content?.trim()?.ifEmpty { null })
                 }
-                val content = response.choices?.firstOrNull()?.message?.content?.trim() ?: ""
-                if (content.isBlank()) {
-                    throw UserFacingException("No vocabulary generated. Please try again.")
-                }
-                val items = parseSuggestVocabularyResponse(content)
-                val minExpected = maxOf(20, requestedCount / 2)
-                if (items.size < minExpected) {
-                    logger.warn { "AI returned only ${items.size} items; expected around $requestedCount" }
-                }
-                logger.info { "Generated ${items.size} vocabulary items for $targetLanguage ($currentLevel); returning up to $requestedCount" }
-                items.take(requestedCount)
             }
-            .doOnError { error ->
-                logger.error(error) { "Failed to generate vocabulary from preferences" }
-            }
+            .doOnError { logger.error(it) { "[OpenRouter] $operation failed" } }
     }
 
-    private fun parseSuggestVocabularyResponse(raw: String): List<SuggestVocabularyItemResponse> {
-        val lines = raw.lines()
+    private fun Mono<String>.orFail(): Mono<String> =
+        switchIfEmpty(Mono.defer { Mono.error(OpenRouterException("Empty response from OpenRouter")) })
+
+    private fun Mono<String>.orUserError(message: String): Mono<String> =
+        switchIfEmpty(Mono.defer { Mono.error(UserFacingException(message)) })
+
+    // ── Parsing ──────────────────────────────────────────────────────────────────
+
+    private fun parseSuggestVocabularyResponse(raw: String): List<SuggestVocabularyItemResponse> =
+        raw.lineSequence()
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        val result = mutableListOf<SuggestVocabularyItemResponse>()
-        for (line in lines) {
-            val parts = line.split(",", limit = 3)
-            if (parts.size >= 2) {
-                val originalWord = parts[0].trim().takeIf { it.isNotBlank() } ?: continue
-                val translation = parts[1].trim().takeIf { it.isNotBlank() } ?: continue
-                val description = parts.getOrNull(2)?.trim() ?: ""
-                result.add(SuggestVocabularyItemResponse(originalWord = originalWord, translation = translation, description = description))
+            .mapNotNull { line ->
+                val parts = line.split(",", limit = 3)
+                val originalWord = parts.getOrNull(0)?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val translation = parts.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                SuggestVocabularyItemResponse(
+                    originalWord = originalWord,
+                    translation = translation,
+                    description = parts.getOrNull(2)?.trim().orEmpty(),
+                )
             }
-        }
-        return result
-    }
+            .toList()
 
     private fun isValidVocabularyFormat(text: String): Boolean {
-        if (text.isBlank()) return false
-        if (!text.contains(",")) return false
-        
+        if (text.isBlank() || !text.contains(",")) return false
         val entries = text.split(";")
-        if (entries.isEmpty()) return false
-        
-        val entryPattern = Regex("^[^,]+,[^,]+(?:,[^,]*)?$")
-        val validEntries = entries.count { entry ->
-            entry.trim().isNotEmpty() && entryPattern.matches(entry.trim())
-        }
-        
-        return validEntries > 0 && (validEntries.toFloat() / entries.size) >= 0.5f
+        val validEntries = entries.count { VOCAB_ENTRY.matches(it.trim()) }
+        return validEntries > 0 && validEntries.toFloat() / entries.size >= 0.5f
+    }
+
+    private companion object {
+        val VOCAB_ENTRY = Regex("^[^,]+,[^,]+(?:,[^,]*)?$")
     }
 }
-

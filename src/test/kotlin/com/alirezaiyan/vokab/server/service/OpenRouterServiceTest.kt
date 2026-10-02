@@ -8,9 +8,6 @@ import com.alirezaiyan.vokab.server.config.VocabularyConfig
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -40,24 +37,19 @@ class OpenRouterServiceTest {
         requestBodySpec = mockk()
         responseSpec = mockk()
 
-        mockkStatic(WebClient::class)
-        every { WebClient.builder() } returns webClientBuilder
+        every { webClientBuilder.clone() } returns webClientBuilder
         every { webClientBuilder.baseUrl(any()) } returns webClientBuilder
         every { webClientBuilder.defaultHeader(any(), any()) } returns webClientBuilder
         every { webClientBuilder.build() } returns webClient
 
-        openRouterService = OpenRouterService(appProperties)
+        openRouterService = OpenRouterService(webClientBuilder, appProperties)
 
         // Wire up the standard fluent chain used by all methods
         every { webClient.post() } returns requestBodyUriSpec
         every { requestBodyUriSpec.uri(any<String>()) } returns requestBodySpec
         every { requestBodySpec.bodyValue(any()) } returns requestBodySpec
         every { requestBodySpec.retrieve() } returns responseSpec
-    }
-
-    @AfterEach
-    fun tearDown() {
-        unmockkStatic(WebClient::class)
+        every { responseSpec.onStatus(any(), any()) } returns responseSpec
     }
 
     // ── extractVocabularyFromImage ────────────────────────────────────────────
@@ -727,23 +719,22 @@ class OpenRouterServiceTest {
 
     @Test
     fun `default model should not use deprecated claude-3_5-sonnet`() {
-        val request = OpenRouterService.OpenRouterRequest(
-            messages = listOf(
-                OpenRouterService.Message(
-                    role = "user",
-                    content = listOf(OpenRouterService.Content(type = "text", text = "test"))
-                )
-            )
-        )
-        assertTrue(
-            !request.model.contains("claude-3.5-sonnet"),
-            "Default model should not use deprecated claude-3.5-sonnet, was: ${request.model}"
-        )
-        assertTrue(
-            request.model.startsWith("anthropic/"),
-            "Default model should use anthropic/ prefix, was: ${request.model}"
-        )
-        assertEquals("anthropic/claude-haiku-4.5", request.model)
+        val model = OpenRouterConfig().model
+        assertTrue(!model.contains("claude-3.5-sonnet"), "Default model should not be claude-3.5-sonnet, was: $model")
+        assertEquals("anthropic/claude-haiku-4.5", model)
+    }
+
+    @Test
+    fun `requests use the configured model`() {
+        appProperties.openrouter.model = "anthropic/custom-model"
+        val captured = io.mockk.slot<Any>()
+        every { requestBodySpec.bodyValue(capture(captured)) } returns requestBodySpec
+        every { responseSpec.bodyToMono(any<ParameterizedTypeReference<OpenRouterService.OpenRouterResponse>>()) } returns
+            Mono.just(createOpenRouterResponseWithContent("Hallo"))
+
+        openRouterService.translateText("Hello", "German").block()
+
+        assertEquals("anthropic/custom-model", (captured.captured as OpenRouterService.OpenRouterRequest).model)
     }
 
     // ── factory functions ─────────────────────────────────────────────────────

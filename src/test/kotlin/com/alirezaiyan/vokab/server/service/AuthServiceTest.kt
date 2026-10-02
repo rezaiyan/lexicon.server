@@ -28,6 +28,8 @@ import com.alirezaiyan.vokab.server.domain.repository.UserPlatformRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
+import com.alirezaiyan.vokab.server.security.AppleIdClaims
+import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.security.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.mockk.every
@@ -43,7 +45,6 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertDoesNotThrow
 import org.junit.jupiter.api.assertThrows
-import org.springframework.web.reactive.function.client.WebClient
 import java.time.Instant
 import java.util.Optional
 
@@ -53,7 +54,8 @@ class AuthServiceTest {
     private lateinit var refreshTokenRepository: RefreshTokenRepository
     private lateinit var jwtTokenProvider: RS256JwtTokenProvider
     private lateinit var refreshTokenHashService: RefreshTokenHashService
-    private lateinit var applePublicKeyService: ApplePublicKeyService
+    private lateinit var appleIdTokenVerifier: AppleIdTokenVerifier
+    private lateinit var revenueCatClient: RevenueCatClient
     private lateinit var wordRepository: WordRepository
     private lateinit var userSettingsRepository: UserSettingsRepository
     private lateinit var dailyActivityRepository: DailyActivityRepository
@@ -67,7 +69,6 @@ class AuthServiceTest {
     private lateinit var appProperties: AppProperties
     private lateinit var auditLogService: AuditLogService
     private lateinit var eventService: EventService
-    private lateinit var webClientBuilder: WebClient.Builder
     private lateinit var appConfigService: AppConfigService
     private lateinit var domainEventPublisher: DomainEventPublisher
     private lateinit var geoLocationService: GeoLocationService
@@ -80,7 +81,8 @@ class AuthServiceTest {
         refreshTokenRepository = mockk()
         jwtTokenProvider = mockk()
         refreshTokenHashService = mockk()
-        applePublicKeyService = mockk()
+        appleIdTokenVerifier = mockk()
+        revenueCatClient = mockk(relaxed = true)
         wordRepository = mockk()
         userSettingsRepository = mockk()
         dailyActivityRepository = mockk()
@@ -104,34 +106,7 @@ class AuthServiceTest {
             security = SecurityConfig(testEmails = "")
         )
 
-        val webClient = mockk<WebClient>()
-        webClientBuilder = mockk()
-        every { webClientBuilder.build() } returns webClient
-
-        authService = AuthService(
-            userRepository = userRepository,
-            refreshTokenRepository = refreshTokenRepository,
-            jwtTokenProvider = jwtTokenProvider,
-            refreshTokenHashService = refreshTokenHashService,
-            applePublicKeyService = applePublicKeyService,
-            wordRepository = wordRepository,
-            userSettingsRepository = userSettingsRepository,
-            dailyActivityRepository = dailyActivityRepository,
-            subscriptionRepository = subscriptionRepository,
-            pushTokenRepository = pushTokenRepository,
-            userPlatformRepository = userPlatformRepository,
-            dailyInsightRepository = dailyInsightRepository,
-            reviewEventRepository = reviewEventRepository,
-            studySessionRepository = studySessionRepository,
-            pushNotificationService = pushNotificationService,
-            appProperties = appProperties,
-            auditLogService = auditLogService,
-            eventService = eventService,
-            domainEventPublisher = domainEventPublisher,
-            geoLocationService = geoLocationService,
-            webClientBuilder = webClientBuilder,
-            appConfigService = appConfigService
-        )
+        authService = buildServiceWith(appProperties)
         every { userRepository.updateSubscription(any(), any(), any(), any()) } returns 1
         every { userRepository.updateGrant(any(), any(), any(), any()) } returns 1
     }
@@ -318,6 +293,63 @@ class AuthServiceTest {
 
         // Exception must be absorbed — auth response must still be returned
         assertDoesNotThrow { authService.authenticateForCi(platform = "ios") }
+    }
+
+    // ── authenticateWithApple ─────────────────────────────────────────────────
+
+    @Test
+    fun `authenticateWithApple rejects a token that fails verification`() {
+        every { appleIdTokenVerifier.verify("bad") } returns null
+
+        assertThrows<IllegalArgumentException> {
+            authService.authenticateWithApple("bad", null, null)
+        }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithApple rejects a client appleUserId that differs from the token subject`() {
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "real-sub", email = "a@b.com")
+
+        assertThrows<IllegalArgumentException> {
+            authService.authenticateWithApple("token", null, appleUserId = "victim-sub")
+        }
+        verify(exactly = 0) { userRepository.findByAppleId(any()) }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithApple signs in existing user found by token subject`() {
+        val existing = createUser(id = 7L, email = "a@b.com", appleId = "real-sub")
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "real-sub", email = "a@b.com")
+        every { userRepository.findByAppleId("real-sub") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, appleUserId = "real-sub")
+
+        assertEquals(7L, result.user.id)
+        assertEquals("access-token", result.accessToken)
+        verify(exactly = 0) { eventService.trackAsync(any(), "signup_completed", any()) }
+    }
+
+    @Test
+    fun `authenticateWithApple with hidden email creates user with fallback email and never links by email`() {
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "abc.123", email = null)
+        every { userRepository.findByAppleId("abc.123") } returns Optional.empty()
+        every { userRepository.save(any()) } answers { firstArg<User>().copy(id = 42L) }
+        every { jwtTokenProvider.generateAccessToken(42L, "apple_abc_123@apple.hidden", any()) } returns "access-token"
+        every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
+        every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
+        every { refreshTokenRepository.save(any()) } returns mockk()
+        every { jwtTokenProvider.getExpirationTime() } returns 86400L
+
+        val result = authService.authenticateWithApple("token", "Jane Doe", null)
+
+        assertEquals("apple_abc_123@apple.hidden", result.user.email)
+        assertEquals("Jane Doe", result.user.name)
+        verify(exactly = 0) { userRepository.findByEmail(any()) }
+        verify { eventService.trackAsync(42L, "signup_completed", mapOf("provider" to "apple")) }
     }
 
     // ── refreshAccessToken ────────────────────────────────────────────────────
@@ -895,15 +927,13 @@ class AuthServiceTest {
     }
 
     private fun buildServiceWith(properties: AppProperties): AuthService {
-        val webClient = mockk<WebClient>()
-        val builder = mockk<WebClient.Builder>()
-        every { builder.build() } returns webClient
         return AuthService(
             userRepository = userRepository,
             refreshTokenRepository = refreshTokenRepository,
             jwtTokenProvider = jwtTokenProvider,
             refreshTokenHashService = refreshTokenHashService,
-            applePublicKeyService = applePublicKeyService,
+            appleIdTokenVerifier = appleIdTokenVerifier,
+            revenueCatClient = revenueCatClient,
             wordRepository = wordRepository,
             userSettingsRepository = userSettingsRepository,
             dailyActivityRepository = dailyActivityRepository,
@@ -919,7 +949,6 @@ class AuthServiceTest {
             eventService = eventService,
             domainEventPublisher = domainEventPublisher,
             geoLocationService = geoLocationService,
-            webClientBuilder = builder,
             appConfigService = appConfigService
         )
     }

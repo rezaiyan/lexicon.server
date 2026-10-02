@@ -71,6 +71,12 @@ app:
   openrouter:
     api-key: ${OPENROUTER_API_KEY:your-openrouter-api-key}
     base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
+    model: ${OPENROUTER_MODEL:anthropic/claude-haiku-4.5}
+    timeout-seconds: ${OPENROUTER_TIMEOUT_SECONDS:60}
+
+  apple:
+    # Accepted `aud` values for Apple ID tokens (iOS bundle id; add a Services ID if web sign-in ships).
+    client-ids: ${APPLE_CLIENT_IDS:com.alirezaiyan.vokab}
 
   vocabulary:
     # How many vocabulary items to ask the AI to generate

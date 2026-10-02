@@ -9,6 +9,7 @@ data class AppProperties(
     var jwt: JwtConfig = JwtConfig(),
     var firebase: FirebaseAppConfig = FirebaseAppConfig(),
     var openrouter: OpenRouterConfig = OpenRouterConfig(),
+    var apple: AppleConfig = AppleConfig(),
     var revenuecat: RevenueCatConfig = RevenueCatConfig(),
     var cors: CorsConfig = CorsConfig(),
     var features: FeatureFlagsConfig = FeatureFlagsConfig(),
@@ -39,8 +40,18 @@ data class FirebaseAppConfig(
 
 data class OpenRouterConfig(
     var apiKey: String = "",
-    var baseUrl: String = "https://openrouter.ai/api/v1"
+    var baseUrl: String = "https://openrouter.ai/api/v1",
+    var model: String = "anthropic/claude-haiku-4.5",
+    var timeoutSeconds: Long = 60
 )
+
+data class AppleConfig(
+    /** Bundle / Services IDs accepted as the `aud` of Apple ID tokens (comma-separated). */
+    var clientIds: String = "com.alirezaiyan.vokab"
+) {
+    val clientIdSet: Set<String>
+        get() = clientIds.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+}
 
 data class RevenueCatConfig(
     var webhookSecret: String = "",

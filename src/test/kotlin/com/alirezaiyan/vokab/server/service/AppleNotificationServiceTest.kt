@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.config.AppProperties
+import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -42,7 +44,7 @@ class AppleNotificationServiceTest {
 
         appleNotificationService = AppleNotificationService(
             userRepository,
-            applePublicKeyService,
+            AppleIdTokenVerifier(applePublicKeyService, AppProperties()),
             objectMapper,
             pushNotificationService,
             authService
@@ -277,6 +279,7 @@ class AppleNotificationServiceTest {
         val eventsJson = buildEventsJson("apple-user-1", "email-disabled", null)
         val tokenSignedByA = io.jsonwebtoken.Jwts.builder()
             .issuer("https://appleid.apple.com")
+            .audience().add("com.alirezaiyan.vokab").and()
             .claim("events", objectMapper.readValue(eventsJson, Map::class.java))
             .header().keyId("test-key-id").and()
             .signWith(keyPairA.private as java.security.interfaces.RSAPrivateKey, io.jsonwebtoken.Jwts.SIG.RS256)
@@ -288,6 +291,19 @@ class AppleNotificationServiceTest {
         val result = appleNotificationService.processNotification(tokenSignedByA)
 
         assertFalse(result)
+    }
+
+    @Test
+    fun `should ignore a notification addressed to another app`() {
+        val user = createUser(id = 6L, appleId = "apple-user-1")
+        val (token, rsaKey) = buildSignedJwt(appleUserId = "apple-user-1", eventType = "account-delete", audience = "com.other.app")
+        every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
+        every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
+
+        val result = appleNotificationService.processNotification(token)
+
+        assertFalse(result)
+        verify(exactly = 0) { authService.deleteAccount(any()) }
     }
 
     // ── factory functions ──────────────────────────────────────────────────────
@@ -318,6 +334,7 @@ class AppleNotificationServiceTest {
         appleUserId: String,
         eventType: String,
         eventExtra: String? = null,
+        audience: String = "com.alirezaiyan.vokab",
     ): Pair<String, java.security.PublicKey> {
         val keyPair = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
         val privateKey = keyPair.private as java.security.interfaces.RSAPrivateKey
@@ -325,9 +342,10 @@ class AppleNotificationServiceTest {
 
         val eventsJson = buildEventsJson(appleUserId, eventType, eventExtra)
 
-        // Build claims: issuer = "https://appleid.apple.com", events claim
+        // Build claims: issuer = "https://appleid.apple.com", aud = our client id, events claim
         val token = io.jsonwebtoken.Jwts.builder()
             .issuer("https://appleid.apple.com")
+            .audience().add(audience).and()
             .claim("events", objectMapper.readValue(eventsJson, Map::class.java))
             .header().keyId("test-key-id").and()
             .signWith(privateKey, io.jsonwebtoken.Jwts.SIG.RS256)

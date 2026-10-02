@@ -8,17 +8,9 @@ import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.event.UserSignedInEvent
 import com.alirezaiyan.vokab.server.domain.event.UserSignedUpEvent
-import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
-import com.alirezaiyan.vokab.server.domain.repository.DailyInsightRepository
-import com.alirezaiyan.vokab.server.domain.repository.PushTokenRepository
 import com.alirezaiyan.vokab.server.domain.repository.RefreshTokenRepository
-import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
-import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
-import com.alirezaiyan.vokab.server.domain.repository.SubscriptionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserPlatformRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
-import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
-import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.presentation.dto.AuthResponse
 import com.alirezaiyan.vokab.server.presentation.dto.UserDto
 import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
@@ -48,15 +40,8 @@ class AuthService(
     private val jwtTokenProvider: RS256JwtTokenProvider,
     private val refreshTokenHashService: RefreshTokenHashService,
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
-    private val wordRepository: WordRepository,
-    private val userSettingsRepository: UserSettingsRepository,
-    private val dailyActivityRepository: DailyActivityRepository,
-    private val subscriptionRepository: SubscriptionRepository,
-    private val pushTokenRepository: PushTokenRepository,
     private val userPlatformRepository: UserPlatformRepository,
-    private val dailyInsightRepository: DailyInsightRepository,
-    private val reviewEventRepository: ReviewEventRepository,
-    private val studySessionRepository: StudySessionRepository,
+    private val userDataPurger: UserDataPurger,
     private val pushNotificationService: PushNotificationService,
     private val revenueCatClient: RevenueCatClient,
     private val appProperties: AppProperties,
@@ -258,17 +243,8 @@ class AuthService(
             type = "account_deleted",
         )
 
-        // Children before parents to satisfy foreign keys (review events before study sessions).
-        refreshTokenRepository.revokeAllByUser(user)
-        refreshTokenRepository.deleteAll(refreshTokenRepository.findByUser(user))
-        pushTokenRepository.deleteAll(pushTokenRepository.findByUser(user))
-        dailyInsightRepository.deleteAll(dailyInsightRepository.findByUser(user))
-        wordRepository.deleteAll(wordRepository.findAllByUser(user))
-        dailyActivityRepository.deleteAll(dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user))
-        subscriptionRepository.deleteAll(subscriptionRepository.findByUser(user))
-        reviewEventRepository.deleteAll(reviewEventRepository.findByUser(user))
-        studySessionRepository.deleteAll(studySessionRepository.findByUser(user))
-        userSettingsRepository.findByUser(user)?.let(userSettingsRepository::delete)
+        val purged = userDataPurger.purge(userId)
+        logger.info { "Purged data for userId=$userId: ${purged.filterValues { it > 0 }}" }
 
         // The audit log has no FK to users, so this record survives the deletion.
         auditLogService.logAccountDeletion(userId, user.email, null)
@@ -356,19 +332,13 @@ class AuthService(
 
     /**
      * Apple id is the primary key for lookup. Email linking only happens when Apple shared the real
-     * address — a fallback address must never match another account.
+     * address — a fallback address must never match another account. A returning user keeps their
+     * stored email: Apple omitting the claim must not replace a real address with the fallback.
      */
     private fun findOrCreateAppleUser(appleId: String, email: String, fullName: String?, emailHidden: Boolean): User {
         val now = Instant.now()
-        val user = userRepository.findByAppleId(appleId).orElse(null)?.let { existing ->
-            val updatedEmail = if (emailHidden && existing.email != email) {
-                logger.info { "Updating fallback email for Apple userId=${existing.id}" }
-                email
-            } else {
-                existing.email
-            }
-            existing.copy(email = updatedEmail, lastLoginAt = now, updatedAt = now)
-        }
+        val user = userRepository.findByAppleId(appleId).orElse(null)
+            ?.copy(lastLoginAt = now, updatedAt = now)
             ?: (if (emailHidden) null else userRepository.findByEmail(email).orElse(null))?.let { existing ->
                 logger.info { "Linking Apple account to userId=${existing.id}" }
                 existing.copy(appleId = appleId, name = fullName ?: existing.name, lastLoginAt = now, updatedAt = now)

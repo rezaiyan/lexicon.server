@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.service
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.*
+import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -21,7 +22,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 class AppleNotificationService(
     private val userRepository: UserRepository,
-    private val applePublicKeyService: ApplePublicKeyService,
+    private val appleIdTokenVerifier: AppleIdTokenVerifier,
     private val objectMapper: ObjectMapper,
     private val pushNotificationService: PushNotificationService,
     private val authService: AuthService
@@ -76,58 +77,9 @@ class AppleNotificationService(
         }
     }
     
-    /**
-     * Verify Apple notification JWT using Apple's public keys
-     */
-    private fun verifyAppleNotificationToken(tokenString: String): Map<String, Any>? {
-        return try {
-            // Parse header to get kid
-            val parts = tokenString.split(".")
-            if (parts.size != 3) {
-                logger.error { "Invalid JWT format" }
-                return null
-            }
-            
-            val headerJson = String(java.util.Base64.getUrlDecoder().decode(parts[0]))
-            val header = objectMapper.readValue(headerJson, Map::class.java) as Map<String, Any>
-            
-            val kid = header["kid"] as? String ?: return null
-            
-            // Get public key
-            val publicKey = applePublicKeyService.getPublicKey(kid)
-            if (publicKey == null) {
-                logger.error { "Could not get public key for kid: $kid" }
-                return null
-            }
-            
-            // Verify signature
-            val jwtParser = io.jsonwebtoken.Jwts.parser()
-                .verifyWith(publicKey as java.security.interfaces.RSAPublicKey)
-                .build()
-            
-            val jwt = jwtParser.parseSignedClaims(tokenString)
-            val claims = jwt.payload
-            
-            // Validate issuer
-            if (claims.issuer != "https://appleid.apple.com") {
-                logger.error { "Invalid issuer: ${claims.issuer}" }
-                return null
-            }
-            
-            // Convert to map
-            val claimsMap = mutableMapOf<String, Any>()
-            claims.forEach { (key, value) ->
-                claimsMap[key] = value
-            }
-            
-            logger.info { "✅ Apple notification token verified" }
-            claimsMap
-            
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to verify Apple notification token" }
-            null
-        }
-    }
+    /** Signature, issuer, expiry and audience are checked by [AppleIdTokenVerifier]. */
+    private fun verifyAppleNotificationToken(tokenString: String): Map<String, Any?>? =
+        appleIdTokenVerifier.verifyClaims(tokenString)?.toMap()
     
     /**
      * Handle email-disabled event

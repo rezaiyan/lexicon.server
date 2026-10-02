@@ -6,28 +6,12 @@ import com.alirezaiyan.vokab.server.config.JwtConfig
 import com.alirezaiyan.vokab.server.config.SecurityConfig
 import com.alirezaiyan.vokab.server.domain.event.UserSignedUpEvent
 import com.alirezaiyan.vokab.server.service.event.DomainEventPublisher
-import com.alirezaiyan.vokab.server.domain.entity.DailyActivity
-import com.alirezaiyan.vokab.server.domain.entity.DailyInsight
-import com.alirezaiyan.vokab.server.domain.entity.PushToken
 import com.alirezaiyan.vokab.server.domain.entity.RefreshToken
-import com.alirezaiyan.vokab.server.domain.entity.ReviewEvent
-import com.alirezaiyan.vokab.server.domain.entity.StudySession
-import com.alirezaiyan.vokab.server.domain.entity.Subscription
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
-import com.alirezaiyan.vokab.server.domain.entity.UserSettings
-import com.alirezaiyan.vokab.server.domain.entity.Word
-import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
-import com.alirezaiyan.vokab.server.domain.repository.DailyInsightRepository
-import com.alirezaiyan.vokab.server.domain.repository.PushTokenRepository
 import com.alirezaiyan.vokab.server.domain.repository.RefreshTokenRepository
-import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
-import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
-import com.alirezaiyan.vokab.server.domain.repository.SubscriptionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserPlatformRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
-import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
-import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.security.AppleIdClaims
 import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.security.RS256JwtTokenProvider
@@ -38,6 +22,7 @@ import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.verify
+import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -56,15 +41,8 @@ class AuthServiceTest {
     private lateinit var refreshTokenHashService: RefreshTokenHashService
     private lateinit var appleIdTokenVerifier: AppleIdTokenVerifier
     private lateinit var revenueCatClient: RevenueCatClient
-    private lateinit var wordRepository: WordRepository
-    private lateinit var userSettingsRepository: UserSettingsRepository
-    private lateinit var dailyActivityRepository: DailyActivityRepository
-    private lateinit var subscriptionRepository: SubscriptionRepository
-    private lateinit var pushTokenRepository: PushTokenRepository
     private lateinit var userPlatformRepository: UserPlatformRepository
-    private lateinit var dailyInsightRepository: DailyInsightRepository
-    private lateinit var reviewEventRepository: ReviewEventRepository
-    private lateinit var studySessionRepository: StudySessionRepository
+    private lateinit var userDataPurger: UserDataPurger
     private lateinit var pushNotificationService: PushNotificationService
     private lateinit var appProperties: AppProperties
     private lateinit var auditLogService: AuditLogService
@@ -83,15 +61,8 @@ class AuthServiceTest {
         refreshTokenHashService = mockk()
         appleIdTokenVerifier = mockk()
         revenueCatClient = mockk(relaxed = true)
-        wordRepository = mockk()
-        userSettingsRepository = mockk()
-        dailyActivityRepository = mockk()
-        subscriptionRepository = mockk()
-        pushTokenRepository = mockk()
         userPlatformRepository = mockk(relaxed = true)
-        dailyInsightRepository = mockk()
-        reviewEventRepository = mockk()
-        studySessionRepository = mockk()
+        userDataPurger = mockk()
         pushNotificationService = mockk()
         auditLogService = mockk(relaxed = true)
         eventService = mockk(relaxed = true)
@@ -350,6 +321,20 @@ class AuthServiceTest {
         assertEquals("Jane Doe", result.user.name)
         verify(exactly = 0) { userRepository.findByEmail(any()) }
         verify { eventService.trackAsync(42L, "signup_completed", mapOf("provider" to "apple")) }
+    }
+
+    @Test
+    fun `authenticateWithApple without email claim keeps a returning user's real email`() {
+        val existing = createUser(id = 8L, email = "real@example.com", appleId = "sub-8")
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "sub-8", email = null)
+        every { userRepository.findByAppleId("sub-8") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("real@example.com", result.user.email)
+        verify { userRepository.save(match { it.email == "real@example.com" }) }
     }
 
     // ── refreshAccessToken ────────────────────────────────────────────────────
@@ -625,67 +610,41 @@ class AuthServiceTest {
     }
 
     @Test
-    fun `deleteAccount should revoke all refresh tokens`() {
-        // Arrange
+    fun `deleteAccount notifies devices, purges owned data, audits, then deletes the user row`() {
         val userId = 31L
         val user = createUser(id = userId, googleId = null)
         stubDeleteAccount(userId, user)
 
-        // Act
         authService.deleteAccount(userId)
 
-        // Assert
-        verify(exactly = 1) { refreshTokenRepository.revokeAllByUser(user) }
-        verify(exactly = 1) { refreshTokenRepository.deleteAll(any<List<RefreshToken>>()) }
+        verifyOrder {
+            pushNotificationService.sendNotificationToUser(userId, any(), any(), any(), any())
+            userDataPurger.purge(userId)
+            auditLogService.logAccountDeletion(userId, user.email, null)
+            userRepository.delete(user)
+        }
     }
 
     @Test
-    fun `deleteAccount should delete words, push tokens, insights, activities, subscriptions, review events, study sessions`() {
-        // Arrange
+    fun `deleteAccount deletes the RevenueCat subscriber when the user has one`() {
         val userId = 32L
+        val user = createUser(id = userId, googleId = null).copy(revenueCatUserId = "rc-32")
+        stubDeleteAccount(userId, user)
+
+        authService.deleteAccount(userId)
+
+        verify(exactly = 1) { revenueCatClient.deleteSubscriber("rc-32") }
+    }
+
+    @Test
+    fun `deleteAccount skips RevenueCat when the user never purchased`() {
+        val userId = 33L
         val user = createUser(id = userId, googleId = null)
         stubDeleteAccount(userId, user)
 
-        // Act
         authService.deleteAccount(userId)
 
-        // Assert
-        verify(exactly = 1) { wordRepository.deleteAll(any<List<Word>>()) }
-        verify(exactly = 1) { pushTokenRepository.deleteAll(any<List<PushToken>>()) }
-        verify(exactly = 1) { dailyInsightRepository.deleteAll(any<List<DailyInsight>>()) }
-        verify(exactly = 1) { dailyActivityRepository.deleteAll(any<List<DailyActivity>>()) }
-        verify(exactly = 1) { subscriptionRepository.deleteAll(any<List<Subscription>>()) }
-        verify(exactly = 1) { reviewEventRepository.deleteAll(any<List<ReviewEvent>>()) }
-        verify(exactly = 1) { studySessionRepository.deleteAll(any<List<StudySession>>()) }
-    }
-
-    @Test
-    fun `deleteAccount should delete user settings when present`() {
-        // Arrange
-        val userId = 33L
-        val user = createUser(id = userId, googleId = null)
-        val settings = mockk<UserSettings>()
-        stubDeleteAccount(userId, user, userSettings = settings)
-
-        // Act
-        authService.deleteAccount(userId)
-
-        // Assert
-        verify(exactly = 1) { userSettingsRepository.delete(settings) }
-    }
-
-    @Test
-    fun `deleteAccount should not call delete on settings when settings are absent`() {
-        // Arrange
-        val userId = 34L
-        val user = createUser(id = userId, googleId = null)
-        stubDeleteAccount(userId, user, userSettings = null)
-
-        // Act
-        authService.deleteAccount(userId)
-
-        // Assert
-        verify(exactly = 0) { userSettingsRepository.delete(any()) }
+        verify(exactly = 0) { revenueCatClient.deleteSubscriber(any()) }
     }
 
     @Test
@@ -878,7 +837,6 @@ class AuthServiceTest {
     private fun stubDeleteAccount(
         userId: Long,
         user: User,
-        userSettings: UserSettings? = null,
         pushThrows: Boolean = false
     ) {
         every { userRepository.findById(userId) } returns Optional.of(user)
@@ -893,36 +851,7 @@ class AuthServiceTest {
             } returns emptyList()
         }
 
-        every { refreshTokenRepository.revokeAllByUser(user) } returns 1
-        every { refreshTokenRepository.findByUser(user) } returns emptyList()
-        every { refreshTokenRepository.deleteAll(any<List<RefreshToken>>()) } just Runs
-
-        every { pushTokenRepository.findByUser(user) } returns emptyList()
-        every { pushTokenRepository.deleteAll(any<List<PushToken>>()) } just Runs
-
-        every { dailyInsightRepository.findByUser(user) } returns emptyList()
-        every { dailyInsightRepository.deleteAll(any<List<DailyInsight>>()) } just Runs
-
-        every { wordRepository.findAllByUser(user) } returns emptyList()
-        every { wordRepository.deleteAll(any<List<Word>>()) } just Runs
-
-        every { dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user) } returns emptyList()
-        every { dailyActivityRepository.deleteAll(any<List<DailyActivity>>()) } just Runs
-
-        every { subscriptionRepository.findByUser(user) } returns emptyList()
-        every { subscriptionRepository.deleteAll(any<List<Subscription>>()) } just Runs
-
-        every { reviewEventRepository.findByUser(user) } returns emptyList()
-        every { reviewEventRepository.deleteAll(any<List<ReviewEvent>>()) } just Runs
-
-        every { studySessionRepository.findByUser(user) } returns emptyList()
-        every { studySessionRepository.deleteAll(any<List<StudySession>>()) } just Runs
-
-        every { userSettingsRepository.findByUser(user) } returns userSettings
-        if (userSettings != null) {
-            justRun { userSettingsRepository.delete(userSettings) }
-        }
-
+        every { userDataPurger.purge(userId) } returns mapOf("words" to 0)
         justRun { userRepository.delete(user) }
     }
 
@@ -934,15 +863,8 @@ class AuthServiceTest {
             refreshTokenHashService = refreshTokenHashService,
             appleIdTokenVerifier = appleIdTokenVerifier,
             revenueCatClient = revenueCatClient,
-            wordRepository = wordRepository,
-            userSettingsRepository = userSettingsRepository,
-            dailyActivityRepository = dailyActivityRepository,
-            subscriptionRepository = subscriptionRepository,
-            pushTokenRepository = pushTokenRepository,
             userPlatformRepository = userPlatformRepository,
-            dailyInsightRepository = dailyInsightRepository,
-            reviewEventRepository = reviewEventRepository,
-            studySessionRepository = studySessionRepository,
+            userDataPurger = userDataPurger,
             pushNotificationService = pushNotificationService,
             appProperties = properties,
             auditLogService = auditLogService,

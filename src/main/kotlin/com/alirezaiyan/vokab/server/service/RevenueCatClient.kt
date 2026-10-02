@@ -7,8 +7,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.WebClientResponseException
-import org.springframework.web.util.UriUtils
-import java.nio.charset.StandardCharsets
+import org.springframework.web.util.UriBuilder
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 
@@ -37,7 +37,7 @@ class RevenueCatClient(
         if (!isConfigured) return null
         return try {
             val response = webClient.get()
-                .uri("/subscribers/{id}", UriUtils.encodePathSegment(appUserId, StandardCharsets.UTF_8))
+                .uri { it.subscriberPath(appUserId) }
                 .header("Authorization", "Bearer ${appProperties.revenuecat.apiKey}")
                 .retrieve()
                 .bodyToMono(SubscriberResponse::class.java)
@@ -52,6 +52,37 @@ class RevenueCatClient(
             null
         }
     }
+
+    /**
+     * Deletes the customer and their purchase history at RevenueCat (GDPR erasure).
+     * Returns false when the API isn't configured or the request failed; never throws.
+     */
+    fun deleteSubscriber(appUserId: String): Boolean {
+        if (!isConfigured) return false
+        return try {
+            webClient.delete()
+                .uri { it.subscriberPath(appUserId) }
+                .header("Authorization", "Bearer ${appProperties.revenuecat.apiKey}")
+                .retrieve()
+                .toBodilessEntity()
+                .timeout(TIMEOUT)
+                .block()
+            true
+        } catch (e: WebClientResponseException) {
+            logger.warn { "RevenueCat subscriber deletion failed: status=${e.statusCode}" }
+            false
+        } catch (e: Exception) {
+            logger.warn(e) { "RevenueCat subscriber deletion failed" }
+            false
+        }
+    }
+
+    /**
+     * `/subscribers/{appUserId}` with the id encoded exactly once, as a single path segment
+     * (a `/` or space in the id must not change the path).
+     */
+    private fun UriBuilder.subscriberPath(appUserId: String): URI =
+        pathSegment("subscribers", appUserId).build()
 
     companion object {
         private const val BASE_URL = "https://api.revenuecat.com/v1"

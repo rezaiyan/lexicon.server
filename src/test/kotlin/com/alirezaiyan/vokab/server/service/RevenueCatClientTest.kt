@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.config.AppProperties
+import com.alirezaiyan.vokab.server.config.RevenueCatConfig
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -7,6 +9,13 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
+import org.springframework.web.reactive.function.client.ClientRequest
+import org.springframework.web.reactive.function.client.ClientResponse
+import org.springframework.web.reactive.function.client.WebClient
+import reactor.core.publisher.Mono
 import java.time.Instant
 
 class RevenueCatClientTest {
@@ -111,5 +120,54 @@ class RevenueCatClientTest {
 
         assertFalse(s.isActive)
         assertFalse(s.hasPurchaseHistory)
+    }
+
+    // ── deleteSubscriber ──────────────────────────────────────────────────────
+
+    @Test
+    fun `deleteSubscriber sends authorized DELETE for the customer and returns true`() {
+        val requests = mutableListOf<ClientRequest>()
+        val client = clientResponding(HttpStatus.OK, requests)
+
+        assertTrue(client.deleteSubscriber("rc user/42"))
+
+        val request = requests.single()
+        assertEquals(HttpMethod.DELETE, request.method())
+        assertEquals("/v1/subscribers/rc%20user%2F42", request.url().rawPath)
+        assertEquals("Bearer sk_test", request.headers().getFirst(HttpHeaders.AUTHORIZATION))
+    }
+
+    @Test
+    fun `fetchEntitlementState encodes the customer id exactly once`() {
+        val requests = mutableListOf<ClientRequest>()
+        clientResponding(HttpStatus.NOT_FOUND, requests).fetchEntitlementState("rc user/42")
+
+        assertEquals("/v1/subscribers/rc%20user%2F42", requests.single().url().rawPath)
+    }
+
+    @Test
+    fun `deleteSubscriber returns false on an error status without throwing`() {
+        assertFalse(clientResponding(HttpStatus.INTERNAL_SERVER_ERROR).deleteSubscriber("42"))
+    }
+
+    @Test
+    fun `deleteSubscriber makes no request when the API key is not configured`() {
+        val requests = mutableListOf<ClientRequest>()
+        val client = clientResponding(HttpStatus.OK, requests, apiKey = "")
+
+        assertFalse(client.deleteSubscriber("42"))
+        assertTrue(requests.isEmpty())
+    }
+
+    private fun clientResponding(
+        status: HttpStatus,
+        requests: MutableList<ClientRequest> = mutableListOf(),
+        apiKey: String = "sk_test",
+    ): RevenueCatClient {
+        val builder = WebClient.builder().exchangeFunction { request ->
+            requests += request
+            Mono.just(ClientResponse.create(status).build())
+        }
+        return RevenueCatClient(builder, AppProperties(revenuecat = RevenueCatConfig(apiKey = apiKey)))
     }
 }

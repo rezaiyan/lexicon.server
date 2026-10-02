@@ -85,7 +85,11 @@ app:
     suggestionCount: ${VOCABULARY_SUGGESTION_COUNT:50}
 
   revenuecat:
-    webhook-secret: ${REVENUECAT_WEBHOOK_SECRET:your-revenuecat-webhook-secret}
+    # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.
+    webhook-secret: ${REVENUECAT_WEBHOOK_SECRET:}
+    # Optional HMAC signing secret ("HMAC webhook signing" in RevenueCat). Set = signature required.
+    webhook-signing-secret: ${REVENUECAT_WEBHOOK_SIGNING_SECRET:}
+    webhook-signature-tolerance-seconds: ${REVENUECAT_WEBHOOK_SIGNATURE_TOLERANCE_SECONDS:300}
     # Secret (sk_) key. Empty disables subscription sync + reconcile.
     api-key: ${REVENUECAT_API_KEY:}
 

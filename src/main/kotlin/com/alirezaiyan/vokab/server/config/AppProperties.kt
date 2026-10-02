@@ -54,7 +54,12 @@ data class AppleConfig(
 }
 
 data class RevenueCatConfig(
+    /** Static `Authorization` header value configured on the RevenueCat webhook. Required. */
     var webhookSecret: String = "",
+    /** HMAC signing secret; when set, every delivery must carry a valid `X-RevenueCat-Webhook-Signature`. */
+    var webhookSigningSecret: String = "",
+    /** Max age/skew of the signature timestamp (`t=`), in seconds. */
+    var webhookSignatureToleranceSeconds: Long = 300,
     var apiKey: String = ""
 )
 

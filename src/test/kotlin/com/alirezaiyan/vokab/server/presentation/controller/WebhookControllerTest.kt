@@ -22,6 +22,9 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.time.Instant
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -74,17 +77,32 @@ class WebhookControllerTest {
     @AfterEach
     fun tearDown() {
         appProperties.revenuecat.webhookSecret = ""
+        appProperties.revenuecat.webhookSigningSecret = ""
     }
+
+    private val signingSecret = "test-signing-secret"
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> anyArg(): T = ArgumentMatchers.any<T>() as T
 
-    private fun postWebhook(body: String = samplePayload, authorization: String? = testSecret) =
-        mockMvc.post("/api/v1/webhooks/revenuecat") {
-            contentType = MediaType.APPLICATION_JSON
-            authorization?.let { header("Authorization", it) }
-            content = body
-        }
+    private fun postWebhook(
+        body: String = samplePayload,
+        authorization: String? = testSecret,
+        signature: String? = null,
+    ) = mockMvc.post("/api/v1/webhooks/revenuecat") {
+        contentType = MediaType.APPLICATION_JSON
+        authorization?.let { header("Authorization", it) }
+        signature?.let { header("X-RevenueCat-Webhook-Signature", it) }
+        content = body
+    }
+
+    /** `t=<unix>,v1=<hex>` as RevenueCat sends it: HMAC-SHA256 over "<t>.<raw body>". */
+    private fun sign(body: String, at: Instant = Instant.now()): String {
+        val t = at.epochSecond
+        val mac = Mac.getInstance("HmacSHA256").apply { init(SecretKeySpec(signingSecret.toByteArray(), "HmacSHA256")) }
+        val hex = mac.doFinal("$t.$body".toByteArray()).joinToString("") { "%02x".format(it) }
+        return "t=$t,v1=$hex"
+    }
 
     // ── authorization ──────────────────────────────────────────────────────────
 
@@ -118,10 +136,52 @@ class WebhookControllerTest {
     }
 
     @Test
-    fun `should accept webhook without Authorization header when secret is blank`() {
+    fun `should reject every webhook when no secret is configured`() {
         appProperties.revenuecat.webhookSecret = ""
 
-        postWebhook(authorization = null).andExpect { status { isOk() } }
+        postWebhook(authorization = null).andExpect { status { isUnauthorized() } }
+        postWebhook(authorization = "anything").andExpect { status { isUnauthorized() } }
+
+        verify(subscriptionService, never()).handleRevenueCatWebhook(anyArg())
+    }
+
+    // ── HMAC signature ─────────────────────────────────────────────────────────
+
+    @Test
+    fun `should accept a correctly signed delivery when signing is enabled`() {
+        appProperties.revenuecat.webhookSigningSecret = signingSecret
+
+        postWebhook(signature = sign(samplePayload)).andExpect { status { isOk() } }
+
+        verify(subscriptionService).handleRevenueCatWebhook(anyArg())
+    }
+
+    @Test
+    fun `should return 401 for an unsigned delivery when signing is enabled`() {
+        appProperties.revenuecat.webhookSigningSecret = signingSecret
+
+        postWebhook().andExpect { status { isUnauthorized() } }
+
+        verify(subscriptionService, never()).handleRevenueCatWebhook(anyArg())
+    }
+
+    @Test
+    fun `should return 401 when the signed body was altered in transit`() {
+        appProperties.revenuecat.webhookSigningSecret = signingSecret
+        val signature = sign(samplePayload)
+
+        postWebhook(body = samplePayload.replace("\"42\"", "\"43\""), signature = signature)
+            .andExpect { status { isUnauthorized() } }
+
+        verify(subscriptionService, never()).handleRevenueCatWebhook(anyArg())
+    }
+
+    @Test
+    fun `should return 401 for a replayed delivery with an old signature timestamp`() {
+        appProperties.revenuecat.webhookSigningSecret = signingSecret
+
+        postWebhook(signature = sign(samplePayload, at = Instant.now().minusSeconds(3600)))
+            .andExpect { status { isUnauthorized() } }
     }
 
     // ── payload parsing ────────────────────────────────────────────────────────

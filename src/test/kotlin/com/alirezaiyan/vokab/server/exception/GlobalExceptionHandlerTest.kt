@@ -167,6 +167,53 @@ class GlobalExceptionHandlerTest {
             .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("Validation failed")))
     }
 
+    // ── Spring MVC request errors → their own 4xx status ─────────────────────
+
+    @Test
+    fun `should return 404 for an unknown endpoint`() {
+        mockMvc.perform(
+            get("/api/v1/does-not-exist")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+    }
+
+    @Test
+    fun `should return 400 naming the parameter when a required query parameter is missing`() {
+        mockMvc.perform(
+            get("/api/v1/analytics/heatmap")
+                .param("start", "0")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("end")))
+    }
+
+    @Test
+    fun `should return 400 naming the parameter when a query parameter has the wrong type`() {
+        mockMvc.perform(
+            get("/api/v1/analytics/heatmap")
+                .param("start", "yesterday")
+                .param("end", "0")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("Invalid value for parameter 'start'"))
+    }
+
+    @Test
+    fun `should return 405 when the HTTP method is not supported`() {
+        mockMvc.perform(
+            delete("/api/v1/words")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isMethodNotAllowed)
+            .andExpect(jsonPath("$.success").value(false))
+    }
+
     // ── Unhandled exception → 500 ─────────────────────────────────────────────
 
     @Test

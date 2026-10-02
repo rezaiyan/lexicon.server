@@ -13,6 +13,8 @@ import org.springframework.validation.FieldError
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
+import org.springframework.web.ErrorResponse as SpringErrorResponse
 
 private val logger = KotlinLogging.logger {}
 
@@ -80,8 +82,26 @@ class GlobalExceptionHandler {
             .body(ApiResponse(success = false, message = "Resource already exists"))
     }
 
+    @ExceptionHandler(MethodArgumentTypeMismatchException::class)
+    fun handleTypeMismatchException(ex: MethodArgumentTypeMismatchException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn { "Type mismatch for parameter '${ex.name}': ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse(success = false, message = "Invalid value for parameter '${ex.name}'"))
+    }
+
     @ExceptionHandler(Exception::class)
     fun handleGenericException(ex: Exception): ResponseEntity<ApiResponse<Unit>> {
+        // Spring MVC request errors (unknown route, missing parameter, wrong method, unsupported
+        // media type, ...) carry their own status; they are client errors, not server failures.
+        if (ex is SpringErrorResponse) {
+            logger.warn { "${ex.javaClass.simpleName}: ${ex.message}" }
+            val message = ex.body.detail ?: HttpStatus.resolve(ex.statusCode.value())?.reasonPhrase ?: "Request failed"
+            return ResponseEntity
+                .status(ex.statusCode)
+                .headers(ex.headers)
+                .body(ApiResponse(success = false, message = message))
+        }
         logger.error(ex) { "Unhandled exception: ${ex.message}" }
         return ResponseEntity
             .status(HttpStatus.INTERNAL_SERVER_ERROR)

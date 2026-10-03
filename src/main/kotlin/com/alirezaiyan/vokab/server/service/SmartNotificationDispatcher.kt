@@ -14,6 +14,9 @@ import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
+/** Push data key carrying the notification_log id; clients echo it back when the user taps. */
+const val NOTIFICATION_LOG_ID_KEY = "notification_log_id"
+
 @Service
 class SmartNotificationDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
@@ -82,33 +85,37 @@ class SmartNotificationDispatcher(
         val userId  = user.requireId()
         val payload = notificationContentBuilder.build(user, type, contentHint)
 
-        val results = pushNotificationService.sendNotificationToUser(
-            userId = userId,
-            title  = payload.title,
-            body   = payload.body,
-            data   = payload.data
-        )
+        // The log is created before the push so its id can ride in the payload and come back
+        // with the tap (POST /notifications/{id}/opened). Without a log we still send — only
+        // open tracking for this one notification is lost.
+        val logId = runCatching {
+            notificationEngagementService.saveLog(
+                userId           = userId,
+                notificationType = type.name,
+                title            = payload.title,
+                body             = payload.body,
+                // Strip null bytes: PostgreSQL JSONB rejects U+0000 in string values
+                dataPayload      = objectMapper.writeValueAsString(
+                    payload.data.mapValues { (_, v) -> v.replace("\u0000", "") }
+                )
+            )
+        }.onFailure { e ->
+            logger.error(e) { "Notification log persist failed for user=$userId — sending without open tracking" }
+        }.getOrNull()
+
+        val data = if (logId != null) payload.data + (NOTIFICATION_LOG_ID_KEY to logId.toString()) else payload.data
+        val results = runCatching {
+            pushNotificationService.sendNotificationToUser(
+                userId = userId,
+                title  = payload.title,
+                body   = payload.body,
+                data   = data
+            )
+        }.onFailure { discardLog(logId) }.getOrThrow()
 
         val sent = results.any { it.success }
         if (sent) {
-            // Commit schedule state first — this MUST succeed before the log insert so that a
-            // log failure cannot roll back lastSentDate and trigger a duplicate send.
-            notificationEngagementService.recordSend(schedule, type.name)
-
-            runCatching {
-                notificationEngagementService.saveLog(
-                    userId           = userId,
-                    notificationType = type.name,
-                    title            = payload.title,
-                    body             = payload.body,
-                    // Strip null bytes: PostgreSQL JSONB rejects U+0000 in string values
-                    dataPayload      = objectMapper.writeValueAsString(
-                        payload.data.mapValues { (_, v) -> v.replace(" ", "") }
-                    )
-                )
-            }.onFailure { e ->
-                logger.error(e) { "Notification log persist failed for user=$userId — schedule already committed" }
-            }
+            notificationEngagementService.recordSend(schedule, type.name, currentLogId = logId)
 
             if (type == NotificationType.PROGRESS_MILESTONE) {
                 val stats = userProgressService.calculateProgressStats(user)
@@ -117,7 +124,15 @@ class SmartNotificationDispatcher(
 
             logger.info { "Sent $type (segment=${ schedule.engagementSegment}) to user=$userId" }
         } else {
+            discardLog(logId)
             logger.warn { "Push delivery failed for user=$userId, type=$type" }
         }
+    }
+
+    /** A log for an undelivered push would later count as an ignored notification. */
+    private fun discardLog(logId: Long?) {
+        if (logId == null) return
+        runCatching { notificationEngagementService.deleteLog(logId) }
+            .onFailure { e -> logger.error(e) { "Failed to discard notification log=$logId" } }
     }
 }

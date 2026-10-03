@@ -29,18 +29,20 @@ class NotificationEngagementService(
 ) {
     /**
      * Called when a user taps a notification.
-     * - Marks notification_log.opened_at
+     * - Marks notification_log.opened_at (first open only — repeats are no-ops)
      * - Resets consecutive_ignores to 0 in notification_schedule
      * - Clears suppression if currently active
+     * @return false when the log doesn't exist or belongs to another user
      */
     @Transactional
-    fun recordOpen(userId: Long, notificationLogId: Long) {
-        notificationLogRepository.findById(notificationLogId).ifPresent { log ->
-            if (log.userId == userId && log.openedAt == null) {
-                log.openedAt = Instant.now(clock)
-                notificationLogRepository.save(log)
-            }
-        }
+    fun recordOpen(userId: Long, notificationLogId: Long): Boolean {
+        val log = notificationLogRepository.findById(notificationLogId).orElse(null)
+        if (log == null || log.userId != userId) return false
+        // Repeated taps / retries are no-ops: only the first open counts as engagement
+        if (log.openedAt != null) return true
+
+        log.openedAt = Instant.now(clock)
+        notificationLogRepository.save(log)
 
         notificationScheduleRepository.findByUserId(userId)?.let { schedule ->
             schedule.consecutiveIgnores = 0
@@ -54,6 +56,7 @@ class NotificationEngagementService(
         }
 
         logger.debug { "Notification opened: user=$userId log=$notificationLogId" }
+        return true
     }
 
     /**
@@ -73,14 +76,20 @@ class NotificationEngagementService(
     @Transactional
     fun recordSend(
         schedule: NotificationSchedule,
-        notificationType: String
+        notificationType: String,
+        currentLogId: Long? = null,
     ) {
         val userId = schedule.user.requireId()
 
         // Increment ignore counter if a notification was previously sent and the user didn't open it.
         // Uses lastSentDate as the "sent-before" signal so suppression works even when saveLog fails.
         // If a log record IS present and was opened, recordOpen() already reset the counter.
-        val previousLog = notificationLogRepository.findTopByUserIdOrderBySentAtDesc(userId)
+        // The log for this send already exists (its id travels in the push payload) — skip it.
+        val previousLog = if (currentLogId != null) {
+            notificationLogRepository.findFirstByUserIdAndIdNotOrderBySentAtDesc(userId, currentLogId)
+        } else {
+            notificationLogRepository.findTopByUserIdOrderBySentAtDesc(userId)
+        }
         val wasOpened = previousLog?.openedAt != null
         if (!wasOpened && schedule.lastSentDate != null) {
             val ignoreCount = schedule.consecutiveIgnores + 1
@@ -107,7 +116,9 @@ class NotificationEngagementService(
 
     /**
      * Persists the notification log entry in its own transaction.
-     * Called after recordSend() so that a failure here cannot roll back the schedule update.
+     * Called before the push so the log id can travel in the payload; a failure here
+     * only loses open tracking for this send, never the send itself.
+     * @return the new log id
      */
     @Transactional
     fun saveLog(
@@ -116,16 +127,22 @@ class NotificationEngagementService(
         title: String?,
         body: String?,
         dataPayload: String?
-    ) {
+    ): Long =
         notificationLogRepository.save(
             NotificationLog(
                 userId = userId,
                 notificationType = notificationType,
                 title = title,
                 body = body,
-                dataPayload = dataPayload
+                dataPayload = dataPayload,
+                sentAt = Instant.now(clock),
             )
-        )
+        ).id
+
+    /** Removes a log pre-created for a push that was then not delivered. */
+    @Transactional
+    fun deleteLog(notificationLogId: Long) {
+        notificationLogRepository.deleteById(notificationLogId)
     }
 
     private fun computeSuppressedUntil(ignoreCount: Int): LocalDate? {

@@ -71,7 +71,7 @@ class EventServiceTest {
             properties = mapOf("notification_log_id" to logId.toString())
         )
         every { appEventRepository.save(any<AppEvent>()) } returns mockk()
-        every { notificationEngagementService.recordOpen(any(), any()) } just runs
+        every { notificationEngagementService.recordOpen(any(), any()) } returns true
 
         // Act
         eventService.track(userId = 1L, request = request)

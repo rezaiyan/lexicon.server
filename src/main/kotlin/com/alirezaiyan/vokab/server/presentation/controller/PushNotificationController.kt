@@ -45,6 +45,15 @@ class PushNotificationController(
         return handler.sendNotification(user, request)
     }
     
+    /** Idempotent: repeated calls for the same notification are no-ops. */
+    @PostMapping("/{notificationLogId}/opened")
+    fun markOpened(
+        @AuthenticationPrincipal user: User,
+        @PathVariable notificationLogId: Long
+    ): ResponseEntity<ApiResponse<Unit>> {
+        return handler.markOpened(user, notificationLogId)
+    }
+
     @GetMapping("/tokens")
     fun getUserTokens(
         @AuthenticationPrincipal user: User

@@ -14,7 +14,11 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
+import io.mockk.verifyOrder
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -60,13 +64,13 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name, any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
         verify(exactly = 1) { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = any()) }
-        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name) }
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name, any()) }
     }
 
     @Test
@@ -98,7 +102,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 0) { notificationEngagementService.recordSend(any(), any()) }
+        verify(exactly = 0) { notificationEngagementService.recordSend(any(), any(), any()) }
     }
 
     @Test
@@ -114,7 +118,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 0) { notificationEngagementService.recordSend(any(), any()) }
+        verify(exactly = 0) { notificationEngagementService.recordSend(any(), any(), any()) }
     }
 
     @Test
@@ -130,8 +134,8 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 5L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(any(), any()) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
         every { userProgressService.calculateProgressStats(user) } returns stats
         justRun { milestoneDetector.recordMilestoneSnapshot(user, stats) }
 
@@ -152,8 +156,8 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 6L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(any(), any()) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
@@ -186,8 +190,8 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 8L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(any(), any()) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
@@ -224,13 +228,13 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 11L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(schedule, NotificationType.MOTIVATION.name) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(schedule, NotificationType.MOTIVATION.name, any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
         verify(exactly = 1) { notificationContentBuilder.build(user, NotificationType.MOTIVATION, "fresh_start") }
-        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.MOTIVATION.name) }
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.MOTIVATION.name, any()) }
     }
 
     @Test
@@ -245,8 +249,8 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 12L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(any(), any()) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
@@ -266,8 +270,8 @@ class SmartNotificationDispatcherTest {
         every { pushNotificationService.sendNotificationToUser(userId = 13L, title = any(), body = any(), data = any()) } returns listOf(
             NotificationResponse(success = true)
         )
-        justRun { notificationEngagementService.recordSend(any(), any()) }
-        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns Unit
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
 
         dispatcher.dispatchForCurrentHour()
 
@@ -287,6 +291,78 @@ class SmartNotificationDispatcherTest {
 
         val expectedDate = TEST_TODAY.plusDays(3)
         assert(schedule.suppressedUntil == expectedDate)
+    }
+
+    // ── Open tracking ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `should create log before sending and put its id into push data`() {
+        val user     = testUser(id = 1L)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.DUE_CARDS)
+        val sentData = slot<Map<String, String>>()
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.DUE_CARDS
+        every { notificationContentBuilder.build(user, NotificationType.DUE_CARDS, null) } returns payload
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+        every { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = capture(sentData)) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+
+        dispatcher.dispatchForCurrentHour()
+
+        assertEquals("77", sentData.captured[NOTIFICATION_LOG_ID_KEY])
+        assertEquals("vokab://review", sentData.captured["deep_link"])
+        verifyOrder {
+            notificationEngagementService.saveLog(1L, NotificationType.DUE_CARDS.name, any(), any(), any())
+            pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = any())
+            notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name, 77L)
+        }
+    }
+
+    @Test
+    fun `should delete the pre-created log when push delivery fails`() {
+        val user     = testUser(id = 1L)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.DUE_CARDS)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.DUE_CARDS
+        every { notificationContentBuilder.build(user, NotificationType.DUE_CARDS, null) } returns payload
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+        every { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = any()) } returns listOf(
+            NotificationResponse(success = false, error = "NOT_REGISTERED")
+        )
+        justRun { notificationEngagementService.deleteLog(77L) }
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 1) { notificationEngagementService.deleteLog(77L) }
+        verify(exactly = 0) { notificationEngagementService.recordSend(any(), any(), any()) }
+    }
+
+    @Test
+    fun `should still send without log id when log insert fails`() {
+        val user     = testUser(id = 1L)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.DUE_CARDS)
+        val sentData = slot<Map<String, String>>()
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.DUE_CARDS
+        every { notificationContentBuilder.build(user, NotificationType.DUE_CARDS, null) } returns payload
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } throws IllegalStateException("db down")
+        every { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = capture(sentData)) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+
+        dispatcher.dispatchForCurrentHour()
+
+        assertFalse(sentData.captured.containsKey(NOTIFICATION_LOG_ID_KEY))
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name, null) }
     }
 
     // ── Factories ─────────────────────────────────────────────────────────────────

@@ -15,7 +15,9 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -91,17 +93,38 @@ class NotificationEngagementServiceTest {
         val requestingUserId = 1L
         val ownerUserId = 2L
         val log = createNotificationLog(id = 10L, userId = ownerUserId, openedAt = null)
-        val schedule = createSchedule(createUser(id = requestingUserId))
         every { notificationLogRepository.findById(10L) } returns Optional.of(log)
-        every { notificationScheduleRepository.findByUserId(requestingUserId) } returns schedule
-        every { notificationScheduleRepository.save(schedule) } returns schedule
 
         // Act
-        notificationEngagementService.recordOpen(requestingUserId, 10L)
+        val found = notificationEngagementService.recordOpen(requestingUserId, 10L)
 
-        // Assert
+        // Assert — another user's log is invisible and must not reset the caller's schedule
+        assertFalse(found)
         assertNull(log.openedAt)
         verify(exactly = 0) { notificationLogRepository.save(log) }
+        verify(exactly = 0) { notificationScheduleRepository.save(any()) }
+    }
+
+    @Test
+    fun `recordOpen returns false for an unknown log and leaves the schedule alone`() {
+        every { notificationLogRepository.findById(10L) } returns Optional.empty()
+
+        val found = notificationEngagementService.recordOpen(1L, 10L)
+
+        assertFalse(found)
+        verify(exactly = 0) { notificationScheduleRepository.save(any()) }
+    }
+
+    @Test
+    fun `recordOpen is idempotent - a repeated open does not reset the schedule again`() {
+        val userId = 1L
+        val log = createNotificationLog(id = 10L, userId = userId, openedAt = TEST_NOW.minusSeconds(60))
+        every { notificationLogRepository.findById(10L) } returns Optional.of(log)
+
+        val found = notificationEngagementService.recordOpen(userId, 10L)
+
+        assertTrue(found)
+        verify(exactly = 0) { notificationScheduleRepository.save(any()) }
     }
 
     @Test
@@ -174,6 +197,22 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(1, schedule.consecutiveIgnores)
+    }
+
+    @Test
+    fun `recordSend judges the previous log, not the one just created for this send`() {
+        // The current log (id 77) is created before the push so its id can travel in the payload.
+        val user = createUser(id = 1L)
+        val schedule = createSchedule(user, consecutiveIgnores = 3, lastSentDate = TEST_TODAY.minusDays(1))
+        val previousOpened = createNotificationLog(id = 76L, userId = 1L, openedAt = TEST_NOW.minusSeconds(3600))
+        every { notificationLogRepository.findFirstByUserIdAndIdNotOrderBySentAtDesc(1L, 77L) } returns previousOpened
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+        every { userSettingsRepository.findByUserId(1L) } returns null
+
+        notificationEngagementService.recordSend(schedule, "DAILY_INSIGHT", currentLogId = 77L)
+
+        assertEquals(3, schedule.consecutiveIgnores)
+        assertNull(schedule.suppressedUntil)
     }
 
     @Test
@@ -391,10 +430,11 @@ class NotificationEngagementServiceTest {
         every { notificationLogRepository.save(any()) } returns savedLog
 
         // Act
-        notificationEngagementService.saveLog(5L, "DAILY_INSIGHT", "Title", "Body", """{"type":"daily_insight"}""")
+        val id = notificationEngagementService.saveLog(5L, "DAILY_INSIGHT", "Title", "Body", """{"type":"daily_insight"}""")
 
         // Assert
-        verify(exactly = 1) { notificationLogRepository.save(any()) }
+        assertEquals(1L, id)
+        verify(exactly = 1) { notificationLogRepository.save(match { it.sentAt == TEST_NOW }) }
     }
 
     // --- getEngagementStats ---

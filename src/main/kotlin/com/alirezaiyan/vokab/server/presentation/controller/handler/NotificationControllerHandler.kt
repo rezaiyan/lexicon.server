@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.NotificationResponse
 import com.alirezaiyan.vokab.server.presentation.dto.RegisterPushTokenRequest
 import com.alirezaiyan.vokab.server.presentation.dto.SendNotificationRequest
+import com.alirezaiyan.vokab.server.service.NotificationEngagementService
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.alirezaiyan.vokab.server.service.push.PushTokenService
 import org.springframework.http.ResponseEntity
@@ -14,7 +15,8 @@ import com.alirezaiyan.vokab.server.domain.entity.requireId
 @Component
 class NotificationControllerHandler(
     private val pushTokenService: PushTokenService,
-    private val pushNotificationService: PushNotificationService
+    private val pushNotificationService: PushNotificationService,
+    private val notificationEngagementService: NotificationEngagementService,
 ) {
     
     fun registerToken(user: User, request: RegisterPushTokenRequest): ResponseEntity<ApiResponse<Unit>> {
@@ -67,6 +69,14 @@ class NotificationControllerHandler(
         }
     }
     
+    fun markOpened(user: User, notificationLogId: Long): ResponseEntity<ApiResponse<Unit>> {
+        // Unknown and foreign ids both 404 so ids can't be probed across users
+        if (!notificationEngagementService.recordOpen(user.requireId(), notificationLogId)) {
+            throw NoSuchElementException("Notification not found")
+        }
+        return ResponseEntity.ok(ApiResponse(success = true))
+    }
+
     private inline fun <T> execute(operation: () -> ApiResponse<T>): ResponseEntity<ApiResponse<T>> =
         ResponseEntity.ok(operation())
 }

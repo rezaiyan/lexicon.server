@@ -477,4 +477,40 @@ class PushNotificationControllerTest {
             status { isForbidden() }
         }
     }
+
+    // ── POST /api/v1/notifications/{logId}/opened ────────────────────────────────
+
+    @Test
+    fun `should record notification open`() {
+        `when`(handler.markOpened(anyArg(), eqArg(42L))).thenReturn(
+            ResponseEntity.ok(ApiResponse(success = true))
+        )
+
+        mockMvc.post("/api/v1/notifications/42/opened") {
+            with(authentication(auth))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.success") { value(true) }
+        }
+
+        verify(handler).markOpened(anyArg(), eqArg(42L))
+    }
+
+    @Test
+    fun `should return 404 when notification log is unknown or not the caller's`() {
+        `when`(handler.markOpened(anyArg(), eqArg(42L))).thenThrow(NoSuchElementException("Notification not found"))
+
+        mockMvc.post("/api/v1/notifications/42/opened") {
+            with(authentication(auth))
+        }.andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    fun `should require authentication for notification open`() {
+        mockMvc.post("/api/v1/notifications/42/opened").andExpect {
+            status { isForbidden() }
+        }
+    }
 }

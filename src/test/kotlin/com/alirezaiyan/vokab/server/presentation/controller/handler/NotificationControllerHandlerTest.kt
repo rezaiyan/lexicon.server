@@ -1,0 +1,41 @@
+package com.alirezaiyan.vokab.server.presentation.controller.handler
+
+import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.service.NotificationEngagementService
+import com.alirezaiyan.vokab.server.service.push.PushNotificationService
+import com.alirezaiyan.vokab.server.service.push.PushTokenService
+import io.mockk.every
+import io.mockk.mockk
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
+
+class NotificationControllerHandlerTest {
+
+    private val engagementService: NotificationEngagementService = mockk()
+    private val handler = NotificationControllerHandler(
+        pushTokenService = mockk<PushTokenService>(),
+        pushNotificationService = mockk<PushNotificationService>(),
+        notificationEngagementService = engagementService,
+    )
+    private val user = User(id = 7L, email = "open@example.com", name = "Open")
+
+    @Test
+    fun `markOpened returns 200 when the log belongs to the caller`() {
+        every { engagementService.recordOpen(7L, 42L) } returns true
+
+        val response = handler.markOpened(user, 42L)
+
+        assertEquals(HttpStatus.OK, response.statusCode)
+        assertTrue(response.body!!.success)
+    }
+
+    @Test
+    fun `markOpened throws not-found when the log is unknown or someone else's`() {
+        every { engagementService.recordOpen(7L, 42L) } returns false
+
+        assertThrows<NoSuchElementException> { handler.markOpened(user, 42L) }
+    }
+}

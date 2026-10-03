@@ -8,6 +8,8 @@ import java.time.Instant
 interface NotificationLogRepository : JpaRepository<NotificationLog, Long> {
     fun findTopByUserIdOrderBySentAtDesc(userId: Long): NotificationLog?
 
+    fun findFirstByUserIdAndIdNotOrderBySentAtDesc(userId: Long, id: Long): NotificationLog?
+
     fun findTop3ByUserIdOrderBySentAtDesc(userId: Long): List<NotificationLog>
 
     fun findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId: Long): NotificationLog?

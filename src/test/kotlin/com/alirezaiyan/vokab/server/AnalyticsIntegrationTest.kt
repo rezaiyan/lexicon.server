@@ -43,6 +43,7 @@ class AnalyticsIntegrationTest {
 
     @AfterAll
     fun teardownUser() {
+        testUserHelper.clearUserSessions(user.id!!)
         testUserHelper.deleteByEmail("analytics@test.com")
     }
 
@@ -529,7 +530,7 @@ class AnalyticsIntegrationTest {
         assertEquals("comeback", result[0].wordText)
     }
 
-    // ── Native Query Tests (via H2 compat functions) ─────────────────────────
+    // ── Native Query Tests ───────────────────────────────────────────────────
 
     @Test
     fun `accuracy by hour groups correctly`() {

@@ -209,6 +209,8 @@ src/main/resources/
 
 ### Run tests
 
+Integration tests run on PostgreSQL 17 (Testcontainers) with the real Flyway migrations, so Docker must be running.
+
 ```bash
 ./gradlew test
 ```

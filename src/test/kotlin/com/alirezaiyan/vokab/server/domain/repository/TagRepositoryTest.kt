@@ -21,8 +21,8 @@ import org.springframework.transaction.annotation.Transactional
  * Regression guard for the GROUP BY fix in findAllWithWordCountByUser:
  * Hibernate 6 + PostgreSQL cannot expand a bare `GROUP BY t` when the entity
  * has an inverse @ManyToMany collection.  The JPQL must enumerate every
- * non-aggregate column explicitly.  This test executes that JPQL against H2
- * so the query is validated on every CI run.
+ * non-aggregate column explicitly.  This test executes that JPQL against
+ * PostgreSQL so the query is validated on every CI run.
  */
 @SpringBootTest
 @ActiveProfiles("test")
@@ -35,15 +35,20 @@ class TagRepositoryTest {
     @Autowired lateinit var testUserHelper: TestUserHelper
 
     private lateinit var user: User
+    private lateinit var otherUser: User
 
+    // Users are committed outside the per-test transaction and removed after it rolled back:
+    // deleting a user from inside a test whose open transaction references it self-deadlocks.
     @BeforeAll
-    fun setupUser() {
+    fun setupUsers() {
         user = testUserHelper.saveAndCommit(User(email = "tagrepo@test.com", name = "Tag Repo User"))
+        otherUser = testUserHelper.saveAndCommit(User(email = "other@test.com", name = "Other User"))
     }
 
     @AfterAll
-    fun teardownUser() {
+    fun teardownUsers() {
         testUserHelper.deleteByEmail("tagrepo@test.com")
+        testUserHelper.deleteByEmail("other@test.com")
     }
 
     // Each @Test runs in a transaction that rolls back, so data never leaks between tests.
@@ -85,18 +90,13 @@ class TagRepositoryTest {
 
     @Test
     fun `findAllWithWordCountByUser only returns tags belonging to the requesting user`() {
-        val otherUser = testUserHelper.saveAndCommit(User(email = "other@test.com", name = "Other User"))
-        try {
-            tagRepository.save(Tag(user = user, name = "my-tag"))
-            tagRepository.save(Tag(user = otherUser, name = "their-tag"))
+        tagRepository.save(Tag(user = user, name = "my-tag"))
+        tagRepository.save(Tag(user = otherUser, name = "their-tag"))
 
-            val results = tagRepository.findAllWithWordCountByUser(user)
+        val results = tagRepository.findAllWithWordCountByUser(user)
 
-            assertEquals(1, results.size)
-            val returnedTag = results[0][0] as Tag
-            assertEquals("my-tag", returnedTag.name)
-        } finally {
-            testUserHelper.deleteByEmail("other@test.com")
-        }
+        assertEquals(1, results.size)
+        val returnedTag = results[0][0] as Tag
+        assertEquals("my-tag", returnedTag.name)
     }
 }

@@ -38,9 +38,8 @@ dependencies {
 	
 	// Database
 	implementation("org.postgresql:postgresql")
-	// H2 only for the local h2 profile (bootRun) and tests; not shipped in the production jar
+	// H2 only for the local h2 profile (bootRun); not shipped in the production jar
 	developmentOnly("com.h2database:h2")
-	testRuntimeOnly("com.h2database:h2")
 	implementation("org.flywaydb:flyway-core:11.8.0")
 	implementation("org.flywaydb:flyway-database-postgresql:11.8.0")
 	
@@ -75,6 +74,8 @@ dependencies {
 	testImplementation("org.springframework.security:spring-security-test")
 	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
 	testImplementation("io.mockk:mockk:1.13.8")
+	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
+	testImplementation("org.testcontainers:postgresql")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

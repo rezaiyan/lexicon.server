@@ -2,7 +2,7 @@
 
 ## application.yml Summary
 
-All secrets + env-specific values injected via env vars. Defaults fall back to H2/dev.
+All secrets + env-specific values injected via env vars. Without `DATABASE_URL` the app refuses to start; use the `h2` profile for local dev.
 
 ## Required in Production
 
@@ -37,7 +37,6 @@ All secrets + env-specific values injected via env vars. Defaults fall back to H
 | `FREE_AI_EXTRACTION_LIMIT` | `10` | Free tier AI extraction cap |
 | `VOCABULARY_SUGGESTION_COUNT` | `50` | AI vocabulary suggestions count |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,...` | CORS whitelist |
-| `H2_CONSOLE_ENABLED` | `true` | H2 web console (dev only) |
 | `FLYWAY_ENABLED` | `true` | Run Flyway on startup |
 | `REQUEST_LOGGING_ENABLED` | `true` | Log HTTP requests |
 | `CI_TEST_AUTH_ENABLED` | `false` | Enable CI-only auth bypass |
@@ -59,11 +58,13 @@ Structured config via `@ConfigurationProperties`:
 
 ## Local Development
 
-Default profile uses H2 in-memory DB. Run:
+The `h2` profile uses an in-memory DB (`scripts/start-dev.sh` sets it):
 ```bash
-./gradlew bootRun
+SPRING_PROFILES_ACTIVE=h2 ./gradlew bootRun
 ```
 H2 console at `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:vokabdb`).
+
+Tests (`./gradlew test`) run on PostgreSQL 17 via Testcontainers with the real Flyway migrations, so Docker must be running.
 
 Scripts:
 - `scripts/start-dev.sh` — local dev

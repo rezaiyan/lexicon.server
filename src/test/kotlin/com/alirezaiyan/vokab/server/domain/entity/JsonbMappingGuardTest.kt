@@ -12,7 +12,8 @@ import org.springframework.core.type.filter.AnnotationTypeFilter
 /**
  * `columnDefinition = "jsonb"` only shapes DDL; without a JSON JDBC type Hibernate binds the String
  * as varchar and PostgreSQL rejects the insert ("column is of type jsonb but expression is of type
- * character varying"). H2 accepts it, so only this check catches the mistake in CI.
+ * character varying"). Integration tests on PostgreSQL only catch it for entities they happen to insert;
+ * this check covers every entity.
  */
 class JsonbMappingGuardTest {
 

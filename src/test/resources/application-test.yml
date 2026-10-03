@@ -1,23 +1,29 @@
 spring:
   datasource:
-    # Mirrors the h2 profile: app_config uses the column names "key" and "value"
-    url: jdbc:h2:mem:vokabdb;NON_KEYWORDS=KEY,VALUE
-    username: sa
-    password: ""
+    # Testcontainers JDBC URL: starts postgres:17-alpine (prod's major) on first connection.
+    # TC_DAEMON keeps one container for the whole test JVM, shared by every cached Spring context.
+    url: jdbc:tc:postgresql:17-alpine:///vokab?TC_DAEMON=true
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
+    hikari:
+      # Spring caches a context per distinct test config (~25), each with its own pool. At the
+      # default 10 connections they exhaust PostgreSQL's max_connections=100 and the suite hangs.
+      maximum-pool-size: 2
+      minimum-idle: 0
+      # A test that waits on its own open transaction (e.g. REQUIRES_NEW deleting a row the outer
+      # test transaction references) fails after 10s instead of hanging the whole suite.
+      connection-init-sql: SET lock_timeout = '10s'
   test:
     database:
-      # @DataJpaTest would otherwise swap in an embedded H2 without NON_KEYWORDS
+      # Never swap in an embedded database for @DataJpaTest
       replace: none
 
-  sql:
-    init:
-      mode: always
-      schema-locations: classpath:schema.sql
-      continue-on-error: false
-
+  # The real migrations build the schema, so tests run against exactly what prod runs.
   flyway:
-    enabled: false
+    enabled: true
 
   jpa:
     hibernate:
-      ddl-auto: none
+      # Fails the context if an entity drifts from the migrations
+      ddl-auto: validate

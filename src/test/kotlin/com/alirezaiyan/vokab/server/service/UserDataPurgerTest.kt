@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 
-/** Runs the real purge SQL against the H2 test schema. */
+/** Runs the real purge SQL against the migrated PostgreSQL test schema. */
 @DataJpaTest
 @ActiveProfiles("test")
 @Import(UserDataPurger::class)
@@ -42,14 +42,21 @@ class UserDataPurgerTest {
     @Test
     fun `every table with a user_id column is handled by the purge`() {
         val tablesWithUserId = jdbc.queryForList(
-            "SELECT LOWER(TABLE_NAME) FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(COLUMN_NAME) = 'user_id' AND TABLE_SCHEMA = 'PUBLIC'",
+            // Base tables only: the analytics views also expose user_id but hold no data of their own
+            """
+            SELECT c.table_name FROM information_schema.columns c
+            JOIN information_schema.tables t ON t.table_schema = c.table_schema AND t.table_name = c.table_name
+            WHERE c.column_name = 'user_id' AND c.table_schema = current_schema() AND t.table_type = 'BASE TABLE'
+            """,
             String::class.java,
         ).toSet()
         val handled = UserDataPurger.STATEMENTS.map { it.first }.toSet()
         // Guard against a vacuous pass if the metadata query stops matching.
         assertTrue("words" in tablesWithUserId && "notification_log" in tablesWithUserId, "schema scan found: $tablesWithUserId")
 
-        val missing = tablesWithUserId - handled
+        // Kept on purpose (see UserDataPurger): no FK, rows outlive the account
+        val retained = setOf("app_events", "audit_log")
+        val missing = tablesWithUserId - handled - retained
         assertTrue(missing.isEmpty(), "Tables with user_id not covered by UserDataPurger: $missing")
     }
 

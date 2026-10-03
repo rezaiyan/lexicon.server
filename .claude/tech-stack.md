@@ -13,7 +13,8 @@
 |---|---|
 | Spring Data JPA + Hibernate | ORM layer |
 | PostgreSQL | Production database |
-| H2 (in-memory) | Dev / CI default |
+| H2 (in-memory) | Local dev only (`h2` profile) |
+| Testcontainers PostgreSQL 17 | Integration tests (needs Docker) |
 | Flyway 11.8.0 | Schema migrations (`db/migration/V{N}__*.sql`) |
 
 ## Authentication & Security

@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server
 
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
@@ -22,16 +23,18 @@ import org.springframework.transaction.annotation.Transactional
 class TestUserHelper(
     private val userRepository: UserRepository,
     private val studySessionRepository: StudySessionRepository,
+    private val reviewEventRepository: ReviewEventRepository,
     private val wordRushGameRepository: WordRushGameRepository,
 ) {
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun saveAndCommit(user: User): User = userRepository.save(user)
 
-    /** Deletes all study sessions (and cascading review_events) for the given user. */
+    /** Deletes all study sessions and their review_events (no FK cascade) for the given user. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     fun clearUserSessions(userId: Long) {
         val user = userRepository.findById(userId).orElse(null) ?: return
+        reviewEventRepository.deleteAll(reviewEventRepository.findByUser(user))
         studySessionRepository.deleteAll(studySessionRepository.findByUser(user))
     }
 

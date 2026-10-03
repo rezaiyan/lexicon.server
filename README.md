@@ -92,7 +92,6 @@ All configuration is injected via environment variables. Copy `env.example` to `
 | `DATABASE_URL` | PostgreSQL JDBC URL |
 | `DATABASE_USERNAME` | Database username |
 | `DATABASE_PASSWORD` | Database password |
-| `JWT_SECRET` | HMAC secret (HS256) **or** use RSA keys below |
 | `JWT_PRIVATE_KEY_PATH` | Path to RSA private key PEM (RS256) |
 | `JWT_PUBLIC_KEY_PATH` | Path to RSA public key PEM (RS256) |
 
@@ -248,7 +247,8 @@ The application ships as a Docker image and can be deployed anywhere containers 
 Key production checklist:
 - Use PostgreSQL (not H2)
 - Persist JWT RSA keys (`./keys/` volume) — losing them invalidates all user sessions
-- Set `H2_CONSOLE_ENABLED=false`
+- H2 is not in the production jar; the console exists only under the `h2` profile
+- Startup fails without `DATABASE_URL` (no fallback database)
 - Put all secrets in environment variables, never in code
 
 ## Contributing

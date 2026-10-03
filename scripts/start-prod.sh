@@ -19,7 +19,6 @@ REQUIRED_VARS=(
     "DATABASE_URL"
     "DATABASE_USERNAME"
     "DATABASE_PASSWORD"
-    "JWT_SECRET"
     "GOOGLE_CLIENT_ID"
     "OPENROUTER_API_KEY"
 )
@@ -30,13 +29,6 @@ for var in "${REQUIRED_VARS[@]}"; do
         exit 1
     fi
 done
-
-# Check JWT_SECRET is not default
-if [[ "$JWT_SECRET" == *"change"* ]] || [[ "$JWT_SECRET" == *"dev"* ]]; then
-    echo "❌ Error: JWT_SECRET must be changed from default value"
-    echo "   Generate a secure key with: openssl rand -base64 64"
-    exit 1
-fi
 
 echo "📊 Production Configuration:"
 echo "   Database: PostgreSQL"

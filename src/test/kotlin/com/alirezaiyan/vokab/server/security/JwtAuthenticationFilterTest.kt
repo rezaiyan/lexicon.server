@@ -434,7 +434,6 @@ class JwtAuthenticationFilterTest {
         val publicKeyBase64 = Base64.getEncoder().encodeToString(keyPair.public.encoded)
         val props = AppProperties()
         props.jwt = JwtConfig(
-            secret = "not-used-for-rs256",
             expirationMs = expirationMs,
             privateKey = privateKeyBase64,
             publicKey = publicKeyBase64,

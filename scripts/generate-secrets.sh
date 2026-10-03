@@ -7,17 +7,6 @@ echo "🔐 Generating Secure Secrets for Vokab Server"
 echo "=============================================="
 echo ""
 
-# Generate JWT Secret
-echo "📝 JWT_SECRET (256-bit):"
-JWT_SECRET=$(openssl rand -base64 32)
-echo "$JWT_SECRET"
-echo ""
-
-# Generate alternative JWT Secret (in case you want two)
-echo "📝 Alternative JWT_SECRET:"
-openssl rand -base64 32
-echo ""
-
 # Generate webhook secret
 echo "🔗 REVENUECAT_WEBHOOK_SECRET:"
 openssl rand -hex 32

@@ -4,6 +4,7 @@ import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.service.EngagementSegmentScheduler
 import com.alirezaiyan.vokab.server.service.NotificationTimingService
 import com.alirezaiyan.vokab.server.service.ReconcileScope
+import com.alirezaiyan.vokab.server.service.RefreshTokenCleanup
 import com.alirezaiyan.vokab.server.service.ReviewReminderDispatcher
 import com.alirezaiyan.vokab.server.service.SmartNotificationDispatcher
 import com.alirezaiyan.vokab.server.service.SubscriptionService
@@ -21,6 +22,7 @@ class ScheduledTasks(
     private val reviewReminderDispatcher: ReviewReminderDispatcher,
     private val engagementSegmentScheduler: EngagementSegmentScheduler,
     private val subscriptionService: SubscriptionService,
+    private val refreshTokenCleanup: RefreshTokenCleanup,
 ) {
     /** Catches missed RevenueCat webhooks and expires lapsed statuses before notification planning. */
     @Scheduled(cron = "0 10 0 * * *")          // 00:10 UTC nightly (before notification refresh)
@@ -30,6 +32,16 @@ class ScheduledTasks(
             logger.info { "Subscription reconcile complete: $report" }
         } catch (e: Exception) {
             logger.error(e) { "Error in subscription reconcile" }
+        }
+    }
+
+    @Scheduled(cron = "0 20 0 * * *")          // 00:20 UTC nightly
+    fun purgeExpiredRefreshTokens() {
+        try {
+            val deleted = refreshTokenCleanup.purgeExpired()
+            logger.info { "Expired refresh token purge complete: deleted=$deleted" }
+        } catch (e: Exception) {
+            logger.error(e) { "Error in expired refresh token purge" }
         }
     }
 

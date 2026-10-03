@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lexicondb}
       POSTGRES_USER: ${POSTGRES_USER:-lexicon_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lexicon_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     # Port 5432 not exposed to host (app reaches postgres via Docker network).
@@ -32,10 +32,7 @@ services:
     environment:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lexicondb}
       DATABASE_USERNAME: ${POSTGRES_USER:-lexicon_user}
-      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-lexicon_password}
-      DATABASE_DRIVER: org.postgresql.Driver
-      HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
-      JWT_SECRET: ${JWT_SECRET:-dev-secret-key-change-in-production}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-7776000000}
       JWT_REFRESH_TOKEN_GRACE_PERIOD_MS: ${JWT_REFRESH_TOKEN_GRACE_PERIOD_MS:-30000}
@@ -52,7 +49,6 @@ services:
       REVENUECAT_WEBHOOK_SIGNING_SECRET: ${REVENUECAT_WEBHOOK_SIGNING_SECRET:-}
       APPLE_CLIENT_IDS: ${APPLE_CLIENT_IDS:-com.alirezaiyan.vokab}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-haiku-4.5}
-      H2_CONSOLE_ENABLED: ${H2_CONSOLE_ENABLED:-false}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8081}
       TEST_EMAILS: ${TEST_EMAILS:-}
       CI_TEST_AUTH_ENABLED: ${CI_TEST_AUTH_ENABLED:-false}

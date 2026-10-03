@@ -13,9 +13,9 @@ on:
 
 jobs:
   build:
-    name: Build
+    # Gate for PRs and main: compile, full test suite and the JaCoCo coverage threshold.
+    name: Build & Test
     runs-on: ubuntu-latest
-    
     permissions:
       contents: read
 
@@ -30,33 +30,19 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Build application
-        run: ./gradlew build -x test --stacktrace
+      - name: Build and test
+        run: ./gradlew build --stacktrace
 
-
-
-  coverage:
-    name: Coverage Badge
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    permissions:
-      contents: read
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
         with:
-          java-version: '21'
-          distribution: 'temurin'
-          cache: gradle
+          name: test-reports
+          path: build/reports/tests/test
+          retention-days: 7
 
-      - name: Run tests and generate JaCoCo report
-        run: ./gradlew test jacocoTestReport
-
-      - name: Update Gist badge
+      - name: Update coverage badge
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           GH_TOKEN: ${{ secrets.GIST_TOKEN }}
           GIST_ID: ${{ secrets.GIST_ID }}
@@ -95,11 +81,12 @@ jobs:
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
         run: |
-          MODEL_ID=$(grep -oP "val model: String = \"\K[^\"]*" src/main/kotlin/com/alirezaiyan/vokab/server/service/OpenRouterService.kt)
-          echo "Model ID in code: $MODEL_ID"
+          # Default model from application.yml (production may override it with OPENROUTER_MODEL)
+          MODEL_ID=$(grep -oP 'OPENROUTER_MODEL:\K[^}]+' src/main/resources/application.yml)
+          echo "Default model ID: $MODEL_ID"
 
           if [ -z "$MODEL_ID" ]; then
-            echo "::error::Could not extract model ID from OpenRouterService.kt"
+            echo "::error::Could not extract the OPENROUTER_MODEL default from application.yml"
             exit 1
           fi
 

@@ -261,7 +261,6 @@ class RS256JwtTokenProviderTest {
 
         val props = AppProperties()
         props.jwt = JwtConfig(
-            secret = "not-used-for-rs256",
             expirationMs = expirationMs,
             privateKey = privateKeyBase64,
             publicKey = publicKeyBase64,

@@ -38,7 +38,9 @@ dependencies {
 	
 	// Database
 	implementation("org.postgresql:postgresql")
-	implementation("com.h2database:h2")
+	// H2 only for the local h2 profile (bootRun) and tests; not shipped in the production jar
+	developmentOnly("com.h2database:h2")
+	testRuntimeOnly("com.h2database:h2")
 	implementation("org.flywaydb:flyway-core:11.8.0")
 	implementation("org.flywaydb:flyway-database-postgresql:11.8.0")
 	

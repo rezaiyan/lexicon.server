@@ -2,12 +2,13 @@ spring:
   application:
     name: vokab-server
 
+  # Empty defaults on purpose: without DATABASE_URL startup fails ("Failed to configure a DataSource")
+  # instead of silently using a dev database; H2 is not on the production classpath.
+  # Local development: SPRING_PROFILES_ACTIVE=h2 (application-h2.yml). Driver comes from the URL.
   datasource:
-    url: ${DATABASE_URL:jdbc:h2:mem:vokabdb}
-    username: ${DATABASE_USERNAME:sa}
+    url: ${DATABASE_URL:}
+    username: ${DATABASE_USERNAME:}
     password: ${DATABASE_PASSWORD:}
-    # Tip: you can omit driver-class-name and let Spring pick it from the URL
-    driver-class-name: ${DATABASE_DRIVER:org.h2.Driver}
 
   sql:
     init:
@@ -28,13 +29,12 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        # In prod, set HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect
-        dialect: ${HIBERNATE_DIALECT:org.hibernate.dialect.H2Dialect}
+        # Dialect is detected from the JDBC connection (PostgreSQL in prod, H2 in dev/tests).
         format_sql: true
 
   h2:
     console:
-      enabled: ${H2_CONSOLE_ENABLED:true}   # set to false in prod
+      enabled: false   # only the h2 profile turns it on
       path: /h2-console
 
 server:
@@ -57,7 +57,6 @@ app:
     base-url: ${AVATAR_BASE_URL:}
 
   jwt:
-    secret: ${JWT_SECRET:your-256-bit-secret-key-change-in-production}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:7776000000}
     refresh-token-grace-period-ms: ${JWT_REFRESH_TOKEN_GRACE_PERIOD_MS:30000}
@@ -69,7 +68,7 @@ app:
     audience: ${JWT_AUDIENCE:vokab-client}
 
   openrouter:
-    api-key: ${OPENROUTER_API_KEY:your-openrouter-api-key}
+    api-key: ${OPENROUTER_API_KEY:}
     base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
     model: ${OPENROUTER_MODEL:anthropic/claude-haiku-4.5}
     timeout-seconds: ${OPENROUTER_TIMEOUT_SECONDS:60}

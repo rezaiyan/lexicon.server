@@ -56,8 +56,6 @@ if [ $? -eq 0 ]; then
     echo "DATABASE_URL=jdbc:postgresql://localhost:5432/$DB_NAME"
     echo "DATABASE_USERNAME=$DB_USER"
     echo "DATABASE_PASSWORD=$DB_PASSWORD"
-    echo "DATABASE_DRIVER=org.postgresql.Driver"
-    echo "HIBERNATE_DIALECT=org.hibernate.dialect.PostgreSQLDialect"
 else
     echo "❌ Database setup failed"
     exit 1

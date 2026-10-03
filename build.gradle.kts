@@ -23,7 +23,6 @@ dependencies {
 	implementation(libs.spring.boot.starter.web)
 	implementation(libs.spring.boot.starter.data.jpa)
 	implementation(libs.spring.boot.starter.security)
-	implementation(libs.spring.boot.starter.oauth2.client)
 	implementation(libs.spring.boot.starter.validation)
 	implementation(libs.spring.boot.starter.actuator)
 	implementation(libs.spring.boot.starter.mail)
@@ -45,19 +44,17 @@ dependencies {
 	runtimeOnly(libs.jjwt.jackson)
 
 	// Firebase Admin SDK for push notifications
-	implementation(libs.firebase.admin)
-
-	// Google API Client for OAuth
-	implementation(libs.google.api.client)
+	implementation(libs.firebase.admin) {
+		// Pulled in by google-cloud-storage (unused: only Auth + Messaging). On the classpath it makes
+		// Spring MVC answer requests without an explicit Accept header in XML instead of JSON.
+		exclude(group = "com.fasterxml.jackson.dataformat", module = "jackson-dataformat-xml")
+	}
 
 	// Rate Limiting
 	implementation(libs.bucket4j.core)
 
-	// Password Hashing (for refresh tokens)
+	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)
-
-	// Argon2 for refresh token hashing
-	implementation(libs.bouncycastle.bcprov)
 
 	// GeoIP
 	implementation(libs.geoip2)

@@ -114,32 +114,39 @@ jobs:
 
           echo "OpenRouter model validation passed: '$MODEL_ID' is valid"
 
-  dependency-check:
-    name: Dependency Check
+  dependency-graph:
+    # Uploads the resolved Gradle dependency graph (build.gradle.kts can't be parsed statically),
+    # so Dependabot security alerts and the PR dependency review see the real versions.
+    name: Dependency Graph
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-    if: github.event_name == 'pull_request'
-    
+      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Run Dependency Check
-        uses: jeremylong/DependencyCheck_Action@main
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
         with:
-          project: 'Lexicon Server'
-          path: '.'
-          format: 'sarif'
-          args: >
-            --enableExperimental
-            --exclude '.git/**'
-            --exclude 'build/**'
-        continue-on-error: true
+          java-version: '21'
+          distribution: 'temurin'
 
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Submit dependency graph
+        uses: gradle/actions/dependency-submission@v4
+
+  dependency-review:
+    # Fails a PR that adds or upgrades to a dependency with a known high/critical vulnerability.
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    needs: dependency-graph
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
         with:
-          sarif_file: reports/dependency-check-report.sarif
-        if: always()
-        continue-on-error: true
+          fail-on-severity: high
+          retry-on-snapshot-warnings: true
+          comment-summary-in-pr: on-failure

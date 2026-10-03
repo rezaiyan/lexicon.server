@@ -28,7 +28,9 @@ class FirebaseNotificationMessageBuilder : NotificationMessageBuilder {
         val enhancedData = enhanceDataWithCategory(data, category)
         
         return Message.builder()
-            .setToken(token)
+            // setFid() replaces this, but it takes a Firebase Installation ID; clients register FCM
+            // registration tokens, so switching needs client changes first
+            .apply { @Suppress("DEPRECATION") setToken(token) }
             .setNotification(notification)
             .putAllData(enhancedData)
             .build()

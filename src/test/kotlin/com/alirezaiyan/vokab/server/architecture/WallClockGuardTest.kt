@@ -18,7 +18,10 @@ class WallClockGuardTest {
     )
 
     // Entity/event field defaults can't take an injected clock; the entity refactor revisits them.
-    private val exemptDirs = listOf("/domain/entity/", "/domain/event/")
+    private fun isExempt(file: File): Boolean {
+        val text = file.readText()
+        return Regex("""^@Entity\b""", RegexOption.MULTILINE).containsMatchIn(text) || file.name == "DomainEvent.kt"
+    }
 
     @Test
     fun `production code reads time only through the injected Clock`() {
@@ -26,7 +29,7 @@ class WallClockGuardTest {
 
         val offenders = sourceRoot.walkTopDown()
             .filter { it.isFile && it.extension == "kt" }
-            .filterNot { file -> exemptDirs.any { file.invariantSeparatorsPath.contains(it) } }
+            .filterNot(::isExempt)
             .flatMap { file ->
                 file.readLines().mapIndexedNotNull { index, line ->
                     if (wallClockRead.containsMatchIn(line)) "${file.path}:${index + 1}: ${line.trim()}" else null

@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.architecture
 
-import com.alirezaiyan.vokab.server.domain.entity.JpaEntity
+import com.alirezaiyan.vokab.server.Application
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import org.hibernate.annotations.JdbcTypeCode
@@ -23,7 +23,7 @@ class JsonbMappingGuardTest {
         val scanner = ClassPathScanningCandidateComponentProvider(false).apply {
             addIncludeFilter(AnnotationTypeFilter(Entity::class.java))
         }
-        val entities = scanner.findCandidateComponents(JpaEntity::class.java.packageName)
+        val entities = scanner.findCandidateComponents(Application::class.java.packageName)
             .map { Class.forName(it.beanClassName) }
         assertTrue(entities.isNotEmpty())
 

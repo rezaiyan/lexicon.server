@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server
 
-import com.alirezaiyan.vokab.server.domain.entity.JpaEntity
-import com.alirezaiyan.vokab.server.domain.entity.User
-import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.shared.JpaEntity
+import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.UserRepository
 import io.mockk.every
 
 /**

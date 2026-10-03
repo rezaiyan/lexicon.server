@@ -1,10 +1,10 @@
 package com.alirezaiyan.vokab.server
 
-import com.alirezaiyan.vokab.server.domain.entity.User
-import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
-import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
-import com.alirezaiyan.vokab.server.domain.repository.UserRepository
-import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
+import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.analytics.ReviewEventRepository
+import com.alirezaiyan.vokab.server.analytics.StudySessionRepository
+import com.alirezaiyan.vokab.server.user.UserRepository
+import com.alirezaiyan.vokab.server.wordrush.WordRushGameRepository
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional

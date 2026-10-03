@@ -99,12 +99,11 @@
     <ID>MaxLineLength:SubscriptionService.kt$SubscriptionService.Companion$val</ID>
     <ID>MaxLineLength:UserRepository.kt$UserRepository$fun</ID>
     <ID>NestedBlockDepth:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain )</ID>
-    <ID>NewLineAtEndOfFile:AppleNotificationService.kt$com.alirezaiyan.vokab.server.service.AppleNotificationService.kt</ID>
-    <ID>NewLineAtEndOfFile:NotificationCategory.kt$com.alirezaiyan.vokab.server.domain.entity.NotificationCategory.kt</ID>
-    <ID>NewLineAtEndOfFile:NotificationMessageBuilder.kt$com.alirezaiyan.vokab.server.service.push.NotificationMessageBuilder.kt</ID>
-    <ID>NewLineAtEndOfFile:NotificationSender.kt$com.alirezaiyan.vokab.server.service.push.NotificationSender.kt</ID>
-    <ID>NewLineAtEndOfFile:Projections.kt$com.alirezaiyan.vokab.server.domain.repository.Projections.kt</ID>
-    <ID>NewLineAtEndOfFile:UserRepository.kt$com.alirezaiyan.vokab.server.domain.repository.UserRepository.kt</ID>
+    <ID>NewLineAtEndOfFile:AppleNotificationService.kt$com.alirezaiyan.vokab.server.auth.AppleNotificationService.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationCategory.kt$com.alirezaiyan.vokab.server.notification.NotificationCategory.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationMessageBuilder.kt$com.alirezaiyan.vokab.server.notification.NotificationMessageBuilder.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationSender.kt$com.alirezaiyan.vokab.server.notification.NotificationSender.kt</ID>
+    <ID>NewLineAtEndOfFile:UserRepository.kt$com.alirezaiyan.vokab.server.user.UserRepository.kt</ID>
     <ID>ReturnCount:ApplePublicKeyService.kt$ApplePublicKeyService$private fun JsonNode.toRsaKeyOrNull(): Pair&lt;String, PublicKey&gt;?</ID>
     <ID>ReturnCount:DailyInsightService.kt$DailyInsightService$fun generateDailyInsightForUser(user: User): DailyInsight?</ID>
     <ID>ReturnCount:EmailService.kt$EmailService$@Transactional fun sendTemplated( userId: Long, recipientEmail: String, templateId: String, variables: Map&lt;String, String&gt; = emptyMap(), dedupHours: Long = 24 ): Boolean</ID>
@@ -125,6 +124,7 @@
     <ID>TooGenericExceptionCaught:AppleNotificationService.kt$AppleNotificationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AppleWebhookController.kt$AppleWebhookController$e: Exception</ID>
     <ID>TooGenericExceptionCaught:AuditLogService.kt$AuditLogService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AuthScheduledTasks.kt$AuthScheduledTasks$e: Exception</ID>
     <ID>TooGenericExceptionCaught:DailyInsightService.kt$DailyInsightService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:EmailService.kt$EmailService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:EventController.kt$EventController$e: Exception</ID>
@@ -132,12 +132,13 @@
     <ID>TooGenericExceptionCaught:FirebaseConfig.kt$FirebaseConfig$e: Exception</ID>
     <ID>TooGenericExceptionCaught:GeoLocationService.kt$GeoLocationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NotificationScheduledTasks.kt$NotificationScheduledTasks$e: Exception</ID>
     <ID>TooGenericExceptionCaught:NotificationSender.kt$FirebaseNotificationSender$e: Exception</ID>
     <ID>TooGenericExceptionCaught:RS256JwtTokenProvider.kt$RS256JwtTokenProvider$e: Exception</ID>
-    <ID>TooGenericExceptionCaught:ScheduledTasks.kt$ScheduledTasks$e: Exception</ID>
     <ID>TooGenericExceptionCaught:StreakNotificationService.kt$StreakNotificationService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:StreakReminderService.kt$StreakReminderService$e: Exception</ID>
     <ID>TooGenericExceptionCaught:StreakReminderService.kt$StreakReminderService$fallbackError: Exception</ID>
+    <ID>TooGenericExceptionCaught:SubscriptionScheduledTasks.kt$SubscriptionScheduledTasks$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WebhookController.kt$WebhookController$e: Exception</ID>
     <ID>TooGenericExceptionCaught:WordRushGamePersister.kt$WordRushGamePersister$e: Exception</ID>
     <ID>TooManyFunctions:AnalyticsController.kt$AnalyticsController</ID>
@@ -153,24 +154,18 @@
     <ID>TooManyFunctions:WordRepository.kt$WordRepository : JpaRepository</ID>
     <ID>UnusedImports:AppleNotificationServiceTest.kt$import org.junit.jupiter.api.Assertions.assertEquals</ID>
     <ID>UnusedImports:AuthDto.kt$import jakarta.validation.constraints.Email</ID>
-    <ID>UnusedImports:AuthServiceTest.kt$import com.alirezaiyan.vokab.server.domain.event.UserSignedUpEvent</ID>
     <ID>UnusedImports:AuthServiceTest.kt$import io.mockk.Runs</ID>
     <ID>UnusedImports:AuthServiceTest.kt$import io.mockk.just</ID>
     <ID>UnusedImports:DailyInsightRepository.kt$import org.springframework.data.repository.query.Param</ID>
-    <ID>UnusedImports:DailyInsightServiceTest.kt$import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule</ID>
     <ID>UnusedImports:DailyInsightServiceTest.kt$import io.mockk.justRun</ID>
     <ID>UnusedImports:EngagementSegmentScheduler.kt$import java.time.LocalDate</ID>
     <ID>UnusedImports:EngagementSegmentSchedulerTest.kt$import io.mockk.justRun</ID>
     <ID>UnusedImports:EventServiceTest.kt$import io.mockk.just</ID>
     <ID>UnusedImports:EventServiceTest.kt$import io.mockk.runs</ID>
-    <ID>UnusedImports:GlobalExceptionHandler.kt$import com.alirezaiyan.vokab.server.presentation.dto.ErrorResponse</ID>
-    <ID>UnusedImports:NotificationTimingServiceTest.kt$import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus</ID>
     <ID>UnusedImports:NotificationTimingServiceTest.kt$import io.mockk.Runs</ID>
     <ID>UnusedImports:NotificationTimingServiceTest.kt$import io.mockk.just</ID>
-    <ID>UnusedImports:PushNotificationService.kt$import com.alirezaiyan.vokab.server.domain.entity.PushToken</ID>
     <ID>UnusedImports:RS256JwtTokenProvider.kt$import io.jsonwebtoken.security.Keys</ID>
     <ID>UnusedImports:SecurityConfig.kt$import org.springframework.http.HttpMethod</ID>
-    <ID>UnusedImports:StreakNotificationService.kt$import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto</ID>
     <ID>UnusedImports:StreakNotificationService.kt$import java.time.Instant</ID>
     <ID>UnusedImports:SubscriptionServiceTest.kt$import org.junit.jupiter.api.assertThrows</ID>
     <ID>UnusedImports:UserSettingsServiceTest.kt$import org.junit.jupiter.api.Assertions.assertNotNull</ID>
@@ -181,24 +176,16 @@
     <ID>UnusedPrivateProperty:AuthControllerTest.kt$AuthControllerTest$@Autowired private lateinit var objectMapper: ObjectMapper</ID>
     <ID>UnusedPrivateProperty:NotificationEngagementServiceTest.kt$NotificationEngagementServiceTest$val since = TEST_NOW.minusSeconds(60 * 60 * 24 * 30)</ID>
     <ID>UnusedPrivateProperty:SecurityConfig.kt$SecurityConfig$val origins = appProperties.cors.allowedOrigins.split(",").toMutableList()</ID>
-    <ID>WildcardImport:AiController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AiController.kt$import org.springframework.web.bind.annotation.*</ID>
-    <ID>WildcardImport:AnalyticsController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AnalyticsController.kt$import org.springframework.web.bind.annotation.*</ID>
     <ID>WildcardImport:AnalyticsDto.kt$import jakarta.validation.constraints.*</ID>
-    <ID>WildcardImport:AnalyticsIntegrationTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AnalyticsIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
-    <ID>WildcardImport:AnalyticsService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AppConfig.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:AppConfigAdminController.kt$import org.springframework.web.bind.annotation.*</ID>
     <ID>WildcardImport:AppEvent.kt$import jakarta.persistence.*</ID>
-    <ID>WildcardImport:AppleNotificationService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AppleWebhookController.kt$import org.springframework.web.bind.annotation.*</ID>
     <ID>WildcardImport:AuditLog.kt$import jakarta.persistence.*</ID>
-    <ID>WildcardImport:AuthController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:AuthController.kt$import org.springframework.web.bind.annotation.*</ID>
-    <ID>WildcardImport:BackwardCompatibilityTest.kt$import com.alirezaiyan.vokab.server.domain.entity.*</ID>
-    <ID>WildcardImport:BackwardCompatibilityTest.kt$import com.alirezaiyan.vokab.server.domain.repository.*</ID>
     <ID>WildcardImport:DailyActivity.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:DailyInsight.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:EmailController.kt$import org.springframework.web.bind.annotation.*</ID>
@@ -206,11 +193,9 @@
     <ID>WildcardImport:EmailSubscription.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:EmailTemplate.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:EventController.kt$import org.springframework.web.bind.annotation.*</ID>
-    <ID>WildcardImport:NotificationContentBuilder.kt$import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType.*</ID>
+    <ID>WildcardImport:NotificationContentBuilder.kt$import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType.*</ID>
     <ID>WildcardImport:NotificationLog.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:NotificationSchedule.kt$import jakarta.persistence.*</ID>
-    <ID>WildcardImport:PushNotificationConfig.kt$import com.alirezaiyan.vokab.server.service.push.*</ID>
-    <ID>WildcardImport:PushNotificationController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:PushNotificationController.kt$import org.springframework.web.bind.annotation.*</ID>
     <ID>WildcardImport:PushToken.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:RefreshToken.kt$import jakarta.persistence.*</ID>
@@ -230,15 +215,11 @@
     <ID>WildcardImport:WebhookController.kt$import org.springframework.web.bind.annotation.*</ID>
     <ID>WildcardImport:Word.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:WordController.kt$import org.springframework.web.bind.annotation.*</ID>
-    <ID>WildcardImport:WordRushController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:WordRushController.kt$import org.springframework.web.bind.annotation.*</ID>
-    <ID>WildcardImport:WordRushControllerTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:WordRushDto.kt$import jakarta.validation.constraints.*</ID>
     <ID>WildcardImport:WordRushGame.kt$import jakarta.persistence.*</ID>
     <ID>WildcardImport:WordRushGamePersisterTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
-    <ID>WildcardImport:WordRushIntegrationTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:WordRushIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
-    <ID>WildcardImport:WordRushService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
     <ID>WildcardImport:WordRushServiceTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
   </CurrentIssues>
 </SmellBaseline>

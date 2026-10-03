@@ -11,6 +11,7 @@ kotlin-logging = "5.1.0"
 mockk = "1.14.11"
 detekt = "1.23.8"
 springdoc = "2.8.17"
+spring-modulith = "1.4.13"
 konsist = "0.17.3"
 
 [libraries]
@@ -46,6 +47,7 @@ geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

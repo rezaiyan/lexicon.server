@@ -8,8 +8,10 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 /**
- * Layer rules for production code: Controller → Service → Repository, entities stay inside the
- * service layer, and the API never exposes a JPA entity.
+ * Layer rules inside each feature package: Controller → Service → Repository, entities depend on no
+ * layer above them, and the API never exposes a JPA entity. Features share a package, so the rules
+ * look at what a class is wired with (constructor dependencies by type), not at imports. Boundaries
+ * between features are checked by [ModularityTest].
  */
 class ArchitectureTest {
 
@@ -22,7 +24,8 @@ class ArchitectureTest {
     private val entities get() = annotatedWith("Entity")
     private val controllers get() = annotatedWith("RestController")
 
-    private val controllerFiles get() = production.files.filter { it.packagee?.name?.endsWith(".presentation.controller") == true }
+    private fun KoClassDeclaration.dependencyTypes(): List<String> =
+        primaryConstructor?.parameters?.map { it.type.text }.orEmpty()
 
     @Test
     fun `rules see every entity and controller`() {
@@ -36,27 +39,21 @@ class ArchitectureTest {
 
     @Test
     fun `controllers go through services, never repositories`() {
-        controllerFiles.assertFalse { file ->
-            file.imports.any { it.name.contains(".domain.repository.") }
-        }
+        controllers.assertFalse { controller -> controller.dependencyTypes().any { it.endsWith("Repository") } }
     }
 
     @Test
-    fun `services and the domain never depend on controllers`() {
-        production.files
-            .filterNot { it.packagee?.name?.endsWith(".presentation.controller") == true }
-            .assertFalse { file -> file.imports.any { it.name.contains(".presentation.controller.") } }
+    fun `nothing depends on a controller`() {
+        production.classes().assertFalse { cls -> cls.dependencyTypes().any { it.endsWith("Controller") } }
     }
 
     @Test
     fun `entities do not depend on services, repositories or the API layer`() {
-        production.files
-            .filter { it.packagee?.name?.endsWith(".domain.entity") == true }
-            .assertFalse { file ->
-                file.imports.any { import ->
-                    listOf(".service.", ".domain.repository.", ".presentation.").any { import.name.contains(it) }
-                }
-            }
+        val upperLayer = Regex("""(Service|Repository|Controller|Dto|Request|Response)\b""")
+        entities.assertFalse { entity ->
+            val types = entity.dependencyTypes() + entity.properties().mapNotNull { it.type?.text }
+            types.any { upperLayer.containsMatchIn(it) }
+        }
     }
 
     @Test

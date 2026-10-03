@@ -1,8 +1,24 @@
 package com.alirezaiyan.vokab.server
 
-import com.alirezaiyan.vokab.server.domain.entity.requireId
-import com.alirezaiyan.vokab.server.domain.entity.*
-import com.alirezaiyan.vokab.server.domain.repository.*
+import com.alirezaiyan.vokab.server.user.requireId
+import com.alirezaiyan.vokab.server.study.DailyActivity
+import com.alirezaiyan.vokab.server.ai.DailyInsight
+import com.alirezaiyan.vokab.server.user.Platform
+import com.alirezaiyan.vokab.server.notification.PushToken
+import com.alirezaiyan.vokab.server.auth.RefreshToken
+import com.alirezaiyan.vokab.server.subscription.Subscription
+import com.alirezaiyan.vokab.server.user.SubscriptionStatus
+import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.UserSettings
+import com.alirezaiyan.vokab.server.words.Word
+import com.alirezaiyan.vokab.server.study.DailyActivityRepository
+import com.alirezaiyan.vokab.server.ai.DailyInsightRepository
+import com.alirezaiyan.vokab.server.notification.PushTokenRepository
+import com.alirezaiyan.vokab.server.auth.RefreshTokenRepository
+import com.alirezaiyan.vokab.server.subscription.SubscriptionRepository
+import com.alirezaiyan.vokab.server.user.UserRepository
+import com.alirezaiyan.vokab.server.user.UserSettingsRepository
+import com.alirezaiyan.vokab.server.words.WordRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest

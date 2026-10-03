@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.architecture
 
-import com.alirezaiyan.vokab.server.presentation.controller.ControllerTestSecurityConfig
-import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.shared.ControllerTestSecurityConfig
+import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.fasterxml.jackson.databind.node.ObjectNode

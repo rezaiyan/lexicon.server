@@ -75,6 +75,8 @@ dependencies {
 	testImplementation(libs.mockk)
 	// Architecture rules as tests (src/test/.../architecture)
 	testImplementation(libs.konsist)
+	// Feature-module boundaries (ModularityTest)
+	testImplementation(libs.spring.modulith.starter.test)
 	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
 	testImplementation(libs.testcontainers.postgresql)
 	testRuntimeOnly(libs.junit.platform.launcher)

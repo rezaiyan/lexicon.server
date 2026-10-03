@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.domain.repository
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.ProcessedWebhookEvent
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -47,7 +48,7 @@ class UserSubscriptionPersistenceTest {
 
         userRepository.updateSubscription(user.id!!, SubscriptionStatus.ACTIVE, expiry, Instant.now())
 
-        val reloaded = reload(user.id)
+        val reloaded = reload(user.requireId())
         assertEquals(SubscriptionStatus.ACTIVE, reloaded.subscriptionStatus)
         assertEquals(expiry, reloaded.subscriptionExpiresAt?.truncatedTo(ChronoUnit.MILLIS))
     }
@@ -64,7 +65,7 @@ class UserSubscriptionPersistenceTest {
         staleSnapshot.updatedAt = Instant.now()
         userRepository.saveAndFlush(staleSnapshot)
 
-        val reloaded = reload(staleSnapshot.id)
+        val reloaded = reload(staleSnapshot.requireId())
         assertEquals(7, reloaded.currentStreak)
         assertEquals(SubscriptionStatus.ACTIVE, reloaded.subscriptionStatus)
     }
@@ -83,9 +84,9 @@ class UserSubscriptionPersistenceTest {
         val user = newUser()
 
         assertEquals(1, userRepository.linkRevenueCatUserId(user.id!!, user.id.toString(), Instant.now()))
-        assertEquals(0, userRepository.linkRevenueCatUserId(user.id, "other", Instant.now()))
+        assertEquals(0, userRepository.linkRevenueCatUserId(user.requireId(), "other", Instant.now()))
 
-        assertEquals(user.id.toString(), reload(user.id).revenueCatUserId)
+        assertEquals(user.id.toString(), reload(user.requireId()).revenueCatUserId)
         assertTrue(userRepository.findIdsLinkedToRevenueCat().contains(user.id))
     }
 
@@ -101,10 +102,10 @@ class UserSubscriptionPersistenceTest {
 
         userRepository.expireLapsedSubscriptions(now, SubscriptionService.STORE_DERIVED_STATUSES, SubscriptionStatus.EXPIRED)
 
-        assertEquals(SubscriptionStatus.EXPIRED, reload(lapsed.id).subscriptionStatus)
-        assertEquals(SubscriptionStatus.ACTIVE, reload(current.id).subscriptionStatus)
-        assertEquals(SubscriptionStatus.ACTIVE, reload(grant.id).subscriptionStatus)
-        assertNull(reload(grant.id).subscriptionExpiresAt)
+        assertEquals(SubscriptionStatus.EXPIRED, reload(lapsed.requireId()).subscriptionStatus)
+        assertEquals(SubscriptionStatus.ACTIVE, reload(current.requireId()).subscriptionStatus)
+        assertEquals(SubscriptionStatus.ACTIVE, reload(grant.requireId()).subscriptionStatus)
+        assertNull(reload(grant.requireId()).subscriptionExpiresAt)
     }
 
     @Test
@@ -117,7 +118,7 @@ class UserSubscriptionPersistenceTest {
         stale.updatedAt = Instant.now()
         userRepository.saveAndFlush(stale)
 
-        val reloaded = reload(stale.id)
+        val reloaded = reload(stale.requireId())
         assertEquals("manual", reloaded.premiumGrantReason)
         assertEquals(until, reloaded.premiumGrantUntil?.truncatedTo(ChronoUnit.MILLIS))
         assertEquals(SubscriptionStatus.FREE, reloaded.subscriptionStatus)
@@ -128,10 +129,10 @@ class UserSubscriptionPersistenceTest {
         val user = newUser()
         userRepository.updateGrant(user.id!!, Instant.now().plusSeconds(60), "test_email", Instant.now())
 
-        userRepository.updateGrant(user.id, null, null, Instant.now())
+        userRepository.updateGrant(user.requireId(), null, null, Instant.now())
 
-        assertNull(reload(user.id).premiumGrantUntil)
-        assertNull(reload(user.id).premiumGrantReason)
+        assertNull(reload(user.requireId()).premiumGrantUntil)
+        assertNull(reload(user.requireId()).premiumGrantReason)
     }
 
     @Test
@@ -148,13 +149,13 @@ class UserSubscriptionPersistenceTest {
         val update = sql.substring(sql.indexOf("UPDATE users"))
         entityManager.createNativeQuery(update.trimEnd().removeSuffix(";")).executeUpdate()
 
-        reload(legacy.id).let {
+        reload(legacy.requireId()).let {
             assertEquals("legacy_grant", it.premiumGrantReason)
             assertEquals(SubscriptionStatus.FREE, it.subscriptionStatus)
             assertNull(it.subscriptionExpiresAt)
         }
-        assertEquals("manual", reload(manual.id).premiumGrantReason)
-        reload(paying.id).let {
+        assertEquals("manual", reload(manual.requireId()).premiumGrantReason)
+        reload(paying.requireId()).let {
             assertNull(it.premiumGrantReason)
             assertEquals(SubscriptionStatus.ACTIVE, it.subscriptionStatus)
         }

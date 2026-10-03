@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.withAssignedId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
@@ -246,7 +247,7 @@ class AuthServiceTest {
         // Assert — platform row ensured, then touched with the resolved version
         verifyOrder {
             userPlatformRepository.insertPlatformIfAbsent(existingUser.id!!, "IOS", "2.5.0")
-            userPlatformRepository.touchPlatform(existingUser.id, "IOS", "2.5.0")
+            userPlatformRepository.touchPlatform(existingUser.requireId(), "IOS", "2.5.0")
         }
     }
 

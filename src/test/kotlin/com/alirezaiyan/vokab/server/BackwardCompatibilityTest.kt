@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.*
 import com.alirezaiyan.vokab.server.domain.repository.*
 import org.junit.jupiter.api.Test
@@ -60,7 +61,7 @@ class BackwardCompatibilityTest {
         )
         assertNotNull(settings.id)
 
-        val retrieved = userRepository.findById(user.id).orElse(null)
+        val retrieved = userRepository.findById(user.requireId()).orElse(null)
         assertNotNull(retrieved)
         assertTrue(retrieved.email == "legacy@example.com")
     }
@@ -83,7 +84,7 @@ class BackwardCompatibilityTest {
         )
 
         assertNotNull(refreshToken.id)
-        val loaded = refreshTokenRepository.findById(refreshToken.id).orElse(null)
+        val loaded = refreshTokenRepository.findById(refreshToken.id!!).orElse(null)
         assertNotNull(loaded)
         assertTrue(loaded.tokenHash == "test_hash")
     }

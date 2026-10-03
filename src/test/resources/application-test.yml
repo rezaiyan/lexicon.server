@@ -27,3 +27,7 @@ spring:
     hibernate:
       # Fails the context if an entity drifts from the migrations
       ddl-auto: validate
+    properties:
+      hibernate:
+        # Lets tests assert statement counts on hot paths (N+1 guards)
+        generate_statistics: true

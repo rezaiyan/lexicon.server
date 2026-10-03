@@ -72,31 +72,33 @@ class User(
     // Store-owned columns are `updatable = false` on purpose: services save whole user rows (login,
     // streaks, profile) from possibly stale instances, which would otherwise silently revert a webhook
     // or sync that landed in between. They are written only by UserRepository.updateSubscription /
-    // updateGrant / linkRevenueCatUserId (or the initial INSERT); setters are private so the in-memory
+    // updateGrant / linkRevenueCatUserId (or the initial INSERT); setters are non-public so the in-memory
     // copy can only change through the mirror* functions below, after that repository write.
+    // (`protected`, not `private`: entities are open for Hibernate proxies, and Kotlin forbids private
+    // setters on open properties.)
 
     @Column(name = "revenuecat_user_id", unique = true, updatable = false)
     var revenueCatUserId: String? = revenueCatUserId
-        private set
+        protected set
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, updatable = false)
     var subscriptionStatus: SubscriptionStatus = subscriptionStatus
-        private set
+        protected set
 
     @Column(name = "subscription_expires_at", updatable = false)
     var subscriptionExpiresAt: Instant? = subscriptionExpiresAt
-        private set
+        protected set
 
     /** Premium granted outside the store (test users, comps). */
     @Column(name = "premium_grant_until", updatable = false)
     var premiumGrantUntil: Instant? = premiumGrantUntil
-        private set
+        protected set
 
     /** Why the grant exists: test_email, legacy_grant, manual, ci. */
     @Column(name = "premium_grant_reason", length = 64, updatable = false)
     var premiumGrantReason: String? = premiumGrantReason
-        private set
+        protected set
 
     /** Reflects a UserRepository.updateSubscription write (or sets the value for a not-yet-inserted user). */
     fun mirrorSubscription(status: SubscriptionStatus, expiresAt: Instant?) {

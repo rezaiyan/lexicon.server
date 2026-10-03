@@ -52,6 +52,9 @@ spring:
       hibernate:
         # Dialect is detected from the JDBC connection (PostgreSQL in prod, H2 in dev/tests).
         format_sql: true
+        # Paginating a query that fetch-joins a collection pages in memory over every row; fail instead
+        query:
+          fail_on_pagination_over_collection_fetch: true
 
   h2:
     console:

@@ -72,6 +72,13 @@ dependencies {
 	testRuntimeOnly(libs.junit.platform.launcher)
 }
 
+// Hibernate proxies subclass entities; final classes made every LAZY to-one association load eagerly
+allOpen {
+	annotation("jakarta.persistence.Entity")
+	annotation("jakarta.persistence.MappedSuperclass")
+	annotation("jakarta.persistence.Embeddable")
+}
+
 kotlin {
 	jvmToolchain(21)
 	compilerOptions {

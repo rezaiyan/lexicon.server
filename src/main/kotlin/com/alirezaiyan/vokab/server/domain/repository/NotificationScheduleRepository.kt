@@ -15,7 +15,7 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
     fun findAllScheduledUserIds(): Set<Long>
 
     @Query("""
-        SELECT ns FROM NotificationSchedule ns
+        SELECT ns FROM NotificationSchedule ns JOIN FETCH ns.user
         WHERE ns.optimalSendHour = :hour
           AND (ns.suppressedUntil IS NULL OR ns.suppressedUntil < CURRENT_DATE)
           AND (ns.lastSentDate IS NULL OR ns.lastSentDate < CURRENT_DATE)
@@ -26,6 +26,7 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
               AND us.notificationFrequency <> 'OFF'
           )
     """)
+    // JOIN FETCH: the dispatchers run without a transaction and read the user after this returns
     fun findUsersToNotifyAtHour(hour: Int): List<NotificationSchedule>
 
     @Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil >= CURRENT_DATE AND ns.consecutiveIgnores BETWEEN 3 AND 5")
@@ -41,7 +42,7 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
     fun countSuppressed30Day(): Long
 
     @Query("""
-        SELECT ns FROM NotificationSchedule ns
+        SELECT ns FROM NotificationSchedule ns JOIN FETCH ns.user
         WHERE ns.optimalSendHour = :hour
           AND (ns.lastSentDate IS NULL OR ns.lastSentDate < CURRENT_DATE)
           AND EXISTS (
@@ -51,6 +52,7 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
               AND (us.notificationsEnabled = false OR us.notificationFrequency = 'OFF')
           )
     """)
+    // JOIN FETCH: see findUsersToNotifyAtHour
     fun findUsersForReviewReminders(@Param("hour") hour: Int): List<NotificationSchedule>
 
     /**

@@ -17,7 +17,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import reactor.core.publisher.Mono
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import java.time.Instant
 
 class NotificationContentBuilderTest {
@@ -57,7 +57,7 @@ class NotificationContentBuilderTest {
         every { userProgressService.calculateProgressStats(user) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(7, user.name, stats)
-        } returns Mono.just("Don't lose it!")
+        } returns "Don't lose it!"
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.STREAK_RISK)
@@ -71,14 +71,14 @@ class NotificationContentBuilderTest {
     }
 
     @Test
-    fun `should use default body when openRouter returns empty mono for STREAK_RISK`() {
+    fun `should use default body when AI is unavailable for STREAK_RISK`() {
         // Arrange
         val user = createUser(currentStreak = 3)
         val stats = createProgressStats(totalWords = 10, dueCards = 2)
         every { userProgressService.calculateProgressStats(user) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(3, user.name, stats)
-        } returns Mono.empty()
+        } throws UpstreamServiceException("OpenRouter down")
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.STREAK_RISK)
@@ -97,7 +97,7 @@ class NotificationContentBuilderTest {
         every { userProgressService.calculateProgressStats(user) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(any(), any(), any())
-        } returns Mono.just("Keep going!")
+        } returns "Keep going!"
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.STREAK_RISK)
@@ -302,7 +302,7 @@ class NotificationContentBuilderTest {
         every { userProgressService.calculateProgressStats(user) } returns stats
         every {
             openRouterService.generateMilestoneMessage(milestone, stats, user.name)
-        } returns Mono.just("Amazing milestone!")
+        } returns "Amazing milestone!"
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.PROGRESS_MILESTONE)
@@ -316,7 +316,7 @@ class NotificationContentBuilderTest {
     }
 
     @Test
-    fun `should use default milestone body when openRouter returns empty mono`() {
+    fun `should use default milestone body when AI is unavailable`() {
         // Arrange
         val user = createUser()
         val milestone = createMilestoneEvent(description = "100 words in your collection")
@@ -325,7 +325,7 @@ class NotificationContentBuilderTest {
         every { userProgressService.calculateProgressStats(user) } returns stats
         every {
             openRouterService.generateMilestoneMessage(any(), any(), any())
-        } returns Mono.empty()
+        } throws UpstreamServiceException("OpenRouter down")
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.PROGRESS_MILESTONE)

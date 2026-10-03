@@ -4,12 +4,12 @@ import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneOffset
 
 private val logger = KotlinLogging.logger {}
 
@@ -19,7 +19,8 @@ class NotificationTypeSelector(
     private val userProgressService: UserProgressService,
     private val analyticsService: AnalyticsService,
     private val featureAccessService: FeatureAccessService,
-    private val milestoneDetector: MilestoneDetector
+    private val milestoneDetector: MilestoneDetector,
+    private val clock: Clock
 ) {
     enum class NotificationType {
         STREAK_RISK, PROGRESS_MILESTONE, WEEKLY_PREVIEW,
@@ -35,7 +36,7 @@ class NotificationTypeSelector(
             return selectReEngagementType(user)
         }
 
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = LocalDate.now(clock)
         val hasReviewedToday = dailyActivityRepository.existsByUserAndActivityDate(user, today)
 
         if (hasReviewedToday) {
@@ -47,7 +48,7 @@ class NotificationTypeSelector(
         }
 
         // Streak risk: only when close to midnight in user's local time
-        val localHour = (LocalTime.now(ZoneOffset.UTC).hour + schedule.timezoneOffsetHrs + 24) % 24
+        val localHour = (LocalTime.now(clock).hour + schedule.timezoneOffsetHrs + 24) % 24
         if (user.currentStreak > 0 && localHour >= 20) {
             return NotificationType.STREAK_RISK
         }
@@ -56,7 +57,7 @@ class NotificationTypeSelector(
             return NotificationType.PROGRESS_MILESTONE
         }
 
-        if (LocalDate.now(ZoneOffset.UTC).dayOfWeek == DayOfWeek.MONDAY) {
+        if (LocalDate.now(clock).dayOfWeek == DayOfWeek.MONDAY) {
             runCatching { analyticsService.getWeeklyReport(user) }
                 .getOrNull()
                 ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }

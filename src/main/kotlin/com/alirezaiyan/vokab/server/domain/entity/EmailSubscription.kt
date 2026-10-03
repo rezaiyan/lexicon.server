@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "email_subscriptions")
-data class EmailSubscription(
+class EmailSubscription(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(name = "user_id", nullable = false)
     val userId: Long,
@@ -17,11 +17,11 @@ data class EmailSubscription(
     val category: String,
 
     @Column(nullable = false)
-    val subscribed: Boolean = true,
+    var subscribed: Boolean = true,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 
     @Column(name = "updated_at", nullable = false)
-    val updatedAt: Instant = Instant.now()
-)
+    var updatedAt: Instant = Instant.now()
+) : JpaEntity<Long>()

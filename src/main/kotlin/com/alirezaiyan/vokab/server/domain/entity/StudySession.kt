@@ -10,10 +10,10 @@ import java.time.Instant
         UniqueConstraint(columnNames = ["user_id", "client_session_id"])
     ]
 )
-data class StudySession(
+class StudySession(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -57,7 +57,7 @@ data class StudySession(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
-) {
+) : JpaEntity<Long>() {
     override fun toString(): String {
         return "StudySession(id=$id, clientSessionId='$clientSessionId', startedAt=$startedAt, totalCards=$totalCards)"
     }

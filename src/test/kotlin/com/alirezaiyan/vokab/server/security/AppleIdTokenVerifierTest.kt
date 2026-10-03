@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.security
 
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.AppleConfig
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.alirezaiyan.vokab.server.service.ApplePublicKeyService
 import io.jsonwebtoken.Jwts
 import io.mockk.every
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.time.Instant
@@ -69,6 +71,13 @@ class AppleIdTokenVerifierTest {
     @Test
     fun `verify rejects a token with an unknown key id`() {
         assertNull(verifier.verify(token(kid = "unknown")))
+    }
+
+    @Test
+    fun `verify propagates an Apple key outage instead of rejecting the token`() {
+        every { applePublicKeyService.getPublicKey(KID) } throws UpstreamServiceException("Apple signing keys unavailable")
+
+        assertThrows<UpstreamServiceException> { verifier.verify(token()) }
     }
 
     @Test

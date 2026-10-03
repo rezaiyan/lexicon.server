@@ -11,7 +11,7 @@ import java.time.Instant
 class Word(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
+    override var id: Long? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -66,12 +66,4 @@ class Word(
         inverseJoinColumns = [JoinColumn(name = "tag_id")]
     )
     var tags: MutableSet<Tag> = mutableSetOf(),
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is Word) return false
-        return id != null && id == other.id
-    }
-
-    override fun hashCode(): Int = id?.hashCode() ?: 0
-}
+) : JpaEntity<Long>()

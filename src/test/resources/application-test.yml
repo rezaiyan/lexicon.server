@@ -1,4 +1,12 @@
 spring:
+  datasource:
+    # Mirrors the h2 profile: app_config uses the column names "key" and "value"
+    url: jdbc:h2:mem:vokabdb;NON_KEYWORDS=KEY,VALUE
+  test:
+    database:
+      # @DataJpaTest would otherwise swap in an embedded H2 without NON_KEYWORDS
+      replace: none
+
   sql:
     init:
       mode: always

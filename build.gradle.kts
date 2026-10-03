@@ -35,8 +35,6 @@ dependencies {
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 	implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
 	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
-	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
 	
 	// Database
 	implementation("org.postgresql:postgresql")
@@ -54,9 +52,6 @@ dependencies {
 	
 	// Google API Client for OAuth
 	implementation("com.google.api-client:google-api-client:2.2.0")
-	
-	// HTTP Client for external API calls
-	implementation("org.springframework.boot:spring-boot-starter-webflux")
 	
 	// Rate Limiting
 	implementation("com.bucket4j:bucket4j-core:8.10.1")

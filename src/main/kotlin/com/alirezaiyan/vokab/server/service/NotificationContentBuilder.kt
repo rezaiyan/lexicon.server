@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType.*
@@ -39,9 +40,9 @@ class NotificationContentBuilder(
 
     private fun buildStreakRisk(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user)
-        val body = openRouterService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
-            .blockOptional()
-            .orElse("Your ${user.currentStreak}-day streak ends at midnight. Keep it alive! 🔥")
+        val body = aiCopyOr("Your ${user.currentStreak}-day streak ends at midnight. Keep it alive! 🔥") {
+            openRouterService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
+        }
         return NotificationPayload(
             title = "Your ${user.currentStreak}-day streak ends at midnight 🔥",
             body = body,
@@ -110,9 +111,9 @@ class NotificationContentBuilder(
         val milestone = milestoneDetector.getPendingMilestone(user)
             ?: return buildFallbackInsight()
         val stats = userProgressService.calculateProgressStats(user)
-        val body = openRouterService.generateMilestoneMessage(milestone, stats, user.name)
-            .blockOptional()
-            .orElse("You hit a new milestone: ${milestone.description}! 🏆")
+        val body = aiCopyOr("You hit a new milestone: ${milestone.description}! 🏆") {
+            openRouterService.generateMilestoneMessage(milestone, stats, user.name)
+        }
         return NotificationPayload(
             title = milestone.title,
             body = body,
@@ -227,4 +228,13 @@ class NotificationContentBuilder(
             type = DAILY_INSIGHT
         )
     }
+
+    /** AI-written copy, or [fallback] when the AI is unavailable: the notification still goes out. */
+    private inline fun aiCopyOr(fallback: String, generate: () -> String): String =
+        try {
+            generate()
+        } catch (e: UpstreamServiceException) {
+            logger.warn { "AI notification copy unavailable, using fallback: ${e.message}" }
+            fallback
+        }
 }

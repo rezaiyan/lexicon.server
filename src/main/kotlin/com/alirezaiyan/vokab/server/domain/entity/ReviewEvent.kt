@@ -4,10 +4,10 @@ import jakarta.persistence.*
 
 @Entity
 @Table(name = "review_events")
-data class ReviewEvent(
+class ReviewEvent(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false)
@@ -46,7 +46,7 @@ data class ReviewEvent(
 
     @Column(name = "reviewed_at", nullable = false)
     val reviewedAt: Long,
-) {
+) : JpaEntity<Long>() {
     override fun toString(): String {
         return "ReviewEvent(id=$id, wordId=$wordId, rating=$rating, previousLevel=$previousLevel, newLevel=$newLevel)"
     }

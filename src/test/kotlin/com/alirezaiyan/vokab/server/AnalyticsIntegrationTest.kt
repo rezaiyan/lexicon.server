@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 
 @SpringBootTest
 @ActiveProfiles("test")
@@ -387,7 +388,7 @@ class AnalyticsIntegrationTest {
             durationMs = 45_000,
         )
 
-        val result = analyticsService.getDailyStats(user, "2023-11-15", "2023-11-15")
+        val result = analyticsService.getDailyStats(user, LocalDate.parse("2023-11-15"), LocalDate.parse("2023-11-15"))
 
         assertEquals(1, result.size)
         assertEquals("2023-11-15", result[0].date)
@@ -400,7 +401,7 @@ class AnalyticsIntegrationTest {
 
     @Test
     fun `daily stats returns empty for date range with no sessions`() {
-        val result = analyticsService.getDailyStats(user, "2020-01-01", "2020-01-31")
+        val result = analyticsService.getDailyStats(user, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-31"))
         assertTrue(result.isEmpty())
     }
 

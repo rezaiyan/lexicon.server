@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.domain.repository.AppEventRepository
 import com.alirezaiyan.vokab.server.presentation.dto.TrackEventRequest
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -17,6 +18,7 @@ class EventService(
     private val appEventRepository: AppEventRepository,
     private val objectMapper: ObjectMapper,
     private val notificationEngagementService: NotificationEngagementService,
+    private val clock: Clock,
 ) {
     @Transactional
     fun track(userId: Long, request: TrackEventRequest) {
@@ -59,7 +61,7 @@ class EventService(
                     properties = properties,
                     platform = null,
                     appVersion = null,
-                    clientTimestampMs = Instant.now().toEpochMilli(),
+                    clientTimestampMs = Instant.now(clock).toEpochMilli(),
                 )
             )
         }.onFailure { e -> logger.warn(e) { "Failed to track async event '$eventName' for user $userId" } }

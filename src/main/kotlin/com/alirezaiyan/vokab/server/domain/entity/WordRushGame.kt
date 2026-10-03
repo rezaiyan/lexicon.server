@@ -10,10 +10,10 @@ import java.time.Instant
         UniqueConstraint(columnNames = ["user_id", "client_game_id"])
     ]
 )
-data class WordRushGame(
+class WordRushGame(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -54,7 +54,7 @@ data class WordRushGame(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
-) {
+) : JpaEntity<Long>() {
     override fun toString(): String {
         return "WordRushGame(id=$id, clientGameId='$clientGameId', score=$score, playedAt=$playedAt)"
     }

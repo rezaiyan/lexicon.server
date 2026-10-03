@@ -9,11 +9,13 @@ import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleReposi
 import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -27,7 +29,8 @@ class DailyInsightService(
     private val pushNotificationService: PushNotificationService,
     private val featureAccessService: FeatureAccessService,
     private val analyticsService: AnalyticsService,
-    private val notificationScheduleRepository: NotificationScheduleRepository
+    private val notificationScheduleRepository: NotificationScheduleRepository,
+    private val clock: Clock
 ) {
 
     /**
@@ -51,7 +54,7 @@ class DailyInsightService(
             return null
         }
 
-        val today = LocalDate.now().toString()
+        val today = LocalDate.now(clock).toString()
 
         val existingInsight = dailyInsightRepository.findByUserAndDate(user, today)
         if (existingInsight != null) {
@@ -59,7 +62,7 @@ class DailyInsightService(
             return existingInsight
         }
 
-        val hasActivityToday = dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now())
+        val hasActivityToday = dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now(clock))
         val streakAtRisk = user.currentStreak > 0 && !hasActivityToday
         val reminderHour = userSettingsRepository.findByUser(user)
             ?.dailyReminderTime?.split(":")?.firstOrNull()?.toIntOrNull() ?: 18
@@ -73,18 +76,16 @@ class DailyInsightService(
         return try {
             val stats = userProgressService.calculateProgressStats(user)
             val insightText = if (hasActivityToday) {
-                openRouterService.generateCelebrationInsight(stats, user.name).block()
-                    ?: "Great work today! 🎉 You're building something real."
+                openRouterService.generateCelebrationInsight(stats, user.name)
             } else {
                 val ctx = buildInsightContext(user, stats)
-                openRouterService.generateDailyInsight(ctx).block()
-                    ?: "Keep grinding! Every word you learn levels you up! 🎮✨"
+                openRouterService.generateDailyInsight(ctx)
             }
 
             val insight = DailyInsight(
                 user = user,
                 insightText = insightText,
-                generatedAt = Instant.now(),
+                generatedAt = Instant.now(clock),
                 date = today,
                 sentViaPush = false
             )
@@ -143,7 +144,7 @@ class DailyInsightService(
 
         return try {
             val responses = pushNotificationService.sendNotificationToUser(
-                userId = insight.user.id!!,
+                userId = insight.user.requireId(),
                 title = "💡 Daily Vocabulary Insight",
                 body = insight.insightText,
                 data = mapOf(
@@ -157,8 +158,9 @@ class DailyInsightService(
             val success = responses.any { it.success }
 
             if (success) {
-                val updatedInsight = insight.copy(sentViaPush = true, pushSentAt = Instant.now())
-                dailyInsightRepository.save(updatedInsight)
+                insight.sentViaPush = true
+                insight.pushSentAt = Instant.now(clock)
+                dailyInsightRepository.save(insight)
                 logger.info { "Successfully sent daily insight push for user ${insight.user.id}" }
             } else {
                 logger.warn { "Failed to send daily insight push for user ${insight.user.id}" }
@@ -186,11 +188,11 @@ class DailyInsightService(
      * the existing row if a unique-constraint violation occurs (race condition safe).
      */
     fun saveDailyInsight(user: User, insightText: String): DailyInsight? {
-        val today = LocalDate.now().toString()
+        val today = LocalDate.now(clock).toString()
         val insight = DailyInsight(
             user = user,
             insightText = insightText,
-            generatedAt = Instant.now(),
+            generatedAt = Instant.now(clock),
             date = today,
             sentViaPush = false
         )
@@ -207,7 +209,7 @@ class DailyInsightService(
      */
     @Transactional(readOnly = true)
     fun getTodaysInsightForUser(user: User): DailyInsight? {
-        val today = LocalDate.now().toString()
+        val today = LocalDate.now(clock).toString()
         return dailyInsightRepository.findByUserAndDate(user, today)
     }
 

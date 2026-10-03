@@ -38,7 +38,7 @@ class WordUpsertPreparer(
         val allTagIds = words.flatMapTo(mutableSetOf()) { it.tagIds }
         if (allTagIds.isEmpty()) return emptyMap()
         return tagRepository.findAllByUserAndIdIn(user, allTagIds.toList())
-            .associateBy { it.id!! }
+            .associateBy { checkNotNull(it.id) }
     }
 
     private fun buildEntitiesToSave(

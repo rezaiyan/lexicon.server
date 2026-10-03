@@ -1,197 +1,137 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.MutableClock
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.math.BigInteger
-import java.security.KeyFactory
-import java.security.PublicKey
+import org.junit.jupiter.api.assertThrows
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.test.web.client.ExpectedCount.once
+import org.springframework.test.web.client.MockRestServiceServer
+import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
+import org.springframework.test.web.client.response.MockRestResponseCreators.withException
+import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
+import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
+import org.springframework.web.client.RestClient
+import java.io.IOException
+import java.security.KeyPairGenerator
 import java.security.interfaces.RSAPublicKey
-import java.security.spec.RSAPublicKeySpec
+import java.time.Duration
+import java.time.Instant
 import java.util.Base64
-import java.util.concurrent.ConcurrentHashMap
 
-/**
- * Unit tests for ApplePublicKeyService.
- *
- * Because the service creates its own WebClient and ObjectMapper internally (no
- * constructor-injection), the tests control internal state via reflection — either
- * by pre-populating the publicKeysCache or by manipulating lastFetchTime so that
- * refreshPublicKeys() is skipped or triggered deterministically.
- *
- * Tests that require an actual HTTP call are intentionally NOT included here;
- * those belong in integration / WireMock-based tests.
- */
 class ApplePublicKeyServiceTest {
 
-    private lateinit var service: ApplePublicKeyService
+    private val keysUrl = "https://appleid.apple.com/auth/keys"
+    private val key1 = newRsaKey()
+    private val key2 = newRsaKey()
 
-    @BeforeEach
-    fun setUp() {
-        service = ApplePublicKeyService()
-        // Mark cache as "just refreshed" so no outbound HTTP call is attempted
-        // during tests that are only exercising cache behaviour.
-        setLastFetchTime(System.currentTimeMillis())
-    }
-
-    // ── getPublicKey: cache hit ────────────────────────────────────────────────
+    private val clock = MutableClock(Instant.parse("2026-10-03T12:00:00Z"))
+    private val builder = RestClient.builder()
+    private val server = MockRestServiceServer.bindTo(builder).build()
+    private val service = ApplePublicKeyService(builder, clock)
 
     @Test
-    fun `should return key from cache when kid is present`() {
-        val expected = generateRsaPublicKey()
-        seedCache(mapOf("kid-1" to expected))
+    fun `fetches Apple's key set on first use and returns the matching key`() {
+        server.expect(once(), requestTo(keysUrl)).andRespond(jwks("kid-1" to key1, "kid-2" to key2))
 
-        val result = service.getPublicKey("kid-1")
-
-        assertNotNull(result)
-        assertEquals(expected, result)
+        assertEquals(key2, service.getPublicKey("kid-2"))
+        server.verify()
     }
 
     @Test
-    fun `should return null when kid is not in cache and cache is fresh`() {
-        seedCache(mapOf("other-kid" to generateRsaPublicKey()))
+    fun `serves cached keys without refetching within the cache lifetime`() {
+        server.expect(once(), requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
 
-        // Cache is fresh (lastFetchTime was just set) but "missing-kid" is absent.
-        // refreshPublicKeys() will be called a second time because the key is absent;
-        // it will hit the real Apple endpoint which may fail in CI.
-        // We verify the return is null (either truly absent or network failure swallowed).
-        val result = service.getPublicKey("missing-kid")
-
-        assertNull(result)
+        service.getPublicKey("kid-1")
+        clock.advance(Duration.ofHours(23))
+        assertEquals(key1, service.getPublicKey("kid-1"))
+        server.verify()
     }
 
     @Test
-    fun `should return null when cache is empty and kid is not found`() {
-        seedCache(emptyMap())
+    fun `refetches once the cache lifetime has passed`() {
+        server.expect(requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
+        server.expect(requestTo(keysUrl)).andRespond(jwks("kid-2" to key2))
 
-        val result = service.getPublicKey("nonexistent-kid")
-
-        assertNull(result)
+        service.getPublicKey("kid-1")
+        clock.advance(Duration.ofHours(25))
+        assertEquals(key2, service.getPublicKey("kid-2"))
+        server.verify()
     }
 
-    // ── getPublicKey: multiple keys in cache ───────────────────────────────────
+    @Test
+    fun `unknown kid right after a fetch returns null without calling Apple again`() {
+        server.expect(once(), requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
+
+        service.getPublicKey("kid-1")
+        repeat(5) { assertNull(service.getPublicKey("random-kid-$it")) }
+        server.verify()
+    }
 
     @Test
-    fun `should return correct key when multiple keys are cached`() {
-        val key1 = generateRsaPublicKey()
-        val key2 = generateRsaPublicKey()
-        seedCache(mapOf("kid-1" to key1, "kid-2" to key2))
+    fun `unknown kid refetches after the throttle interval, picking up rotated keys`() {
+        server.expect(requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
+        server.expect(requestTo(keysUrl)).andRespond(jwks("kid-1" to key1, "kid-2" to key2))
+
+        service.getPublicKey("kid-1")
+        clock.advance(Duration.ofMinutes(2))
+        assertEquals(key2, service.getPublicKey("kid-2"))
+        server.verify()
+    }
+
+    @Test
+    fun `throws UpstreamServiceException when Apple is unreachable and nothing is cached`() {
+        server.expect(requestTo(keysUrl)).andRespond(withException(IOException("connection refused")))
+
+        assertThrows<UpstreamServiceException> { service.getPublicKey("kid-1") }
+    }
+
+    @Test
+    fun `throws UpstreamServiceException when Apple answers with an error status`() {
+        server.expect(requestTo(keysUrl)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
+
+        assertThrows<UpstreamServiceException> { service.getPublicKey("kid-1") }
+    }
+
+    @Test
+    fun `keeps serving a cached key when a refresh fails after the cache lifetime`() {
+        server.expect(requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
+        server.expect(requestTo(keysUrl)).andRespond(withException(IOException("connection refused")))
+
+        service.getPublicKey("kid-1")
+        clock.advance(Duration.ofHours(25))
+        assertEquals(key1, service.getPublicKey("kid-1"))
+    }
+
+    @Test
+    fun `skips malformed and non-RSA entries in the key set`() {
+        val body = """{"keys":[
+            {"kid":"ec","kty":"EC","crv":"P-256","x":"AA","y":"AA"},
+            {"kid":"broken","kty":"RSA"},
+            ${jwk("kid-1", key1)}
+        ]}"""
+        server.expect(requestTo(keysUrl)).andRespond(withSuccess(body, MediaType.APPLICATION_JSON))
 
         assertEquals(key1, service.getPublicKey("kid-1"))
-        assertEquals(key2, service.getPublicKey("kid-2"))
+        assertNull(service.getPublicKey("ec"))
     }
 
-    // ── getPublicKey: stale cache triggers refresh ─────────────────────────────
+    // ── helpers ───────────────────────────────────────────────────────────────
 
-    @Test
-    fun `should attempt refresh when cache TTL has expired`() {
-        // Set lastFetchTime to more than 24 hours ago so cache appears stale.
-        setLastFetchTime(System.currentTimeMillis() - (25 * 60 * 60 * 1000L))
-        seedCache(emptyMap())
+    private fun jwks(vararg keys: Pair<String, RSAPublicKey>) = withSuccess(
+        """{"keys":[${keys.joinToString(",") { (kid, key) -> jwk(kid, key) }}]}""",
+        MediaType.APPLICATION_JSON,
+    )
 
-        // After a stale-cache refresh attempt the key will still be null because
-        // the network call either fails or returns keys that don't include our kid.
-        // What we verify is that no exception is thrown — refreshPublicKeys catches all.
-        val result = service.getPublicKey("any-kid")
-
-        assertNull(result)
+    private fun jwk(kid: String, key: RSAPublicKey): String {
+        val encoder = Base64.getUrlEncoder().withoutPadding()
+        fun encode(value: java.math.BigInteger) = encoder.encodeToString(value.toByteArray().dropWhile { it == 0.toByte() }.toByteArray())
+        return """{"kid":"$kid","kty":"RSA","alg":"RS256","use":"sig","n":"${encode(key.modulus)}","e":"${encode(key.publicExponent)}"}"""
     }
 
-    @Test
-    fun `should not throw when network is unavailable and cache is stale`() {
-        setLastFetchTime(0L)
-        seedCache(emptyMap())
-
-        org.junit.jupiter.api.assertDoesNotThrow {
-            service.getPublicKey("any-kid")
-        }
-    }
-
-    // ── createPublicKey (via cache pre-population round-trip) ─────────────────
-
-    @Test
-    fun `should create RSA public key from valid Base64URL modulus and exponent`() {
-        // Generate a known RSA key pair and verify the recreated key matches the original
-        val keyGen = java.security.KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }
-        val keyPair = keyGen.generateKeyPair()
-        val rsaPublicKey = keyPair.public as RSAPublicKey
-
-        val modulusBase64 = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(rsaPublicKey.modulus.toByteArray())
-        val exponentBase64 = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(rsaPublicKey.publicExponent.toByteArray())
-
-        // Build a minimal JWK JSON string and let the service parse it via
-        // direct method access through reflection
-        val recreated = invokeCreatePublicKey(modulusBase64, exponentBase64)
-
-        assertNotNull(recreated)
-        assertEquals(rsaPublicKey.modulus, (recreated as RSAPublicKey).modulus)
-        assertEquals(rsaPublicKey.publicExponent, (recreated as RSAPublicKey).publicExponent)
-    }
-
-    // ── cache population is idempotent ────────────────────────────────────────
-
-    @Test
-    fun `should overwrite existing cache entry when the same kid is seeded again`() {
-        val key1 = generateRsaPublicKey()
-        val key2 = generateRsaPublicKey()
-        seedCache(mapOf("kid-1" to key1))
-
-        // Overwrite with key2
-        seedCache(mapOf("kid-1" to key2))
-
-        assertEquals(key2, service.getPublicKey("kid-1"))
-    }
-
-    // ── helper: reflection-based access ───────────────────────────────────────
-
-    /**
-     * Pre-populates the service's internal ConcurrentHashMap<String, PublicKey> cache.
-     * Existing entries are cleared first to give each test a clean slate.
-     */
-    @Suppress("UNCHECKED_CAST")
-    private fun seedCache(entries: Map<String, PublicKey>) {
-        val field = ApplePublicKeyService::class.java.getDeclaredField("publicKeysCache")
-        field.isAccessible = true
-        val cache = field.get(service) as ConcurrentHashMap<String, PublicKey>
-        cache.clear()
-        cache.putAll(entries)
-    }
-
-    /**
-     * Sets the service's private lastFetchTime field so tests can simulate fresh
-     * or stale cache without waiting real time.
-     */
-    private fun setLastFetchTime(timeMs: Long) {
-        val field = ApplePublicKeyService::class.java.getDeclaredField("lastFetchTime")
-        field.isAccessible = true
-        field.set(service, timeMs)
-    }
-
-    /**
-     * Calls the private createPublicKey method via reflection so the RSA key
-     * construction logic can be tested in isolation.
-     */
-    private fun invokeCreatePublicKey(modulusBase64: String, exponentBase64: String): PublicKey {
-        val method = ApplePublicKeyService::class.java.getDeclaredMethod(
-            "createPublicKey",
-            String::class.java,
-            String::class.java
-        )
-        method.isAccessible = true
-        return method.invoke(service, modulusBase64, exponentBase64) as PublicKey
-    }
-
-    /**
-     * Generates a real RSA public key for use as a test fixture.
-     */
-    private fun generateRsaPublicKey(): PublicKey {
-        return java.security.KeyPairGenerator.getInstance("RSA")
-            .apply { initialize(1024) }
-            .generateKeyPair()
-            .public
-    }
+    private fun newRsaKey(): RSAPublicKey =
+        KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair().public as RSAPublicKey
 }

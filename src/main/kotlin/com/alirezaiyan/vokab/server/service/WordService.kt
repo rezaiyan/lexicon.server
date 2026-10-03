@@ -7,9 +7,11 @@ import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.presentation.dto.UpdateWordRequest
 import com.alirezaiyan.vokab.server.presentation.dto.WordDto
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @Service
 class WordService(
@@ -17,6 +19,7 @@ class WordService(
     private val tagRepository: TagRepository,
     private val wordUpsertPreparer: WordUpsertPreparer,
     private val userRepository: UserRepository,
+    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun list(user: User): List<WordDto> =
@@ -48,7 +51,8 @@ class WordService(
         wordRepository.saveAll(entities)
 
         if (hasNewWords && user.firstWordAddedAt == null) {
-            userRepository.save(user.copy(firstWordAddedAt = Instant.now()))
+            user.firstWordAddedAt = Instant.now(clock)
+            userRepository.save(user)
         }
     }
 
@@ -67,7 +71,7 @@ class WordService(
         entity.repetitions = request.repetitions
         entity.lastReviewDate = request.lastReviewDate
         entity.nextReviewDate = request.nextReviewDate
-        entity.updatedAt = Instant.now()
+        entity.updatedAt = Instant.now(clock)
         // Only update tags when the client explicitly provides them; empty list means "no tag info"
         if (request.tagIds.isNotEmpty()) {
             entity.tags = tagRepository.findAllByUserAndIdIn(user, request.tagIds).toMutableSet()
@@ -77,14 +81,14 @@ class WordService(
 
     @Transactional
     fun delete(user: User, id: Long) {
-        val deleted = wordRepository.deleteByIdAndUserId(id, user.id!!)
+        val deleted = wordRepository.deleteByIdAndUserId(id, user.requireId())
         require(deleted == 1) { "Word not found" }
     }
 
     @Transactional
     fun batchDelete(user: User, ids: List<Long>): Int {
         if (ids.isEmpty()) return 0
-        return wordRepository.deleteAllByIdInAndUserId(ids, user.id!!)
+        return wordRepository.deleteAllByIdInAndUserId(ids, user.requireId())
     }
 
     @Transactional
@@ -97,8 +101,8 @@ class WordService(
         if (ids.isEmpty()) return 0
         if (sourceLanguage == null && targetLanguage == null) return 0
 
-        val userId = user.id!!
-        val now = Instant.now()
+        val userId = user.requireId()
+        val now = Instant.now(clock)
 
         return when {
             sourceLanguage != null && targetLanguage != null ->
@@ -107,15 +111,17 @@ class WordService(
             sourceLanguage != null ->
                 wordRepository.updateSourceLanguageByIdInAndUserId(ids, userId, sourceLanguage, now)
 
-            else ->
-                wordRepository.updateTargetLanguageByIdInAndUserId(ids, userId, targetLanguage!!, now)
+            targetLanguage != null ->
+                wordRepository.updateTargetLanguageByIdInAndUserId(ids, userId, targetLanguage, now)
+
+            else -> 0
         }
     }
 
     @Transactional
     fun batchAssignTags(user: User, wordIds: List<Long>, tagIds: List<Long>): Int {
         if (wordIds.isEmpty()) return 0
-        val userId = user.id!!
+        val userId = user.requireId()
         wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, userId)
         if (tagIds.isNotEmpty()) {
             wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, userId)

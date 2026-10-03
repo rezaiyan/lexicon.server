@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.DailyActivity
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -10,7 +13,6 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
 import java.time.LocalDate
 
 class ProfileStatsServiceTest {
@@ -26,7 +28,7 @@ class ProfileStatsServiceTest {
         dailyActivityRepository = mockk()
         wordRepository = mockk()
         streakService = mockk()
-        profileStatsService = ProfileStatsService(dailyActivityRepository, wordRepository, streakService)
+        profileStatsService = ProfileStatsService(dailyActivityRepository, wordRepository, streakService, clock = fixedClock())
     }
 
     @Test
@@ -49,7 +51,7 @@ class ProfileStatsServiceTest {
     fun `getProfileStats should calculate longest streak from consecutive activities`() {
         // Arrange
         val user = createUser(currentStreak = 0, longestStreak = 0)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val activities = listOf(
             createDailyActivity(user, today),
             createDailyActivity(user, today.minusDays(1)),
@@ -73,7 +75,7 @@ class ProfileStatsServiceTest {
     fun `getProfileStats should return weekly activity for last 7 days`() {
         // Arrange
         val user = createUser()
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val yesterday = today.minusDays(1)
         val recentActivities = listOf(
             createDailyActivity(user, yesterday, reviewCount = 10)
@@ -140,7 +142,7 @@ class ProfileStatsServiceTest {
         // Arrange
         // user.longestStreak = 10, currentStreak from service = 3, calculated from activities = 4
         val user = createUser(currentStreak = 3, longestStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val activities = listOf(
             createDailyActivity(user, today),
             createDailyActivity(user, today.minusDays(1)),
@@ -175,8 +177,8 @@ class ProfileStatsServiceTest {
         currentStreak = currentStreak,
         longestStreak = longestStreak,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createDailyActivity(

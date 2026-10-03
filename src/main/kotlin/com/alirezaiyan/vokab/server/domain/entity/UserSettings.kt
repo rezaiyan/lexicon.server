@@ -7,7 +7,7 @@ import jakarta.persistence.*
 class UserSettings(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    var id: Long? = null,
+    override var id: Long? = null,
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
@@ -31,6 +31,6 @@ class UserSettings(
 
     @Column(nullable = false)
     var notificationFrequency: String = "DAILY"
-)
+) : JpaEntity<Long>()
 
 

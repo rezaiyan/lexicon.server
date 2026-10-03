@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationLog
 import com.alirezaiyan.vokab.server.domain.repository.NotificationLogRepository
 import com.alirezaiyan.vokab.server.service.EngagementSegmentService.EngagementSegment
@@ -18,7 +20,7 @@ class EngagementSegmentServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = EngagementSegmentService(notificationLogRepository)
+        service = EngagementSegmentService(notificationLogRepository, clock = fixedClock())
     }
 
     // ── HOT ──────────────────────────────────────────────────────────────────────
@@ -26,8 +28,8 @@ class EngagementSegmentServiceTest {
     @Test
     fun `should return HOT when 2 of last 3 notifications were opened`() {
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
-            log(openedAt = Instant.now()),
-            log(openedAt = Instant.now()),
+            log(openedAt = TEST_NOW),
+            log(openedAt = TEST_NOW),
             log(openedAt = null)
         )
 
@@ -37,9 +39,9 @@ class EngagementSegmentServiceTest {
     @Test
     fun `should return HOT when all 3 of last 3 notifications were opened`() {
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
-            log(openedAt = Instant.now()),
-            log(openedAt = Instant.now()),
-            log(openedAt = Instant.now())
+            log(openedAt = TEST_NOW),
+            log(openedAt = TEST_NOW),
+            log(openedAt = TEST_NOW)
         )
 
         assertEquals(EngagementSegment.HOT, service.computeSegment(1L))
@@ -57,7 +59,7 @@ class EngagementSegmentServiceTest {
     @Test
     fun `should return WARM when exactly 1 of last 3 notifications was opened`() {
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
-            log(openedAt = Instant.now()),
+            log(openedAt = TEST_NOW),
             log(openedAt = null),
             log(openedAt = null)
         )
@@ -69,7 +71,7 @@ class EngagementSegmentServiceTest {
 
     @Test
     fun `should return COOLING when 0 of last 3 opened but last open was less than 7 days ago`() {
-        val fiveDaysAgo = Instant.now().minus(5, ChronoUnit.DAYS)
+        val fiveDaysAgo = TEST_NOW.minus(5, ChronoUnit.DAYS)
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
             log(openedAt = null),
             log(openedAt = null),
@@ -86,7 +88,7 @@ class EngagementSegmentServiceTest {
 
     @Test
     fun `should return COLD when last open was between 7 and 30 days ago`() {
-        val fifteenDaysAgo = Instant.now().minus(15, ChronoUnit.DAYS)
+        val fifteenDaysAgo = TEST_NOW.minus(15, ChronoUnit.DAYS)
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
             log(openedAt = null),
             log(openedAt = null),
@@ -116,7 +118,7 @@ class EngagementSegmentServiceTest {
 
     @Test
     fun `should return DORMANT when last open was more than 30 days ago`() {
-        val fortyDaysAgo = Instant.now().minus(40, ChronoUnit.DAYS)
+        val fortyDaysAgo = TEST_NOW.minus(40, ChronoUnit.DAYS)
         every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
             log(openedAt = null),
             log(openedAt = null),

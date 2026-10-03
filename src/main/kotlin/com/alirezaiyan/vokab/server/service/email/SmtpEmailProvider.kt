@@ -51,7 +51,7 @@ class SmtpEmailProvider(
         val from = request.from ?: emailConfig.fromAddress
         val messageId = UUID.randomUUID().toString()
 
-        logger.info { "Sending email via SMTP to ${request.to}: ${request.subject}" }
+        logger.info { "Sending email via SMTP: ${request.subject}" }
 
         val message = MimeMessage(session).apply {
             setFrom(InternetAddress(from))

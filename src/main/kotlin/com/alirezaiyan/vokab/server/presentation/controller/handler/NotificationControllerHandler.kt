@@ -1,6 +1,5 @@
 package com.alirezaiyan.vokab.server.presentation.controller.handler
 
-import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.NotificationResponse
@@ -8,11 +7,9 @@ import com.alirezaiyan.vokab.server.presentation.dto.RegisterPushTokenRequest
 import com.alirezaiyan.vokab.server.presentation.dto.SendNotificationRequest
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.alirezaiyan.vokab.server.service.push.PushTokenService
-import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.stereotype.Component
-
-private val logger = KotlinLogging.logger {}
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @Component
 class NotificationControllerHandler(
@@ -23,7 +20,7 @@ class NotificationControllerHandler(
     fun registerToken(user: User, request: RegisterPushTokenRequest): ResponseEntity<ApiResponse<Unit>> {
         return execute<Unit> {
             pushTokenService.registerToken(
-                userId = user.id!!,
+                userId = user.requireId(),
                 token = request.token,
                 platform = request.platform,
                 deviceId = request.deviceId
@@ -41,7 +38,7 @@ class NotificationControllerHandler(
     
     fun deactivateAllTokens(user: User): ResponseEntity<ApiResponse<Unit>> {
         return execute<Unit> {
-            pushTokenService.deactivateAllUserTokens(user.id!!)
+            pushTokenService.deactivateAllUserTokens(user.requireId())
             ApiResponse(success = true, message = "All tokens deactivated successfully")
         }
     }
@@ -49,7 +46,7 @@ class NotificationControllerHandler(
     fun sendNotification(user: User, request: SendNotificationRequest): ResponseEntity<ApiResponse<List<NotificationResponse>>> {
         return execute<List<NotificationResponse>> {
             val responses = pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
+                userId = user.requireId(),
                 title = request.title,
                 body = request.body,
                 data = request.data,
@@ -61,7 +58,7 @@ class NotificationControllerHandler(
     
     fun getUserTokens(user: User): ResponseEntity<ApiResponse<Int>> {
         return execute<Int> {
-            val tokens = pushTokenService.getActiveTokensForUser(user.id!!)
+            val tokens = pushTokenService.getActiveTokensForUser(user.requireId())
             ApiResponse(
                 success = true,
                 data = tokens.size,
@@ -70,16 +67,8 @@ class NotificationControllerHandler(
         }
     }
     
-    private inline fun <T> execute(operation: () -> ApiResponse<T>): ResponseEntity<ApiResponse<T>> {
-        return try {
-            val result = operation()
-            ResponseEntity.ok(result)
-        } catch (e: Exception) {
-            logger.error(e) { "Operation failed" }
-            ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = e.clientMessage("Operation failed")))
-        }
-    }
+    private inline fun <T> execute(operation: () -> ApiResponse<T>): ResponseEntity<ApiResponse<T>> =
+        ResponseEntity.ok(operation())
 }
 
 

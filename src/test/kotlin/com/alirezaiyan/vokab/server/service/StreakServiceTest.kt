@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.DailyActivity
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
@@ -14,6 +17,7 @@ import org.junit.jupiter.api.Test
 import java.time.Instant
 import java.time.LocalDate
 import java.util.Optional
+import java.util.TimeZone
 
 class StreakServiceTest {
 
@@ -25,7 +29,31 @@ class StreakServiceTest {
     fun setUp() {
         dailyActivityRepository = mockk()
         userRepository = mockk()
-        streakService = StreakService(dailyActivityRepository, userRepository)
+        streakService = StreakService(dailyActivityRepository, userRepository, clock = fixedClock())
+    }
+
+    @Test
+    fun `getUserStreak uses the UTC date of the clock, not the JVM default zone`() {
+        // 23:30 UTC on June 17 is already June 18 in Berlin
+        val lateEvening = StreakService(
+            dailyActivityRepository, userRepository,
+            clock = fixedClock(Instant.parse("2026-06-17T23:30:00Z"))
+        )
+        val user = createUser(id = 1L, currentStreak = 1, longestStreak = 1)
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        every { dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user) } returns listOf(
+            createDailyActivity(user, LocalDate.of(2026, 6, 17))
+        )
+
+        val originalZone = TimeZone.getDefault()
+        val streak = try {
+            TimeZone.setDefault(TimeZone.getTimeZone("Europe/Berlin"))
+            lateEvening.getUserStreak(1L)
+        } finally {
+            TimeZone.setDefault(originalZone)
+        }
+
+        assertEquals(1, streak.currentStreak)
     }
 
     // --- recordActivity ---
@@ -34,8 +62,8 @@ class StreakServiceTest {
     fun `should create new DailyActivity and update streak when first activity today`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 0, longestStreak = 0)
-        val today = LocalDate.now()
-        val savedUser = user.copy(currentStreak = 1, longestStreak = 1)
+        val today = TEST_TODAY
+        val savedUser = createUser(id = 1L, currentStreak = 1, longestStreak = 1)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -57,7 +85,7 @@ class StreakServiceTest {
     fun `should increment review count when activity already exists today`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 3, longestStreak = 5)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val existingActivity = createDailyActivity(user, today, reviewCount = 2)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.of(existingActivity)
@@ -89,8 +117,8 @@ class StreakServiceTest {
     fun `should set streak to 1 on first ever activity`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 0, longestStreak = 0)
-        val today = LocalDate.now()
-        val savedUser = user.copy(currentStreak = 1, longestStreak = 1)
+        val today = TEST_TODAY
+        val savedUser = createUser(id = 1L, currentStreak = 1, longestStreak = 1)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -111,9 +139,9 @@ class StreakServiceTest {
     fun `should calculate consecutive streak correctly`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 2, longestStreak = 2)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val yesterday = today.minusDays(1)
-        val savedUser = user.copy(currentStreak = 3, longestStreak = 3)
+        val savedUser = createUser(id = 1L, currentStreak = 3, longestStreak = 3)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -135,10 +163,10 @@ class StreakServiceTest {
     fun `should reset streak to 1 when yesterday has no activity`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 5, longestStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         // Two days ago is the most recent activity — gap yesterday breaks the chain
         val twoDaysAgo = today.minusDays(2)
-        val savedUser = user.copy(currentStreak = 1, longestStreak = 10)
+        val savedUser = createUser(id = 1L, currentStreak = 1, longestStreak = 10)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -159,8 +187,8 @@ class StreakServiceTest {
     fun `should update longest streak when new record is set`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 4, longestStreak = 4)
-        val today = LocalDate.now()
-        val savedUser = user.copy(currentStreak = 5, longestStreak = 5)
+        val today = TEST_TODAY
+        val savedUser = createUser(id = 1L, currentStreak = 5, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -185,8 +213,8 @@ class StreakServiceTest {
     fun `should not update longest streak when current streak is below record`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 0, longestStreak = 10)
-        val today = LocalDate.now()
-        val savedUser = user.copy(currentStreak = 1, longestStreak = 10)
+        val today = TEST_TODAY
+        val savedUser = createUser(id = 1L, currentStreak = 1, longestStreak = 10)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findByUserAndActivityDate(user, today) } returns Optional.empty()
         every { dailyActivityRepository.save(any<DailyActivity>()) } returns createDailyActivity(user, today)
@@ -219,7 +247,7 @@ class StreakServiceTest {
     @Test
     fun `getUserStreak should return calculated streak`() {
         // Arrange
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user = createUser(id = 1L, currentStreak = 3, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user) } returns listOf(
@@ -241,7 +269,7 @@ class StreakServiceTest {
         val user = createUser(id = 1L, currentStreak = 5, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user) } returns emptyList()
-        every { userRepository.save(any()) } returns user.copy(currentStreak = 0)
+        every { userRepository.save(any()) } answers { firstArg() }
 
         // Act
         val result = streakService.getUserStreak(1L)
@@ -253,7 +281,7 @@ class StreakServiceTest {
     @Test
     fun `getUserStreak should return 0 when last activity was not today`() {
         // Arrange
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val yesterday = today.minusDays(1)
         val user = createUser(id = 1L, currentStreak = 3, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
@@ -262,7 +290,7 @@ class StreakServiceTest {
             createDailyActivity(user, yesterday.minusDays(1)),
             createDailyActivity(user, yesterday.minusDays(2))
         )
-        every { userRepository.save(any()) } returns user.copy(currentStreak = 0)
+        every { userRepository.save(any()) } answers { firstArg() }
 
         // Act
         val result = streakService.getUserStreak(1L)
@@ -274,7 +302,7 @@ class StreakServiceTest {
     @Test
     fun `getUserStreak should update user when calculated streak differs from stored value`() {
         // Arrange
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         // Stored currentStreak is 5, but activities only give streak of 2
         val user = createUser(id = 1L, currentStreak = 5, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
@@ -282,7 +310,7 @@ class StreakServiceTest {
             createDailyActivity(user, today),
             createDailyActivity(user, today.minusDays(1))
         )
-        every { userRepository.save(match { it.currentStreak == 2 }) } returns user.copy(currentStreak = 2)
+        every { userRepository.save(match { it.currentStreak == 2 }) } answers { firstArg() }
 
         // Act
         streakService.getUserStreak(1L)
@@ -294,7 +322,7 @@ class StreakServiceTest {
     @Test
     fun `getUserStreak should not save user when streak is unchanged`() {
         // Arrange
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user = createUser(id = 1L, currentStreak = 2, longestStreak = 5)
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { dailyActivityRepository.findAllByUserOrderByActivityDateDesc(user) } returns listOf(
@@ -323,8 +351,8 @@ class StreakServiceTest {
         currentStreak = currentStreak,
         longestStreak = longestStreak,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createDailyActivity(

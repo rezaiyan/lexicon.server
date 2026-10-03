@@ -4,6 +4,7 @@ import com.alirezaiyan.vokab.server.config.RateLimitConfig
 import com.alirezaiyan.vokab.server.domain.entity.DailyInsight
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.alirezaiyan.vokab.server.presentation.dto.ExtractVocabularyRequest
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyItemResponse
@@ -28,13 +29,10 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import reactor.core.publisher.Mono
 import java.time.Instant
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -73,7 +71,7 @@ class AiControllerTest {
     // ── POST /api/v1/ai/extract-vocabulary ────────────────────────────────────
 
     @Test
-    fun `POST extract-vocabulary should return 403 when user lacks premium access`() {
+    fun `POST extract-vocabulary should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(false)
 
         val request = createExtractVocabularyRequest()
@@ -84,7 +82,8 @@ class AiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isForbidden)
+            .andExpect(status().isPaymentRequired)
+            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -104,6 +103,7 @@ class AiControllerTest {
         )
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
@@ -116,7 +116,7 @@ class AiControllerTest {
             targetLanguage = "German",
             extractWords = true,
             extractSentences = false
-        )).thenReturn(Mono.just("Hallo,hello;Welt,world"))
+        )).thenReturn("Hallo,hello;Welt,world")
 
         val request = createExtractVocabularyRequest()
 
@@ -133,7 +133,7 @@ class AiControllerTest {
     }
 
     @Test
-    fun `POST extract-vocabulary should return 400 when extraction throws exception`() {
+    fun `POST extract-vocabulary should return 500 when extraction throws exception`() {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
@@ -142,7 +142,7 @@ class AiControllerTest {
             targetLanguage = "German",
             extractWords = true,
             extractSentences = false
-        )).thenReturn(Mono.error(RuntimeException("AI service unavailable")))
+        )).thenThrow(RuntimeException("AI service unavailable"))
 
         val request = createExtractVocabularyRequest()
 
@@ -152,24 +152,46 @@ class AiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
+    }
+
+    @Test
+    fun `POST extract-vocabulary should return 502 UPSTREAM_UNAVAILABLE when OpenRouter fails`() {
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(openRouterService.extractVocabularyFromImage(
+            imageBase64 = "dGVzdA==",
+            targetLanguage = "German",
+            extractWords = true,
+            extractSentences = false
+        )).thenThrow(UpstreamServiceException("OpenRouter image extraction failed: status=503"))
+
+        mockMvc.perform(
+            post("/api/v1/ai/extract-vocabulary")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createExtractVocabularyRequest()))
+        )
+            .andExpect(status().isBadGateway)
+            .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"))
+            .andExpect(jsonPath("$.message").value("A service we depend on is unavailable. Please try again shortly."))
     }
 
     // ── GET /api/v1/ai/generate-insight ──────────────────────────────────────
 
     @Test
-    fun `GET generate-insight should return 403 when user lacks premium access`() {
+    fun `GET generate-insight should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(false)
 
-        val mvcResult = mockMvc.perform(
+        mockMvc.perform(
             get("/api/v1/ai/generate-insight")
                 .with(authentication(auth))
-        ).andExpect(request().asyncStarted()).andReturn()
-
-        mockMvc.perform(asyncDispatch(mvcResult))
-            .andExpect(status().isForbidden)
+        )
+            .andExpect(status().isPaymentRequired)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
     }
 
     @Test
@@ -178,14 +200,13 @@ class AiControllerTest {
         val bucket = createRateLimitedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
-        val mvcResult = mockMvc.perform(
+        mockMvc.perform(
             get("/api/v1/ai/generate-insight")
                 .with(authentication(auth))
-        ).andExpect(request().asyncStarted()).andReturn()
-
-        mockMvc.perform(asyncDispatch(mvcResult))
+        )
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
@@ -200,12 +221,10 @@ class AiControllerTest {
         )
         `when`(dailyInsightService.getTodaysInsightForUser(mockUser)).thenReturn(existingInsight)
 
-        val mvcResult = mockMvc.perform(
+        mockMvc.perform(
             get("/api/v1/ai/generate-insight")
                 .with(authentication(auth))
-        ).andExpect(request().asyncStarted()).andReturn()
-
-        mockMvc.perform(asyncDispatch(mvcResult))
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.insight").value("You've mastered 10 words today!"))
@@ -221,22 +240,20 @@ class AiControllerTest {
         val progressStats = createProgressStatsDto()
         `when`(userProgressService.calculateProgressStats(mockUser)).thenReturn(progressStats)
         `when`(openRouterService.generateDailyInsight(anyNonNull())).thenReturn(
-            Mono.just("Keep up the great work, you have 5 words to review!")
+            "Keep up the great work, you have 5 words to review!"
         )
 
-        val mvcResult = mockMvc.perform(
+        mockMvc.perform(
             get("/api/v1/ai/generate-insight")
                 .with(authentication(auth))
-        ).andExpect(request().asyncStarted()).andReturn()
-
-        mockMvc.perform(asyncDispatch(mvcResult))
+        )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.data.insight").value("Keep up the great work, you have 5 words to review!"))
     }
 
     @Test
-    fun `GET generate-insight should return 400 when insight generation fails`() {
+    fun `GET generate-insight should return 500 when insight generation fails`() {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
@@ -244,17 +261,13 @@ class AiControllerTest {
 
         val progressStats = createProgressStatsDto()
         `when`(userProgressService.calculateProgressStats(mockUser)).thenReturn(progressStats)
-        `when`(openRouterService.generateDailyInsight(anyNonNull())).thenReturn(
-            Mono.error(RuntimeException("AI insight generation failed"))
-        )
+        `when`(openRouterService.generateDailyInsight(anyNonNull())).thenThrow(RuntimeException("AI insight generation failed"))
 
-        val mvcResult = mockMvc.perform(
+        mockMvc.perform(
             get("/api/v1/ai/generate-insight")
                 .with(authentication(auth))
-        ).andExpect(request().asyncStarted()).andReturn()
-
-        mockMvc.perform(asyncDispatch(mvcResult))
-            .andExpect(status().isBadRequest)
+        )
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -319,13 +332,14 @@ class AiControllerTest {
         )
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
     fun `POST translate-text should return 200 with translation on success`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.translateText("Hello", "German")).thenReturn(Mono.just("Hallo"))
+        `when`(openRouterService.translateText("Hello", "German")).thenReturn("Hallo")
 
         val request = TranslateTextRequest(text = "Hello", targetLanguage = "German")
 
@@ -342,12 +356,10 @@ class AiControllerTest {
     }
 
     @Test
-    fun `POST translate-text should return 400 when translation throws exception`() {
+    fun `POST translate-text should return 500 when translation throws exception`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.translateText("Hello", "German")).thenReturn(
-            Mono.error(RuntimeException("Translation service unavailable"))
-        )
+        `when`(openRouterService.translateText("Hello", "German")).thenThrow(RuntimeException("Translation service unavailable"))
 
         val request = TranslateTextRequest(text = "Hello", targetLanguage = "German")
 
@@ -357,7 +369,7 @@ class AiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -378,6 +390,7 @@ class AiControllerTest {
         )
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
@@ -398,7 +411,7 @@ class AiControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.just(rawItems))
+        )).thenReturn(rawItems)
 
         val request = createSuggestVocabularyRequest()
 
@@ -426,7 +439,7 @@ class AiControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.error(RuntimeException("AI service down")))
+        )).thenThrow(RuntimeException("AI service down"))
 
         val request = createSuggestVocabularyRequest()
 
@@ -436,7 +449,7 @@ class AiControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 

@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.ProgressRow
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
@@ -8,7 +10,6 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
 
 class UserProgressServiceTest {
 
@@ -18,7 +19,7 @@ class UserProgressServiceTest {
     @BeforeEach
     fun setUp() {
         wordRepository = mockk()
-        userProgressService = UserProgressService(wordRepository)
+        userProgressService = UserProgressService(wordRepository, clock = fixedClock())
     }
 
     @Test
@@ -185,7 +186,7 @@ class UserProgressServiceTest {
         currentStreak = 0,
         longestStreak = 0,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 }

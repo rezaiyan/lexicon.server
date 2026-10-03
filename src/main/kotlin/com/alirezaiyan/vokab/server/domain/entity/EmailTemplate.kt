@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "email_templates")
-data class EmailTemplate(
+class EmailTemplate(
     @Id
     @Column(length = 100)
-    val id: String,
+    override val id: String,
 
     @Column(nullable = false)
     val name: String,
@@ -33,4 +33,4 @@ data class EmailTemplate(
 
     @Column(name = "updated_at", nullable = false)
     val updatedAt: Instant = Instant.now()
-)
+) : JpaEntity<String>()

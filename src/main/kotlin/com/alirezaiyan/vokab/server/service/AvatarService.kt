@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.service
 
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -22,7 +23,8 @@ class AvatarService(
     @Value("\${app.avatar.upload-dir:/var/www/uploads/avatars}")
     private val uploadDir: String,
     @Value("\${app.avatar.base-url:}")
-    private val baseUrl: String
+    private val baseUrl: String,
+    private val clock: Clock
 ) {
 
     @Transactional
@@ -50,14 +52,14 @@ class AvatarService(
         // Delete old avatar file if exists
         deleteAvatarFile(userId, uploadPath)
 
-        val filename = "avatar_${userId}_${System.currentTimeMillis()}.${extension}"
+        val filename = "avatar_${userId}_${clock.millis()}.${extension}"
         val filePath = uploadPath.resolve(filename)
         Files.copy(file.inputStream, filePath, StandardCopyOption.REPLACE_EXISTING)
 
         val imageUrl = "${baseUrl}/uploads/avatars/${filename}"
 
-        val updatedUser = user.copy(profileImageUrl = imageUrl)
-        userRepository.save(updatedUser)
+        user.profileImageUrl = imageUrl
+        userRepository.save(user)
 
         logger.info { "Avatar uploaded for user $userId: $filename" }
         return imageUrl
@@ -71,8 +73,8 @@ class AvatarService(
         val uploadPath = Paths.get(uploadDir)
         deleteAvatarFile(userId, uploadPath)
 
-        val updatedUser = user.copy(profileImageUrl = null)
-        userRepository.save(updatedUser)
+        user.profileImageUrl = null
+        userRepository.save(user)
 
         logger.info { "Avatar deleted for user $userId" }
     }

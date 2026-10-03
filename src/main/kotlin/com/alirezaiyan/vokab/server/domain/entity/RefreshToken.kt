@@ -12,10 +12,10 @@ import java.time.Instant
         Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at")
     ]
 )
-data class RefreshToken(
+class RefreshToken(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(name = "token_hash", nullable = false, unique = true, length = 255)
     val tokenHash: String,
@@ -25,12 +25,12 @@ data class RefreshToken(
     val user: User,
 
     @Column(name = "expires_at", nullable = false)
-    val expiresAt: Instant,
+    var expiresAt: Instant,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 
     @Column(nullable = false)
     val revoked: Boolean = false
-)
+) : JpaEntity<Long>()
 

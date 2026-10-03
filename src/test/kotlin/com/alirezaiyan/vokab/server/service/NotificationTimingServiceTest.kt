@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -37,7 +39,8 @@ class NotificationTimingServiceTest {
         notificationTimingService = NotificationTimingService(
             reviewEventRepository,
             userSettingsRepository,
-            notificationScheduleRepository
+            notificationScheduleRepository,
+            clock = fixedClock()
         )
     }
 
@@ -276,7 +279,7 @@ class NotificationTimingServiceTest {
         val user = createUser(id = 1L)
         val oldSchedule = createNotificationSchedule(
             user = user,
-            lastComputedAt = Instant.now().minus(8, ChronoUnit.DAYS)
+            lastComputedAt = TEST_NOW.minus(8, ChronoUnit.DAYS)
         )
         val timestamps = List(20) { epochMsAtUtcHour(18) }
         every { reviewEventRepository.findReviewedAtByUserIdSince(1L, any()) } returns timestamps
@@ -296,7 +299,7 @@ class NotificationTimingServiceTest {
         val user = createUser(id = 1L)
         val recentSchedule = createNotificationSchedule(
             user = user,
-            lastComputedAt = Instant.now().minus(2, ChronoUnit.DAYS)
+            lastComputedAt = TEST_NOW.minus(2, ChronoUnit.DAYS)
         )
         every { notificationScheduleRepository.findByUser(user) } returns recentSchedule
 
@@ -385,7 +388,7 @@ class NotificationTimingServiceTest {
 
     /** Returns epoch milliseconds for a fixed point in time at the given UTC hour today. */
     private fun epochMsAtUtcHour(hour: Int): Long {
-        return Instant.now()
+        return TEST_NOW
             .truncatedTo(ChronoUnit.DAYS)
             .atZone(ZoneOffset.UTC)
             .withHour(hour)

@@ -70,7 +70,7 @@ class WordRushControllerTest {
     }
 
     @Test
-    fun `POST sync should return 400 when service throws exception`() {
+    fun `POST sync should return 500 when service throws exception`() {
         val request = createSyncRequest()
         `when`(wordRushService.syncGames(mockUser, request))
             .thenThrow(RuntimeException("sync failed"))
@@ -81,7 +81,7 @@ class WordRushControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -130,7 +130,7 @@ class WordRushControllerTest {
     }
 
     @Test
-    fun `GET insights should return 400 when service throws exception`() {
+    fun `GET insights should return 500 when service throws exception`() {
         `when`(wordRushService.getInsights(mockUser))
             .thenThrow(RuntimeException("database error"))
 
@@ -138,7 +138,7 @@ class WordRushControllerTest {
             get("/api/v1/word-rush/insights")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -185,7 +185,7 @@ class WordRushControllerTest {
     }
 
     @Test
-    fun `GET history should return 400 when service throws exception`() {
+    fun `GET history should return 500 when service throws exception`() {
         `when`(wordRushService.getHistory(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -193,7 +193,7 @@ class WordRushControllerTest {
             get("/api/v1/word-rush/history")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 

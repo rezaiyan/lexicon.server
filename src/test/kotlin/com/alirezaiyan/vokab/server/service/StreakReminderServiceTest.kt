@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
@@ -10,9 +13,6 @@ import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import reactor.core.publisher.Mono
-import java.time.Instant
-import java.time.LocalDate
 
 class StreakReminderServiceTest {
 
@@ -35,13 +35,14 @@ class StreakReminderServiceTest {
             dailyActivityRepository,
             pushNotificationService,
             openRouterService,
-            userProgressService
+            userProgressService,
+            clock = fixedClock()
         )
     }
 
     @Test
     fun `findUsersNeedingReminder should return users with active streaks who have no activity today`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user1 = createUser(id = 1L, currentStreak = 5, name = "User One")
         val user2 = createUser(id = 2L, currentStreak = 10, name = "User Two")
         val user3 = createUser(id = 3L, currentStreak = 0, name = "User Three")
@@ -63,7 +64,7 @@ class StreakReminderServiceTest {
 
     @Test
     fun `findUsersNeedingReminder should return empty list when no users need reminders`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user1 = createUser(id = 1L, currentStreak = 5, name = "User One")
 
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user1)
@@ -76,7 +77,7 @@ class StreakReminderServiceTest {
 
     @Test
     fun `sendReminderNotifications should send notifications to users needing reminders`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user1 = createUser(id = 1L, currentStreak = 5, name = "Alice")
         val user2 = createUser(id = 2L, currentStreak = 10, name = "Bob")
 
@@ -115,14 +116,14 @@ class StreakReminderServiceTest {
                 userName = "Alice",
                 progressStats = progressStats1
             )
-        } returns Mono.just("Hey Alice! Your 5-day streak is on fire! 🔥 Keep it going!")
+        } returns "Hey Alice! Your 5-day streak is on fire! 🔥 Keep it going!"
         every {
             openRouterService.generateStreakReminderMessage(
                 currentStreak = 10,
                 userName = "Bob",
                 progressStats = progressStats2
             )
-        } returns Mono.just("Bob, don't let your amazing 10-day streak slip away! 💪")
+        } returns "Bob, don't let your amazing 10-day streak slip away! 💪"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = 1L,
@@ -166,7 +167,7 @@ class StreakReminderServiceTest {
 
     @Test
     fun `sendReminderNotifications should use fallback message when AI generation returns null`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user = createUser(id = 1L, currentStreak = 5, name = "Alice")
 
         val progressStats = ProgressStatsDto(
@@ -190,7 +191,7 @@ class StreakReminderServiceTest {
                 userName = "Alice",
                 progressStats = progressStats
             )
-        } returns Mono.empty()
+        } returns "You have a 5-day streak! 🔥 Complete your review today to keep it going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = 1L,
@@ -216,7 +217,7 @@ class StreakReminderServiceTest {
 
     @Test
     fun `sendReminderNotifications should use fallback when AI generation fails`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user = createUser(id = 1L, currentStreak = 5, name = "Alice")
 
         val progressStats = ProgressStatsDto(
@@ -240,7 +241,7 @@ class StreakReminderServiceTest {
                 userName = "Alice",
                 progressStats = progressStats
             )
-        } returns Mono.error(RuntimeException("AI service unavailable"))
+        } throws RuntimeException("AI service unavailable")
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = 1L,
@@ -266,7 +267,7 @@ class StreakReminderServiceTest {
 
     @Test
     fun `sendReminderNotifications should handle notification send failures gracefully`() {
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val user = createUser(id = 1L, currentStreak = 5, name = "Alice")
 
         val progressStats = ProgressStatsDto(
@@ -290,7 +291,7 @@ class StreakReminderServiceTest {
                 userName = "Alice",
                 progressStats = progressStats
             )
-        } returns Mono.just("Personalized message")
+        } returns "Personalized message"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = 1L,
@@ -337,8 +338,8 @@ class StreakReminderServiceTest {
             currentStreak = currentStreak,
             longestStreak = currentStreak,
             active = active,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now()
+            createdAt = TEST_NOW,
+            updatedAt = TEST_NOW
         )
     }
 

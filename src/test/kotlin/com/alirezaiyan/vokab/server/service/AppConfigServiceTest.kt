@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.AppConfig
 import com.alirezaiyan.vokab.server.domain.entity.AppConfigHistory
 import com.alirezaiyan.vokab.server.domain.repository.AppConfigHistoryRepository
@@ -23,7 +24,7 @@ class AppConfigServiceTest {
 
     @BeforeEach
     fun setUp() {
-        service = AppConfigService(appConfigRepository, appConfigHistoryRepository)
+        service = AppConfigService(appConfigRepository, appConfigHistoryRepository, clock = fixedClock())
     }
 
     // ── get ───────────────────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ class AppConfigServiceTest {
     @Test
     fun `set updates config value, records history, and clears cache`() {
         val config = testConfig(id = 1L, namespace = "ns", key = "k", value = "old")
-        val updatedConfig = config.copy(value = "new")
+        val updatedConfig = testConfig(id = 1L, namespace = "ns", key = "k", value = "new")
         val historySlot = slot<AppConfigHistory>()
 
         every { appConfigRepository.findByNamespaceAndKey("ns", "k") } returns config

@@ -4,7 +4,9 @@ import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import java.time.Instant
 
@@ -19,16 +21,17 @@ private val logger = KotlinLogging.logger {}
 @Service
 class FeatureAccessService(
     private val appProperties: AppProperties,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val clock: Clock
 ) {
 
-    fun hasActivePremiumAccess(user: User): Boolean = premiumSource(user, Instant.now()) != PremiumSource.NONE
+    fun hasActivePremiumAccess(user: User): Boolean = premiumSource(user, Instant.now(clock)) != PremiumSource.NONE
 
     /**
      * Store subscription is active: ACTIVE/TRIAL until their expiry (if any); CANCELLED means
      * auto-renew is off — the period is already paid, so access continues until the expiry date.
      */
-    fun hasActiveStoreSubscription(user: User, now: Instant = Instant.now()): Boolean {
+    fun hasActiveStoreSubscription(user: User, now: Instant = Instant.now(clock)): Boolean {
         val expiresAt = user.subscriptionExpiresAt
         return when (user.subscriptionStatus) {
             SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL -> expiresAt == null || expiresAt.isAfter(now)
@@ -37,7 +40,7 @@ class FeatureAccessService(
         }
     }
 
-    fun hasActiveGrant(user: User, now: Instant = Instant.now()): Boolean =
+    fun hasActiveGrant(user: User, now: Instant = Instant.now(clock)): Boolean =
         user.premiumGrantUntil?.isAfter(now) == true
 
     /** Store wins over a grant, so the client can show renewal details and manage buttons. */
@@ -45,6 +48,18 @@ class FeatureAccessService(
         hasActiveStoreSubscription(user, now) -> PremiumSource.STORE
         hasActiveGrant(user, now) -> PremiumSource.GRANT
         else -> PremiumSource.NONE
+    }
+
+    /**
+     * Flags plus the user's access, read from the database so a subscription change made
+     * earlier in the same request (e.g. a store sync) is reflected.
+     */
+    fun getFeatureAccess(userId: Long): FeatureAccessResponse {
+        val user = userRepository.findById(userId).orElseThrow { NoSuchElementException("User not found") }
+        return FeatureAccessResponse(
+            featureFlags = getClientFeatureFlags(),
+            userAccess = getUserFeatureAccess(user),
+        )
     }
 
     /**
@@ -57,7 +72,7 @@ class FeatureAccessService(
     }
 
     fun getUserFeatureAccess(user: User): UserFeatureAccess {
-        val now = Instant.now()
+        val now = Instant.now(clock)
         val source = premiumSource(user, now)
         logger.debug { "userId=${user.id} premium source=$source" }
         return when (source) {

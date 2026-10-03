@@ -6,11 +6,13 @@ import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleReposi
 import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -18,7 +20,8 @@ private val logger = KotlinLogging.logger {}
 class NotificationTimingService(
     private val reviewEventRepository: ReviewEventRepository,
     private val userSettingsRepository: UserSettingsRepository,
-    private val notificationScheduleRepository: NotificationScheduleRepository
+    private val notificationScheduleRepository: NotificationScheduleRepository,
+    private val clock: Clock
 ) {
     companion object {
         private const val LOOKBACK_DAYS = 90L
@@ -40,7 +43,7 @@ class NotificationTimingService(
      */
     @Transactional(readOnly = true)
     fun computeOptimalHour(userId: Long): Pair<Int, Int> {
-        val since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS)
+        val since = Instant.now(clock).minus(LOOKBACK_DAYS, ChronoUnit.DAYS)
         val timestamps = reviewEventRepository.findReviewedAtByUserIdSince(userId, since.toEpochMilli())
 
         if (timestamps.size < MIN_REVIEWS_FOR_CONFIDENCE) {
@@ -72,7 +75,7 @@ class NotificationTimingService(
      */
     @Transactional(readOnly = true)
     fun deriveTimezoneOffset(userId: Long): Int {
-        val since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS)
+        val since = Instant.now(clock).minus(LOOKBACK_DAYS, ChronoUnit.DAYS)
         val timestamps = reviewEventRepository.findReviewedAtByUserIdSince(userId, since.toEpochMilli())
         if (timestamps.size < MIN_REVIEWS_FOR_CONFIDENCE) return 0
 
@@ -108,21 +111,21 @@ class NotificationTimingService(
      * Each user's schedule save runs in its own independent transaction.
      */
     fun refreshSchedulesForAllUsers(users: List<User>) {
-        val sevenDaysAgo = Instant.now().minus(7, ChronoUnit.DAYS)
+        val sevenDaysAgo = Instant.now(clock).minus(7, ChronoUnit.DAYS)
         for (user in users) {
             runCatching {
                 val existing = notificationScheduleRepository.findByUser(user)
                 if (existing?.lastComputedAt?.isAfter(sevenDaysAgo) == true) return@runCatching
 
-                val (hour, confidence) = computeOptimalHour(user.id!!)
-                val offset = deriveTimezoneOffset(user.id!!)
+                val (hour, confidence) = computeOptimalHour(user.requireId())
+                val offset = deriveTimezoneOffset(user.requireId())
 
                 val schedule = existing ?: NotificationSchedule(user = user)
                 schedule.optimalSendHour = hour
                 schedule.timezoneOffsetHrs = offset
                 schedule.dataConfidence = confidence
-                schedule.lastComputedAt = Instant.now()
-                schedule.updatedAt = Instant.now()
+                schedule.lastComputedAt = Instant.now(clock)
+                schedule.updatedAt = Instant.now(clock)
 
                 notificationScheduleRepository.save(schedule)
             }.onFailure { logger.warn(it) { "Failed to compute timing for user ${user.id}" } }

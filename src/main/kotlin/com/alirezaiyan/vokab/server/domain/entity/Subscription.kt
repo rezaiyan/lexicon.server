@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "subscriptions")
-data class Subscription(
+class Subscription(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -18,31 +18,31 @@ data class Subscription(
     val revenueCatSubscriptionId: String? = null,
     
     @Column(name = "product_id", nullable = false)
-    val productId: String,
+    var productId: String,
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val status: SubscriptionStatus,
+    var status: SubscriptionStatus,
     
     @Column(name = "started_at", nullable = false)
     val startedAt: Instant,
     
     @Column(name = "expires_at")
-    val expiresAt: Instant? = null,
+    var expiresAt: Instant? = null,
     
     @Column(name = "cancelled_at")
-    val cancelledAt: Instant? = null,
+    var cancelledAt: Instant? = null,
     
     @Column(name = "is_trial")
-    val isTrial: Boolean = false,
+    var isTrial: Boolean = false,
     
     @Column(name = "auto_renew")
-    val autoRenew: Boolean = true,
+    var autoRenew: Boolean = true,
     
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
     
     @Column(name = "updated_at", nullable = false)
-    val updatedAt: Instant = Instant.now()
-)
+    var updatedAt: Instant = Instant.now()
+) : JpaEntity<Long>()
 

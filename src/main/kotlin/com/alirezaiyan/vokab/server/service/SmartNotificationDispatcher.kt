@@ -6,10 +6,11 @@ import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.Notificatio
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneOffset
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -22,10 +23,11 @@ class SmartNotificationDispatcher(
     private val milestoneDetector: MilestoneDetector,
     private val userProgressService: UserProgressService,
     private val notificationEngagementService: NotificationEngagementService,
-    private val objectMapper: ObjectMapper
+    private val objectMapper: ObjectMapper,
+    private val clock: Clock
 ) {
     fun dispatchForCurrentHour() {
-        val hour = LocalTime.now(ZoneOffset.UTC).hour
+        val hour = LocalTime.now(clock).hour
         val schedules = notificationScheduleRepository.findUsersToNotifyAtHour(hour)
         logger.info { "Smart dispatch: hour=$hour, candidates=${schedules.size}" }
 
@@ -48,7 +50,7 @@ class SmartNotificationDispatcher(
                 "pause" -> {
                     val pauseDays = schedule.aiIntervalDays?.toLong() ?: 3L
                     notificationScheduleRepository.findByUserId(userId)?.let { s ->
-                        s.suppressedUntil = LocalDate.now(ZoneOffset.UTC).plusDays(pauseDays)
+                        s.suppressedUntil = LocalDate.now(clock).plusDays(pauseDays)
                         notificationScheduleRepository.save(s)
                     }
                     logger.debug { "AI pause for user=$userId for ${pauseDays}d" }
@@ -77,7 +79,7 @@ class SmartNotificationDispatcher(
         contentHint: String?
     ) {
         val user    = schedule.user
-        val userId  = user.id!!
+        val userId  = user.requireId()
         val payload = notificationContentBuilder.build(user, type, contentHint)
 
         val results = pushNotificationService.sendNotificationToUser(

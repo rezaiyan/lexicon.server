@@ -5,10 +5,10 @@ import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleReposi
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import java.time.LocalDate
 import java.time.LocalTime
-import java.time.ZoneOffset
 
 private val logger = KotlinLogging.logger {}
 
@@ -16,10 +16,11 @@ private val logger = KotlinLogging.logger {}
 class ReviewReminderDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val notificationContentBuilder: NotificationContentBuilder,
-    private val pushNotificationService: PushNotificationService
+    private val pushNotificationService: PushNotificationService,
+    private val clock: Clock
 ) {
     fun dispatchForCurrentHour() {
-        val hour = LocalTime.now(ZoneOffset.UTC).hour
+        val hour = LocalTime.now(clock).hour
         val schedules = notificationScheduleRepository.findUsersForReviewReminders(hour)
         logger.info { "Review reminder dispatch: hour=$hour, candidates=${schedules.size}" }
         for (schedule in schedules) {
@@ -40,7 +41,7 @@ class ReviewReminderDispatcher(
         )
         val sent = results.any { it.success }
         if (sent) {
-            schedule.lastSentDate = LocalDate.now(ZoneOffset.UTC)
+            schedule.lastSentDate = LocalDate.now(clock)
             notificationScheduleRepository.save(schedule)
             logger.info { "Sent REVIEW_REMINDER to user=${user.id}" }
         } else {

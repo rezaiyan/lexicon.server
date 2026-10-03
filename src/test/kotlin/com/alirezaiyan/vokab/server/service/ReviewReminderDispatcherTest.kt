@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -13,8 +16,6 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneOffset
 
 class ReviewReminderDispatcherTest {
 
@@ -33,7 +34,8 @@ class ReviewReminderDispatcherTest {
         dispatcher = ReviewReminderDispatcher(
             notificationScheduleRepository,
             notificationContentBuilder,
-            pushNotificationService
+            pushNotificationService,
+            clock = fixedClock()
         )
     }
 
@@ -71,6 +73,28 @@ class ReviewReminderDispatcherTest {
     }
 
     @Test
+    fun `dispatchForCurrentHour targets the UTC hour of the injected clock`() {
+        val user = createUser(id = 1L)
+        val schedule = createSchedule(user)
+        val dispatcherAt18 = ReviewReminderDispatcher(
+            notificationScheduleRepository,
+            notificationContentBuilder,
+            pushNotificationService,
+            clock = fixedClock(Instant.parse("2026-06-17T18:05:00Z"))
+        )
+        // Strict mock: only hour 18 is stubbed, any other hour throws
+        every { notificationScheduleRepository.findUsersForReviewReminders(18) } returns listOf(schedule)
+        every { notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER) } returns createPayload()
+        every { pushNotificationService.sendNotificationToUser(1L, any(), any(), any()) } returns
+            listOf(NotificationResponse(success = true))
+        every { notificationScheduleRepository.save(any()) } returns schedule
+
+        dispatcherAt18.dispatchForCurrentHour()
+
+        verify(exactly = 1) { pushNotificationService.sendNotificationToUser(1L, any(), any(), any()) }
+    }
+
+    @Test
     fun `should update lastSentDate after successful send`() {
         // Arrange
         val user = createUser(id = 1L)
@@ -91,7 +115,7 @@ class ReviewReminderDispatcherTest {
 
         // Assert
         verify {
-            notificationScheduleRepository.save(match { it.lastSentDate == LocalDate.now(ZoneOffset.UTC) })
+            notificationScheduleRepository.save(match { it.lastSentDate == TEST_TODAY })
         }
     }
 
@@ -188,8 +212,8 @@ class ReviewReminderDispatcherTest {
         currentStreak = 3,
         longestStreak = 3,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createSchedule(

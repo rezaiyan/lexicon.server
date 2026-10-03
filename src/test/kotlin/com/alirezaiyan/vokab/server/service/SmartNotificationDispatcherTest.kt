@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -14,8 +17,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
-import java.time.LocalDate
 
 class SmartNotificationDispatcherTest {
 
@@ -40,7 +41,8 @@ class SmartNotificationDispatcherTest {
             milestoneDetector,
             userProgressService,
             notificationEngagementService,
-            objectMapper
+            objectMapper,
+            clock = fixedClock()
         )
     }
 
@@ -205,7 +207,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(5)
+        val expectedDate = TEST_TODAY.plusDays(5)
         assert(schedule.suppressedUntil == expectedDate)
         verify(exactly = 0) { notificationContentBuilder.build(any(), any(), any()) }
         verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
@@ -283,7 +285,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(3)
+        val expectedDate = TEST_TODAY.plusDays(3)
         assert(schedule.suppressedUntil == expectedDate)
     }
 
@@ -301,8 +303,8 @@ class SmartNotificationDispatcherTest {
         currentStreak      = currentStreak,
         longestStreak      = currentStreak,
         active             = true,
-        createdAt          = Instant.now(),
-        updatedAt          = Instant.now()
+        createdAt          = TEST_NOW,
+        updatedAt          = TEST_NOW
     )
 
     private fun testSchedule(

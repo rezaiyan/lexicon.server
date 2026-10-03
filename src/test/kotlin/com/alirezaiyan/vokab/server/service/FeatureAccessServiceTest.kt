@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.FeatureFlagsConfig
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
@@ -9,10 +11,12 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import java.util.Optional
 
 class FeatureAccessServiceTest {
 
@@ -24,7 +28,7 @@ class FeatureAccessServiceTest {
     fun setUp() {
         appProperties = mockk()
         userRepository = mockk()
-        featureAccessService = FeatureAccessService(appProperties, userRepository)
+        featureAccessService = FeatureAccessService(appProperties, userRepository, clock = fixedClock())
     }
 
     // --- hasActivePremiumAccess ---
@@ -34,7 +38,7 @@ class FeatureAccessServiceTest {
         // Arrange
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.ACTIVE,
-            subscriptionExpiresAt = Instant.now().plusSeconds(86400)
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400)
         )
 
         // Act
@@ -49,7 +53,7 @@ class FeatureAccessServiceTest {
         // Arrange
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.TRIAL,
-            subscriptionExpiresAt = Instant.now().plusSeconds(86400)
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400)
         )
 
         // Act
@@ -64,7 +68,7 @@ class FeatureAccessServiceTest {
         // Arrange
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.ACTIVE,
-            subscriptionExpiresAt = Instant.now().minusSeconds(1)
+            subscriptionExpiresAt = TEST_NOW.minusSeconds(1)
         )
 
         // Act
@@ -114,7 +118,7 @@ class FeatureAccessServiceTest {
     fun `hasActivePremiumAccess should return true when status is CANCELLED and paid period not over`() {
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.CANCELLED,
-            subscriptionExpiresAt = Instant.now().plusSeconds(86400)
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400)
         )
 
         assertTrue(featureAccessService.hasActivePremiumAccess(user))
@@ -124,7 +128,7 @@ class FeatureAccessServiceTest {
     fun `hasActivePremiumAccess should return false when status is CANCELLED and paid period over`() {
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.CANCELLED,
-            subscriptionExpiresAt = Instant.now().minusSeconds(60)
+            subscriptionExpiresAt = TEST_NOW.minusSeconds(60)
         )
 
         assertFalse(featureAccessService.hasActivePremiumAccess(user))
@@ -178,7 +182,7 @@ class FeatureAccessServiceTest {
         // Arrange
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.ACTIVE,
-            subscriptionExpiresAt = Instant.now().plusSeconds(86400)
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400)
         )
 
         // Act
@@ -204,7 +208,7 @@ class FeatureAccessServiceTest {
 
     @Test
     fun `active grant gives premium with GRANT source`() {
-        val until = Instant.now().plusSeconds(86400)
+        val until = TEST_NOW.plusSeconds(86400)
         val user = createUser(premiumGrantUntil = until, premiumGrantReason = "test_email")
 
         val access = featureAccessService.getUserFeatureAccess(user)
@@ -217,7 +221,7 @@ class FeatureAccessServiceTest {
 
     @Test
     fun `expired grant gives no premium`() {
-        val user = createUser(premiumGrantUntil = Instant.now().minusSeconds(60), premiumGrantReason = "manual")
+        val user = createUser(premiumGrantUntil = TEST_NOW.minusSeconds(60), premiumGrantReason = "manual")
 
         assertFalse(featureAccessService.hasActivePremiumAccess(user))
         assertEquals(PremiumSource.NONE, featureAccessService.getUserFeatureAccess(user).source)
@@ -225,11 +229,11 @@ class FeatureAccessServiceTest {
 
     @Test
     fun `store subscription wins over grant and reports renewal details`() {
-        val expiry = Instant.now().plusSeconds(86400)
+        val expiry = TEST_NOW.plusSeconds(86400)
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.TRIAL,
             subscriptionExpiresAt = expiry,
-            premiumGrantUntil = Instant.now().plusSeconds(999_999),
+            premiumGrantUntil = TEST_NOW.plusSeconds(999_999),
         )
 
         val access = featureAccessService.getUserFeatureAccess(user)
@@ -244,7 +248,7 @@ class FeatureAccessServiceTest {
     fun `cancelled store subscription reports willRenew false`() {
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.CANCELLED,
-            subscriptionExpiresAt = Instant.now().plusSeconds(86400),
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400),
         )
 
         val access = featureAccessService.getUserFeatureAccess(user)
@@ -259,6 +263,30 @@ class FeatureAccessServiceTest {
 
         assertFalse(access.hasPremiumAccess)
         assertEquals(PremiumSource.NONE, access.source)
+    }
+
+    // --- getFeatureAccess ---
+
+    @Test
+    fun `getFeatureAccess reads the user from the database so a fresh subscription is reflected`() {
+        every { appProperties.features } returns FeatureFlagsConfig(pushNotificationsEnabled = true)
+        val stored = createUser(
+            subscriptionStatus = SubscriptionStatus.ACTIVE,
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400)
+        )
+        every { userRepository.findById(1L) } returns Optional.of(stored)
+
+        val response = featureAccessService.getFeatureAccess(1L)
+
+        assertTrue(response.userAccess.hasPremiumAccess)
+        assertTrue(response.featureFlags.pushNotificationsEnabled)
+    }
+
+    @Test
+    fun `getFeatureAccess throws NoSuchElementException for an unknown user`() {
+        every { userRepository.findById(404L) } returns Optional.empty()
+
+        assertThrows(NoSuchElementException::class.java) { featureAccessService.getFeatureAccess(404L) }
     }
 
     // --- Factory functions ---
@@ -281,7 +309,7 @@ class FeatureAccessServiceTest {
         currentStreak = 0,
         longestStreak = 0,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 }

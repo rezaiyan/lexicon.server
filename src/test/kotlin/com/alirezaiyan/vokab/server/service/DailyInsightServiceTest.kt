@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.DailyInsight
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
@@ -24,9 +27,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.dao.DataIntegrityViolationException
-import reactor.core.publisher.Mono
 import java.time.Instant
-import java.time.LocalDate
 
 class DailyInsightServiceTest {
 
@@ -63,7 +64,8 @@ class DailyInsightServiceTest {
             pushNotificationService = pushNotificationService,
             featureAccessService = featureAccessService,
             analyticsService = analyticsService,
-            notificationScheduleRepository = notificationScheduleRepository
+            notificationScheduleRepository = notificationScheduleRepository,
+            clock = fixedClock()
         )
     }
 
@@ -87,7 +89,7 @@ class DailyInsightServiceTest {
     fun `should return existing insight when already generated today`() {
         // Arrange
         val user = createUser()
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val existing = createDailyInsight(user = user, date = today)
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns existing
@@ -104,11 +106,11 @@ class DailyInsightServiceTest {
     fun `should return null when streak at risk and reminder hour is before 20`() {
         // Arrange
         val user = createUser(currentStreak = 5)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val settings = createUserSettings(user = user, dailyReminderTime = "18:00")
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns false
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns settings
 
         // Act
@@ -124,15 +126,15 @@ class DailyInsightServiceTest {
     fun `should generate celebration insight when user has activity today`() {
         // Arrange
         val user = createUser(currentStreak = 3)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Great work!")
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns true
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns Mono.just("Great work!")
+        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
         // Act
@@ -148,15 +150,15 @@ class DailyInsightServiceTest {
     fun `should generate motivational insight when no activity today and no streak risk`() {
         // Arrange
         val user = createUser(currentStreak = 0)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns false
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateDailyInsight(any()) } returns Mono.just("Keep it up!")
+        every { openRouterService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
         every { analyticsService.getWeeklyReport(user) } returns createWeeklyReportResponse()
         every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns emptyList()
@@ -176,15 +178,15 @@ class DailyInsightServiceTest {
     fun `should generate insight when streak at risk but reminder hour is 20 or later`() {
         // Arrange
         val user = createUser(currentStreak = 10)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns false
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "20:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateDailyInsight(any()) } returns Mono.just("Keep it up!")
+        every { openRouterService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
         every { analyticsService.getWeeklyReport(user) } returns createWeeklyReportResponse()
         every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns emptyList()
@@ -204,11 +206,11 @@ class DailyInsightServiceTest {
     fun `should return null when openRouter throws exception`() {
         // Arrange
         val user = createUser(currentStreak = 3)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns true
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
         every { openRouterService.generateCelebrationInsight(any(), any()) } throws RuntimeException("AI service unavailable")
@@ -224,15 +226,15 @@ class DailyInsightServiceTest {
     @Test
     fun `should return existing insight when concurrent save throws DataIntegrityViolationException`() {
         val user = createUser(currentStreak = 3)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val existingInsight = createDailyInsight(user = user, date = today)
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns true
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns Mono.just("Great work!")
+        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
         // Second findByUserAndDate call (fallback after constraint violation)
         every { dailyInsightRepository.findByUserAndDate(user, today) } returnsMany listOf(null, existingInsight)
@@ -259,7 +261,7 @@ class DailyInsightServiceTest {
                 category = any()
             )
         } returns listOf(successResponse)
-        every { dailyInsightRepository.save(any()) } returns insight.copy(sentViaPush = true)
+        every { dailyInsightRepository.save(any()) } answers { firstArg() }
 
         // Act
         val result = dailyInsightService.sendDailyInsightPush(insight)
@@ -343,15 +345,15 @@ class DailyInsightServiceTest {
     fun `should send push when insight exists and has not been sent yet`() {
         // Arrange
         val user = createUser(currentStreak = 3)
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val unsent = createDailyInsight(user = user, date = today, sentViaPush = false)
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now()) } returns true
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns Mono.just("Great work!")
+        every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } returns unsent
         every {
             pushNotificationService.sendNotificationToUser(
@@ -382,7 +384,7 @@ class DailyInsightServiceTest {
     fun `should not send push when insight was already sent via push`() {
         // Arrange
         val user = createUser()
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val alreadySent = createDailyInsight(user = user, date = today, sentViaPush = true)
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns alreadySent
@@ -407,7 +409,7 @@ class DailyInsightServiceTest {
     @Test
     fun `saveDailyInsight should save and return new insight`() {
         val user = createUser()
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val saved = createDailyInsight(user = user, insightText = "You're on a roll!", date = today)
         every { dailyInsightRepository.save(any()) } returns saved
 
@@ -420,7 +422,7 @@ class DailyInsightServiceTest {
     @Test
     fun `saveDailyInsight should return existing row when concurrent write causes constraint violation`() {
         val user = createUser()
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         val existing = createDailyInsight(user = user, date = today, insightText = "Concurrent winner")
         every { dailyInsightRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns existing
@@ -433,7 +435,7 @@ class DailyInsightServiceTest {
     @Test
     fun `saveDailyInsight should return null when constraint violation and no existing row found`() {
         val user = createUser()
-        val today = LocalDate.now().toString()
+        val today = TEST_TODAY.toString()
         every { dailyInsightRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
 
@@ -458,22 +460,22 @@ class DailyInsightServiceTest {
         longestStreak = longestStreak,
         subscriptionStatus = SubscriptionStatus.ACTIVE,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createDailyInsight(
         id: Long? = 1L,
         user: User = createUser(),
         insightText: String = "You are doing great!",
-        date: String = LocalDate.now().toString(),
+        date: String = TEST_TODAY.toString(),
         sentViaPush: Boolean = false,
         pushSentAt: Instant? = null
     ): DailyInsight = DailyInsight(
         id = id,
         user = user,
         insightText = insightText,
-        generatedAt = Instant.now(),
+        generatedAt = TEST_NOW,
         date = date,
         sentViaPush = sentViaPush,
         pushSentAt = pushSentAt

@@ -10,7 +10,7 @@ import java.time.LocalDate
 @Table(name = "notification_schedule")
 class NotificationSchedule(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    override val id: Long = 0,
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
@@ -66,14 +66,8 @@ class NotificationSchedule(
 
     @Column(name = "updated_at", nullable = false)
     var updatedAt: Instant = Instant.now()
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is NotificationSchedule) return false
-        return id != 0L && id == other.id
-    }
-
-    override fun hashCode(): Int = if (id != 0L) id.hashCode() else System.identityHashCode(this)
+) : JpaEntity<Long>() {
+    override fun isTransient(): Boolean = id == 0L
 
     override fun toString(): String =
         "NotificationSchedule(id=$id, userId=${user.id}, optimalSendHour=$optimalSendHour)"

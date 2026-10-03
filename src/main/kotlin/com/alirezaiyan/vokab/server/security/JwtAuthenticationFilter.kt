@@ -14,7 +14,7 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
 
-private val logger = KotlinLogging.logger {}
+private val log = KotlinLogging.logger {}
 
 @Component
 class JwtAuthenticationFilter(
@@ -52,7 +52,7 @@ class JwtAuthenticationFilter(
         filterChain: FilterChain
     ) {
         val path = request.requestURI
-        logger.info { "🔐 JWT Filter [START]: Processing ${request.method} $path" }
+        log.info { "🔐 JWT Filter [START]: Processing ${request.method} $path" }
 
         // Admin key — grants ROLE_ADMIN for /admin/** without requiring a user JWT
         val adminKey = request.getHeader("X-Admin-Key")
@@ -70,20 +70,20 @@ class JwtAuthenticationFilter(
             val jwt = getJwtFromRequest(request)
             
             if (jwt == null) {
-                logger.warn { "❌ JWT Filter [NO_TOKEN]: No JWT token found for $path - returning 401" }
+                log.warn { "❌ JWT Filter [NO_TOKEN]: No JWT token found for $path - returning 401" }
                 response.status = HttpServletResponse.SC_UNAUTHORIZED
                 response.writer.write("""{"success":false,"message":"Authentication required"}""")
                 response.contentType = "application/json"
                 return
             } else {
-                logger.info { "🔑 JWT Filter [TOKEN_FOUND]: Token length ${jwt.length} for $path" }
+                log.info { "🔑 JWT Filter [TOKEN_FOUND]: Token length ${jwt.length} for $path" }
                 
                 val isValid = jwtTokenProvider.validateToken(jwt)
-                logger.info { "🔍 JWT Filter [VALIDATE]: Token valid=$isValid for $path" }
+                log.info { "🔍 JWT Filter [VALIDATE]: Token valid=$isValid for $path" }
                 
                 if (isValid) {
                     val userId = jwtTokenProvider.getUserIdFromToken(jwt)
-                    logger.info { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
+                    log.info { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
                     
                     if (userId != null) {
                         val testEmails = appConfigService.getTestEmails()
@@ -92,7 +92,7 @@ class JwtAuthenticationFilter(
                         val userEmail = if (isPresent) userOptional.get().email else null
                         val isTestAccount = userEmail in testEmails
                         val isActive = if (isPresent) userOptional.get().active else false
-                        logger.info { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }
+                        log.info { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }
 
                         if (isPresent && (isActive || isTestAccount)) {
                             val authentication = UsernamePasswordAuthenticationToken(
@@ -103,24 +103,24 @@ class JwtAuthenticationFilter(
                             authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
 
                             SecurityContextHolder.getContext().authentication = authentication
-                            logger.info { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }
-                            logger.info { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
+                            log.info { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }
+                            log.info { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
                         } else {
-                            logger.warn { "❌ JWT Filter [AUTH_FAILED]: User not found or inactive for userId=$userId, active=$isActive, testAccount=$isTestAccount - returning 403 for $path" }
+                            log.warn { "❌ JWT Filter [AUTH_FAILED]: User not found or inactive for userId=$userId, active=$isActive, testAccount=$isTestAccount - returning 403 for $path" }
                             response.status = HttpServletResponse.SC_FORBIDDEN
                             response.writer.write("""{"success":false,"message":"User account has been deleted or deactivated"}""")
                             response.contentType = "application/json"
                             return
                         }
                     } else {
-                        logger.warn { "❌ JWT Filter [NO_USER_ID]: Unable to extract user ID from token - returning 401 for $path" }
+                        log.warn { "❌ JWT Filter [NO_USER_ID]: Unable to extract user ID from token - returning 401 for $path" }
                         response.status = HttpServletResponse.SC_UNAUTHORIZED
                         response.writer.write("""{"success":false,"message":"Invalid token"}""")
                         response.contentType = "application/json"
                         return
                     }
                 } else {
-                    logger.warn { "❌ JWT Filter [INVALID_TOKEN]: Token validation failed - returning 401 for $path" }
+                    log.warn { "❌ JWT Filter [INVALID_TOKEN]: Token validation failed - returning 401 for $path" }
                     response.status = HttpServletResponse.SC_UNAUTHORIZED
                     response.writer.write("""{"success":false,"message":"Invalid or expired token"}""")
                     response.contentType = "application/json"
@@ -128,17 +128,17 @@ class JwtAuthenticationFilter(
                 }
             }
         } catch (e: Exception) {
-            logger.error { "💥 JWT Filter [EXCEPTION]: Error during authentication for $path - ${e.message}" }
-            logger.error { "Stack trace: ${e.stackTraceToString()}" }
+            log.error { "💥 JWT Filter [EXCEPTION]: Error during authentication for $path - ${e.message}" }
+            log.error { "Stack trace: ${e.stackTraceToString()}" }
             response.status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR
             response.writer.write("""{"success":false,"message":"Authentication error"}""")
             response.contentType = "application/json"
             return
         }
         
-        logger.info { "🔄 JWT Filter [CONTINUE]: Calling filter chain for $path" }
+        log.info { "🔄 JWT Filter [CONTINUE]: Calling filter chain for $path" }
         filterChain.doFilter(request, response)
-        logger.info { "✅ JWT Filter [END]: Filter chain completed for $path, response status: ${response.status}" }
+        log.info { "✅ JWT Filter [END]: Filter chain completed for $path, response status: ${response.status}" }
     }
     
     private fun getJwtFromRequest(request: HttpServletRequest): String? {

@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.presentation.controller
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.DayActivity
+import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.presentation.dto.LanguagePair
 import com.alirezaiyan.vokab.server.presentation.dto.ProfileStatsResponse
 import com.alirezaiyan.vokab.server.presentation.dto.UpdateProfileRequest
@@ -227,7 +228,7 @@ class UserControllerTest {
     }
 
     @Test
-    fun `DELETE avatar should return 400 when delete fails`() {
+    fun `DELETE avatar should return 500 when delete fails`() {
         doThrow(RuntimeException("file system error"))
             .`when`(avatarService).deleteAvatar(1L)
 
@@ -235,7 +236,7 @@ class UserControllerTest {
             delete("/api/v1/users/me/avatar")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -253,7 +254,7 @@ class UserControllerTest {
     }
 
     @Test
-    fun `DELETE me should return 400 when deletion fails`() {
+    fun `DELETE me should return 500 when deletion fails`() {
         doThrow(RuntimeException("deletion error"))
             .`when`(authService).deleteAccount(1L)
 
@@ -261,7 +262,7 @@ class UserControllerTest {
             delete("/api/v1/users/me")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -269,10 +270,13 @@ class UserControllerTest {
 
     @Test
     fun `GET feature-access should return 200 with feature flags and user access`() {
-        `when`(featureAccessService.getClientFeatureFlags())
-            .thenReturn(ClientFeatureFlags(pushNotificationsEnabled = true))
-        `when`(featureAccessService.getUserFeatureAccess(mockUser))
-            .thenReturn(UserFeatureAccess(hasPremiumAccess = false))
+        `when`(featureAccessService.getFeatureAccess(1L))
+            .thenReturn(
+                FeatureAccessResponse(
+                    featureFlags = ClientFeatureFlags(pushNotificationsEnabled = true),
+                    userAccess = UserFeatureAccess(hasPremiumAccess = false),
+                )
+            )
 
         mockMvc.perform(
             get("/api/v1/users/feature-access")
@@ -286,10 +290,13 @@ class UserControllerTest {
 
     @Test
     fun `GET feature-access should return 200 with premium access for subscribed user`() {
-        `when`(featureAccessService.getClientFeatureFlags())
-            .thenReturn(ClientFeatureFlags(pushNotificationsEnabled = true))
-        `when`(featureAccessService.getUserFeatureAccess(mockUser))
-            .thenReturn(UserFeatureAccess(hasPremiumAccess = true))
+        `when`(featureAccessService.getFeatureAccess(1L))
+            .thenReturn(
+                FeatureAccessResponse(
+                    featureFlags = ClientFeatureFlags(pushNotificationsEnabled = true),
+                    userAccess = UserFeatureAccess(hasPremiumAccess = true),
+                )
+            )
 
         mockMvc.perform(
             get("/api/v1/users/feature-access")
@@ -300,15 +307,15 @@ class UserControllerTest {
     }
 
     @Test
-    fun `GET feature-access should return 400 when service throws exception`() {
-        `when`(featureAccessService.getClientFeatureFlags())
+    fun `GET feature-access should return 500 when service throws exception`() {
+        `when`(featureAccessService.getFeatureAccess(1L))
             .thenThrow(RuntimeException("config error"))
 
         mockMvc.perform(
             get("/api/v1/users/feature-access")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -328,14 +335,14 @@ class UserControllerTest {
     }
 
     @Test
-    fun `GET feature-flags should return 400 when service throws exception`() {
+    fun `GET feature-flags should return 500 when service throws exception`() {
         `when`(featureAccessService.getClientFeatureFlags())
             .thenThrow(RuntimeException("config error"))
 
         mockMvc.perform(
             get("/api/v1/users/feature-flags")
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -372,7 +379,7 @@ class UserControllerTest {
     }
 
     @Test
-    fun `GET profile-stats should return 400 when service throws exception`() {
+    fun `GET profile-stats should return 500 when service throws exception`() {
         `when`(profileStatsService.getProfileStats(mockUser))
             .thenThrow(RuntimeException("stats error"))
 
@@ -380,7 +387,7 @@ class UserControllerTest {
             get("/api/v1/users/profile-stats")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 

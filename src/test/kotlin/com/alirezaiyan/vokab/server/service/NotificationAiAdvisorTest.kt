@@ -1,10 +1,9 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.config.AppProperties
-import com.alirezaiyan.vokab.server.config.OpenRouterConfig
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
-import io.mockk.spyk
+import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
@@ -13,17 +12,14 @@ import org.junit.jupiter.api.Test
 class NotificationAiAdvisorTest {
 
     private lateinit var advisor: NotificationAiAdvisor
-    private lateinit var spy: NotificationAiAdvisor
+    private lateinit var openRouterService: OpenRouterService
 
     private val objectMapper = ObjectMapper()
 
     @BeforeEach
     fun setUp() {
-        val appProperties = AppProperties().apply {
-            openrouter = OpenRouterConfig(apiKey = "test-key", baseUrl = "https://openrouter.ai/api/v1")
-        }
-        advisor = NotificationAiAdvisor(appProperties, objectMapper)
-        spy    = spyk(advisor)
+        openRouterService = mockk()
+        advisor = NotificationAiAdvisor(openRouterService, objectMapper)
     }
 
     // ── parseResponse: valid JSON ─────────────────────────────────────────────────
@@ -166,14 +162,14 @@ class NotificationAiAdvisorTest {
         assertEquals(3, result.intervalDays)
     }
 
-    // ── advise: fallback on callOpenRouter error ──────────────────────────────────
+    // ── advise: fallback when OpenRouter fails ────────────────────────────────────
 
     @Test
-    fun `advise should return defaultAdvice when callOpenRouter throws`() {
-        every { spy.callOpenRouter(any()) } throws RuntimeException("Network error")
+    fun `advise should return defaultAdvice when OpenRouter is unavailable`() {
+        every { openRouterService.complete(any(), any()) } throws UpstreamServiceException("OpenRouter down")
 
         val context = testContext()
-        val result = spy.advise(context)
+        val result = advisor.advise(context)
 
         assertEquals("send", result.action)
         assertEquals(3, result.intervalDays)
@@ -181,10 +177,17 @@ class NotificationAiAdvisorTest {
     }
 
     @Test
-    fun `advise should return valid advice when callOpenRouter returns good JSON`() {
-        every { spy.callOpenRouter(any()) } returns """{"action":"motivate","intervalDays":5,"contentHint":"fresh_start"}"""
+    fun `advise should return defaultAdvice when OpenRouter returns no text`() {
+        every { openRouterService.complete(any(), any()) } returns null
 
-        val result = spy.advise(testContext())
+        assertEquals("send", advisor.advise(testContext()).action)
+    }
+
+    @Test
+    fun `advise should return valid advice when OpenRouter returns good JSON`() {
+        every { openRouterService.complete(any(), any()) } returns """{"action":"motivate","intervalDays":5,"contentHint":"fresh_start"}"""
+
+        val result = advisor.advise(testContext())
 
         assertEquals("motivate", result.action)
         assertEquals(5, result.intervalDays)

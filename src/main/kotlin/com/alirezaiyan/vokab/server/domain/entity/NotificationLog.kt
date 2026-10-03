@@ -7,7 +7,7 @@ import java.time.Instant
 @Table(name = "notification_log")
 class NotificationLog(
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long = 0,
+    override val id: Long = 0,
 
     @Column(name = "user_id", nullable = false)
     val userId: Long,                             // no FK intentionally
@@ -29,12 +29,6 @@ class NotificationLog(
 
     @Column(name = "data_payload", columnDefinition = "jsonb")
     val dataPayload: String? = null              // JSON string
-) {
-    override fun equals(other: Any?): Boolean {
-        if (this === other) return true
-        if (other !is NotificationLog) return false
-        return id != 0L && id == other.id
-    }
-
-    override fun hashCode(): Int = if (id != 0L) id.hashCode() else System.identityHashCode(this)
+) : JpaEntity<Long>() {
+    override fun isTransient(): Boolean = id == 0L
 }

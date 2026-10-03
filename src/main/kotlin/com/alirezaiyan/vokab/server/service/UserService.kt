@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.presentation.dto.UserDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -37,12 +38,10 @@ class UserService(
             validateDisplayAlias(displayAlias)
         }
 
-        val updatedUser = user.copy(
-            name = name ?: user.name,
-            displayAlias = displayAlias ?: user.displayAlias
-        )
+        if (name != null) user.name = name
+        if (displayAlias != null) user.displayAlias = displayAlias
 
-        val saved = userRepository.save(updatedUser)
+        val saved = userRepository.save(user)
         logger.info { "User updated: userId=${saved.id}" }
 
         return saved.toDto()
@@ -57,7 +56,7 @@ class UserService(
     
     private fun User.toDto(): UserDto {
         return UserDto(
-            id = this.id!!,
+            id = requireId(),
             email = this.email,
             name = this.name,
             subscriptionStatus = this.subscriptionStatus,

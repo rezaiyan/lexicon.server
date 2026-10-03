@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
@@ -21,7 +23,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
 import java.util.Optional
 
 class AppleNotificationServiceTest {
@@ -47,7 +48,8 @@ class AppleNotificationServiceTest {
             AppleIdTokenVerifier(applePublicKeyService, AppProperties()),
             objectMapper,
             pushNotificationService,
-            authService
+            authService,
+            clock = fixedClock()
         )
     }
 
@@ -356,6 +358,6 @@ class AppleNotificationServiceTest {
 
     private fun buildEventsJson(appleUserId: String, eventType: String, eventExtra: String?): String {
         val extras = if (eventExtra != null) ",$eventExtra" else ""
-        return """{"type":"$eventType","sub":"$appleUserId","event_time":${Instant.now().toEpochMilli()}$extras}"""
+        return """{"type":"$eventType","sub":"$appleUserId","event_time":${TEST_NOW.toEpochMilli()}$extras}"""
     }
 }

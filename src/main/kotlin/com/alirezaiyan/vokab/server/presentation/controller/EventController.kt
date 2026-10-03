@@ -9,6 +9,7 @@ import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -23,7 +24,7 @@ class EventController(
         @Valid @RequestBody request: TrackEventRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
         return try {
-            eventService.track(user.id!!, request)
+            eventService.track(user.requireId(), request)
             ResponseEntity.ok(ApiResponse(success = true, message = "Event tracked"))
         } catch (e: Exception) {
             // Analytics must never break the client — absorb all errors silently

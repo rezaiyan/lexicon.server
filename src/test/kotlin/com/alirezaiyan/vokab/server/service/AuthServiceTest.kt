@@ -1,10 +1,14 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.withAssignedId
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.CiAuthConfig
 import com.alirezaiyan.vokab.server.config.JwtConfig
 import com.alirezaiyan.vokab.server.config.SecurityConfig
 import com.alirezaiyan.vokab.server.domain.event.UserSignedUpEvent
+import com.alirezaiyan.vokab.server.exception.AuthRejectedException
 import com.alirezaiyan.vokab.server.service.event.DomainEventPublisher
 import com.alirezaiyan.vokab.server.domain.entity.RefreshToken
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
@@ -14,6 +18,8 @@ import com.alirezaiyan.vokab.server.domain.repository.UserPlatformRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.security.AppleIdClaims
 import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
+import com.alirezaiyan.vokab.server.security.FirebaseIdClaims
+import com.alirezaiyan.vokab.server.security.FirebaseIdTokenVerifier
 import com.alirezaiyan.vokab.server.security.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.mockk.every
@@ -40,6 +46,7 @@ class AuthServiceTest {
     private lateinit var jwtTokenProvider: RS256JwtTokenProvider
     private lateinit var refreshTokenHashService: RefreshTokenHashService
     private lateinit var appleIdTokenVerifier: AppleIdTokenVerifier
+    private lateinit var firebaseIdTokenVerifier: FirebaseIdTokenVerifier
     private lateinit var revenueCatClient: RevenueCatClient
     private lateinit var userPlatformRepository: UserPlatformRepository
     private lateinit var userDataPurger: UserDataPurger
@@ -60,6 +67,7 @@ class AuthServiceTest {
         jwtTokenProvider = mockk()
         refreshTokenHashService = mockk()
         appleIdTokenVerifier = mockk()
+        firebaseIdTokenVerifier = mockk()
         revenueCatClient = mockk(relaxed = true)
         userPlatformRepository = mockk(relaxed = true)
         userDataPurger = mockk()
@@ -101,7 +109,7 @@ class AuthServiceTest {
     fun `authenticateForCi should return auth response for existing CI user`() {
         // Arrange
         val existingUser = createUser(id = 10L, email = "ci@test.vokab.dev")
-        val savedUser = existingUser.copy(lastLoginAt = Instant.now())
+        val savedUser = createUser(id = 10L, email = "ci@test.vokab.dev").also { it.lastLoginAt = TEST_NOW }
         every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         every { userRepository.save(any()) } returns savedUser
         stubTokenGeneration(savedUser)
@@ -270,13 +278,52 @@ class AuthServiceTest {
         assertDoesNotThrow { authService.authenticateForCi(platform = "ios") }
     }
 
+    // ── authenticateWithGoogle ────────────────────────────────────────────────
+
+    @Test
+    fun `authenticateWithGoogle rejects a token that fails verification`() {
+        every { firebaseIdTokenVerifier.verify("bad") } returns null
+
+        assertThrows<AuthRejectedException> { authService.authenticateWithGoogle("bad") }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle rejects a token without an email`() {
+        every { firebaseIdTokenVerifier.verify("token") } returns FirebaseIdClaims(uid = "g-1", email = null, name = null)
+
+        assertThrows<AuthRejectedException> { authService.authenticateWithGoogle("token") }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle lets a Firebase outage propagate instead of rejecting the token`() {
+        every { firebaseIdTokenVerifier.verify("token") } throws IllegalStateException("certificates unreachable")
+
+        assertThrows<IllegalStateException> { authService.authenticateWithGoogle("token") }
+    }
+
+    @Test
+    fun `authenticateWithGoogle signs in existing user found by Google id`() {
+        val existing = createUser(id = 5L, email = "g@example.com", googleId = "g-5")
+        every { firebaseIdTokenVerifier.verify("token") } returns FirebaseIdClaims(uid = "g-5", email = "g@example.com", name = "G")
+        every { userRepository.findByGoogleId("g-5") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithGoogle("token")
+
+        assertEquals(5L, result.user.id)
+        assertEquals("access-token", result.accessToken)
+    }
+
     // ── authenticateWithApple ─────────────────────────────────────────────────
 
     @Test
     fun `authenticateWithApple rejects a token that fails verification`() {
         every { appleIdTokenVerifier.verify("bad") } returns null
 
-        assertThrows<IllegalArgumentException> {
+        assertThrows<AuthRejectedException> {
             authService.authenticateWithApple("bad", null, null)
         }
         verify(exactly = 0) { userRepository.save(any()) }
@@ -286,7 +333,7 @@ class AuthServiceTest {
     fun `authenticateWithApple rejects a client appleUserId that differs from the token subject`() {
         every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "real-sub", email = "a@b.com")
 
-        assertThrows<IllegalArgumentException> {
+        assertThrows<AuthRejectedException> {
             authService.authenticateWithApple("token", null, appleUserId = "victim-sub")
         }
         verify(exactly = 0) { userRepository.findByAppleId(any()) }
@@ -312,7 +359,7 @@ class AuthServiceTest {
     fun `authenticateWithApple with hidden email creates user with fallback email and never links by email`() {
         every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "abc.123", email = null)
         every { userRepository.findByAppleId("abc.123") } returns Optional.empty()
-        every { userRepository.save(any()) } answers { firstArg<User>().copy(id = 42L) }
+        every { userRepository.save(any()) } answers { firstArg<User>().withAssignedId(42L) }
         every { jwtTokenProvider.generateAccessToken(42L, "apple_abc_123@apple.hidden", any()) } returns "access-token"
         every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
         every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
@@ -350,7 +397,7 @@ class AuthServiceTest {
         val token = "valid-refresh-token"
         val lookupHash = "hashed-token"
         val tokenEntity = createRefreshToken(user = user, tokenHash = lookupHash,
-            expiresAt = Instant.now().plusSeconds(3600))
+            expiresAt = TEST_NOW.plusSeconds(3600))
 
         every { refreshTokenHashService.createLookupHash(token) } returns lookupHash
         every { refreshTokenRepository.findByTokenHash(lookupHash) } returns Optional.of(tokenEntity)
@@ -379,7 +426,7 @@ class AuthServiceTest {
         every { refreshTokenRepository.findByTokenHash(lookupHash) } returns Optional.empty()
 
         // Act & Assert
-        val ex = assertThrows<IllegalArgumentException> {
+        val ex = assertThrows<AuthRejectedException> {
             authService.refreshAccessToken(token)
         }
         assertEquals("Refresh token not found", ex.message)
@@ -392,13 +439,13 @@ class AuthServiceTest {
         val token = "revoked-token"
         val lookupHash = "revoked-hash"
         val revokedToken = createRefreshToken(user = user, tokenHash = lookupHash,
-            expiresAt = Instant.now().plusSeconds(3600), revoked = true)
+            expiresAt = TEST_NOW.plusSeconds(3600), revoked = true)
 
         every { refreshTokenHashService.createLookupHash(token) } returns lookupHash
         every { refreshTokenRepository.findByTokenHash(lookupHash) } returns Optional.of(revokedToken)
 
         // Act & Assert
-        val ex = assertThrows<IllegalArgumentException> {
+        val ex = assertThrows<AuthRejectedException> {
             authService.refreshAccessToken(token)
         }
         assertEquals("Refresh token has been revoked", ex.message)
@@ -411,16 +458,24 @@ class AuthServiceTest {
         val token = "expired-token"
         val lookupHash = "expired-hash"
         val expiredToken = createRefreshToken(user = user, tokenHash = lookupHash,
-            expiresAt = Instant.now().minusSeconds(3600))
+            expiresAt = TEST_NOW.minusSeconds(3600))
 
         every { refreshTokenHashService.createLookupHash(token) } returns lookupHash
         every { refreshTokenRepository.findByTokenHash(lookupHash) } returns Optional.of(expiredToken)
 
         // Act & Assert
-        val ex = assertThrows<IllegalArgumentException> {
+        val ex = assertThrows<AuthRejectedException> {
             authService.refreshAccessToken(token)
         }
         assertEquals("Refresh token has expired", ex.message)
+    }
+
+    @Test
+    fun `refreshAccessToken lets a database failure propagate instead of rejecting the token`() {
+        every { refreshTokenHashService.createLookupHash("token") } returns "hash"
+        every { refreshTokenRepository.findByTokenHash("hash") } throws IllegalStateException("connection refused")
+
+        assertThrows<IllegalStateException> { authService.refreshAccessToken("token") }
     }
 
     @Test
@@ -430,7 +485,7 @@ class AuthServiceTest {
         val token = "valid-token"
         val lookupHash = "valid-hash"
         val tokenEntity = createRefreshToken(user = user, tokenHash = lookupHash,
-            expiresAt = Instant.now().plusSeconds(3600))
+            expiresAt = TEST_NOW.plusSeconds(3600))
 
         every { refreshTokenHashService.createLookupHash(token) } returns lookupHash
         every { refreshTokenRepository.findByTokenHash(lookupHash) } returns Optional.of(tokenEntity)
@@ -632,7 +687,7 @@ class AuthServiceTest {
     @Test
     fun `deleteAccount deletes the RevenueCat subscriber when the user has one`() {
         val userId = 32L
-        val user = createUser(id = userId, googleId = null).copy(revenueCatUserId = "rc-32")
+        val user = createUser(id = userId, googleId = null).also { it.mirrorRevenueCatUserId("rc-32") }
         stubDeleteAccount(userId, user)
 
         authService.deleteAccount(userId)
@@ -750,7 +805,7 @@ class AuthServiceTest {
         assertNotNull(savedUser)
         assertEquals("test_email", savedUser!!.premiumGrantReason)
         // Grant should last roughly 100 years — at least 50 years in the future
-        val fiftyYearsFromNow = Instant.now().plusSeconds(50L * 365 * 24 * 3600)
+        val fiftyYearsFromNow = TEST_NOW.plusSeconds(50L * 365 * 24 * 3600)
         assert(savedUser!!.premiumGrantUntil!!.isAfter(fiftyYearsFromNow)) {
             "Expected grant to last far into the future"
         }
@@ -787,7 +842,7 @@ class AuthServiceTest {
     @Test
     fun `test grant is revoked when email is removed from the test list`() {
         val existingUser = createUser(id = 52L, email = "ci@test.vokab.dev")
-            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "test_email")
+            .also { it.mirrorGrant(TEST_NOW.plusSeconds(86400), "test_email") }
         every { appConfigService.getTestEmails() } returns emptySet()
         every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         var savedUser: User? = null
@@ -803,7 +858,7 @@ class AuthServiceTest {
     @Test
     fun `legacy or manual grants are not revoked by the test list`() {
         val existingUser = createUser(id = 53L, email = "ci@test.vokab.dev")
-            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "legacy_grant")
+            .also { it.mirrorGrant(TEST_NOW.plusSeconds(86400), "legacy_grant") }
         every { appConfigService.getTestEmails() } returns emptySet()
         every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         every { userRepository.save(any()) } answers { firstArg() }
@@ -817,7 +872,7 @@ class AuthServiceTest {
     @Test
     fun `authenticateForCi non-premium clears grant as well as subscription`() {
         val existingUser = createUser(id = 54L, email = "ci@test.vokab.dev")
-            .copy(premiumGrantUntil = Instant.now().plusSeconds(86400), premiumGrantReason = "test_email")
+            .also { it.mirrorGrant(TEST_NOW.plusSeconds(86400), "test_email") }
         every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         every { userRepository.save(any()) } answers { firstArg() }
         stubTokenGeneration(existingUser)
@@ -866,6 +921,7 @@ class AuthServiceTest {
             jwtTokenProvider = jwtTokenProvider,
             refreshTokenHashService = refreshTokenHashService,
             appleIdTokenVerifier = appleIdTokenVerifier,
+            firebaseIdTokenVerifier = firebaseIdTokenVerifier,
             revenueCatClient = revenueCatClient,
             userPlatformRepository = userPlatformRepository,
             userDataPurger = userDataPurger,
@@ -875,7 +931,8 @@ class AuthServiceTest {
             eventService = eventService,
             domainEventPublisher = domainEventPublisher,
             geoLocationService = geoLocationService,
-            appConfigService = appConfigService
+            appConfigService = appConfigService,
+            clock = fixedClock()
         )
     }
 
@@ -902,7 +959,7 @@ class AuthServiceTest {
         id: Long? = 1L,
         user: User,
         tokenHash: String = "hash",
-        expiresAt: Instant = Instant.now().plusSeconds(3600),
+        expiresAt: Instant = TEST_NOW.plusSeconds(3600),
         revoked: Boolean = false
     ): RefreshToken = RefreshToken(
         id = id,

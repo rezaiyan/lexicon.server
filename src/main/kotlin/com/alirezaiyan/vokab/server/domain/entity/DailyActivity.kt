@@ -17,10 +17,10 @@ import java.time.LocalDateTime
         Index(name = "idx_user_activity_date", columnList = "user_id,activity_date")
     ]
 )
-data class DailyActivity(
+class DailyActivity(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -34,6 +34,6 @@ data class DailyActivity(
 
     @Column(name = "created_at", nullable = false)
     val createdAt: LocalDateTime = LocalDateTime.now()
-)
+) : JpaEntity<Long>()
 
 

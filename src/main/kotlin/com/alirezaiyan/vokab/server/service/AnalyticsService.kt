@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +17,7 @@ import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -25,6 +27,7 @@ class AnalyticsService(
     private val reviewEventRepository: ReviewEventRepository,
     private val userRepository: UserRepository,
     private val sessionPersister: AnalyticsSessionPersister,
+    private val clock: Clock,
 ) {
 
     // Not @Transactional at the batch level — each session is saved in its own
@@ -49,7 +52,7 @@ class AnalyticsService(
         val totalCorrect = reviewEventRepository.countCorrectByUser(user)
         val totalStudyTime = studySessionRepository.totalStudyTimeByUser(user)
         val totalSessions = studySessionRepository.countByUser(user)
-        val daysStudied = studySessionRepository.countDistinctStudyDays(user.id!!)
+        val daysStudied = studySessionRepository.countDistinctStudyDays(user.requireId())
         val uniqueWords = reviewEventRepository.countDistinctWordsReviewed(user)
         val abandoned = studySessionRepository.countAbandonedByUser(user)
         val wordsMastered = reviewEventRepository.countWordsMastered(user)
@@ -75,11 +78,11 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getDailyStats(user: User, startDate: String, endDate: String): List<DailyStatsResponse> {
-        val start = LocalDate.parse(startDate).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
-        val end = LocalDate.parse(endDate).plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() - 1
+    fun getDailyStats(user: User, startDate: LocalDate, endDate: LocalDate): List<DailyStatsResponse> {
+        val start = startDate.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
+        val end = endDate.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() - 1
         val sessions = studySessionRepository.findByUserAndDateRange(user, start, end)
-        val eventStats = reviewEventRepository.getDailyEventStats(user.id!!, start, end)
+        val eventStats = reviewEventRepository.getDailyEventStats(user.requireId(), start, end)
             .associateBy { it.day }
 
         return sessions.groupBy {
@@ -144,7 +147,7 @@ class AnalyticsService(
 
     @Transactional(readOnly = true)
     fun getAccuracyByHour(user: User): List<HourlyAccuracyResponse> {
-        return reviewEventRepository.getAccuracyByHour(user.id!!).map { p ->
+        return reviewEventRepository.getAccuracyByHour(user.requireId()).map { p ->
             HourlyAccuracyResponse(
                 hour = p.hour,
                 totalReviews = p.total,
@@ -156,7 +159,7 @@ class AnalyticsService(
 
     @Transactional(readOnly = true)
     fun getAccuracyByDayOfWeek(user: User): List<DayOfWeekAccuracyResponse> {
-        return reviewEventRepository.getAccuracyByDayOfWeek(user.id!!).map { p ->
+        return reviewEventRepository.getAccuracyByDayOfWeek(user.requireId()).map { p ->
             DayOfWeekAccuracyResponse(
                 dayOfWeek = p.dayOfWeek,
                 totalReviews = p.total,
@@ -186,7 +189,7 @@ class AnalyticsService(
 
     @Transactional(readOnly = true)
     fun getHeatmap(user: User, startMs: Long, endMs: Long): List<HeatmapDayResponse> {
-        return reviewEventRepository.getHeatmapData(user.id!!, startMs, endMs).map { p ->
+        return reviewEventRepository.getHeatmapData(user.requireId(), startMs, endMs).map { p ->
             HeatmapDayResponse(
                 date = p.day,
                 count = p.count.toInt()
@@ -233,7 +236,7 @@ class AnalyticsService(
 
     @Transactional(readOnly = true)
     fun getMonthlyStats(user: User): List<MonthlyStatsResponse> {
-        return reviewEventRepository.getMonthlyStats(user.id!!).map { p ->
+        return reviewEventRepository.getMonthlyStats(user.requireId()).map { p ->
             MonthlyStatsResponse(
                 year = p.yr,
                 month = p.mo,
@@ -246,7 +249,7 @@ class AnalyticsService(
 
     @Transactional(readOnly = true)
     fun getResponseTimeTrend(user: User): List<ResponseTimeTrendResponse> {
-        return reviewEventRepository.getResponseTimeTrend(user.id!!).map { p ->
+        return reviewEventRepository.getResponseTimeTrend(user.requireId()).map { p ->
             ResponseTimeTrendResponse(
                 year = p.yr,
                 week = p.wk,
@@ -281,7 +284,7 @@ class AnalyticsService(
      */
     @Transactional(readOnly = true)
     fun getWeeklyReport(user: User): WeeklyReportResponse {
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = LocalDate.now(clock)
 
         fun dateToMs(date: LocalDate): Long = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
         fun endOfDayMs(date: LocalDate): Long = date.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() - 1

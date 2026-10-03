@@ -6,9 +6,11 @@ import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -18,12 +20,13 @@ class StreakReminderService(
     private val dailyActivityRepository: DailyActivityRepository,
     private val pushNotificationService: PushNotificationService,
     private val openRouterService: OpenRouterService,
-    private val userProgressService: UserProgressService
+    private val userProgressService: UserProgressService,
+    private val clock: Clock
 ) {
 
     @Transactional(readOnly = true)
     fun findUsersNeedingReminder(): List<User> {
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         val usersWithActiveStreaks = userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0)
 
         logger.info { "Found ${usersWithActiveStreaks.size} users with active streaks" }
@@ -44,14 +47,14 @@ class StreakReminderService(
                 currentStreak = user.currentStreak,
                 userName = user.name,
                 progressStats = progressStats
-            ).block() ?: "You have a ${user.currentStreak}-day streak! 🔥 Complete your review today to keep it going!"
+            )
 
             val data = mapOf(
                 "type" to "streak_reminder",
                 "currentStreak" to user.currentStreak.toString()
             )
             val results = pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
+                userId = user.requireId(),
                 title = "Don't lose your streak!",
                 body = message,
                 data = data,
@@ -66,7 +69,7 @@ class StreakReminderService(
             logger.error(e) { "Error sending streak reminder to user=${user.id}" }
             try {
                 pushNotificationService.sendNotificationToUser(
-                    userId = user.id!!,
+                    userId = user.requireId(),
                     title = "Don't lose your streak!",
                     body = "You have a ${user.currentStreak}-day streak. Complete your review today to keep it going!",
                     data = mapOf("type" to "streak_reminder", "currentStreak" to user.currentStreak.toString()),

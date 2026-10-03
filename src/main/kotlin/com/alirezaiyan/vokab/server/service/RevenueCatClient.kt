@@ -4,12 +4,15 @@ import com.alirezaiyan.vokab.server.config.AppProperties
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.WebClientResponseException
+import com.alirezaiyan.vokab.server.config.describe
+import org.springframework.http.HttpHeaders
+import org.springframework.web.client.RestClient
+import org.springframework.web.client.RestClientException
+import org.springframework.web.client.body
 import org.springframework.web.util.UriBuilder
 import java.net.URI
-import java.time.Duration
 import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
@@ -21,11 +24,11 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class RevenueCatClient(
-    webClientBuilder: WebClient.Builder,
+    restClientBuilder: RestClient.Builder,
     private val appProperties: AppProperties,
+    private val clock: Clock,
 ) {
-    // clone(): the injected builder is a shared singleton; don't leak our baseUrl into it.
-    private val webClient = webClientBuilder.clone().baseUrl(BASE_URL).build()
+    private val restClient = restClientBuilder.baseUrl(BASE_URL).build()
 
     val isConfigured: Boolean get() = appProperties.revenuecat.apiKey.isNotBlank()
 
@@ -36,19 +39,15 @@ class RevenueCatClient(
     fun fetchEntitlementState(appUserId: String): StoreEntitlementState? {
         if (!isConfigured) return null
         return try {
-            val response = webClient.get()
+            restClient.get()
                 .uri { it.subscriberPath(appUserId) }
-                .header("Authorization", "Bearer ${appProperties.revenuecat.apiKey}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${appProperties.revenuecat.apiKey}")
                 .retrieve()
-                .bodyToMono(SubscriberResponse::class.java)
-                .timeout(TIMEOUT)
-                .block()
-            response?.subscriber?.toEntitlementState(Instant.now())
-        } catch (e: WebClientResponseException) {
-            logger.warn { "RevenueCat subscriber lookup failed: status=${e.statusCode}" }
-            null
-        } catch (e: Exception) {
-            logger.warn(e) { "RevenueCat subscriber lookup failed" }
+                .body<SubscriberResponse>()
+                ?.subscriber
+                ?.toEntitlementState(Instant.now(clock))
+        } catch (e: RestClientException) {
+            logger.warn { "RevenueCat subscriber lookup failed: ${e.describe()}" }
             null
         }
     }
@@ -60,19 +59,14 @@ class RevenueCatClient(
     fun deleteSubscriber(appUserId: String): Boolean {
         if (!isConfigured) return false
         return try {
-            webClient.delete()
+            restClient.delete()
                 .uri { it.subscriberPath(appUserId) }
-                .header("Authorization", "Bearer ${appProperties.revenuecat.apiKey}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${appProperties.revenuecat.apiKey}")
                 .retrieve()
                 .toBodilessEntity()
-                .timeout(TIMEOUT)
-                .block()
             true
-        } catch (e: WebClientResponseException) {
-            logger.warn { "RevenueCat subscriber deletion failed: status=${e.statusCode}" }
-            false
-        } catch (e: Exception) {
-            logger.warn(e) { "RevenueCat subscriber deletion failed" }
+        } catch (e: RestClientException) {
+            logger.warn { "RevenueCat subscriber deletion failed: ${e.describe()}" }
             false
         }
     }
@@ -84,9 +78,8 @@ class RevenueCatClient(
     private fun UriBuilder.subscriberPath(appUserId: String): URI =
         pathSegment("subscribers", appUserId).build()
 
-    companion object {
-        private const val BASE_URL = "https://api.revenuecat.com/v1"
-        private val TIMEOUT = Duration.ofSeconds(10)
+    private companion object {
+        const val BASE_URL = "https://api.revenuecat.com/v1"
     }
 }
 

@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.presentation.dto.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,7 +31,7 @@ class WordRushService(
 
     @Transactional(readOnly = true)
     fun getInsights(user: User): WordRushInsightsResponse {
-        val p = wordRushGameRepository.findInsightsByUserId(user.id!!)
+        val p = wordRushGameRepository.findInsightsByUserId(user.requireId())
         val completionRatePercent = if (p.totalGames > 0) p.totalCompleted.toDouble() / p.totalGames * 100 else 0.0
         val avgDurationMs = if (p.totalGames > 0) p.totalTimePlayedMs.toDouble() / p.totalGames else 0.0
 

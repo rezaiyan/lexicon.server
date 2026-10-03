@@ -12,12 +12,14 @@ import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatEvent
 import com.alirezaiyan.vokab.server.presentation.dto.RevenueCatWebhookEvent
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration
 import java.time.Instant
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -29,6 +31,7 @@ class SubscriptionService(
     private val processedWebhookEventRepository: ProcessedWebhookEventRepository,
     private val revenueCatClient: RevenueCatClient,
     private val pushNotificationService: PushNotificationService,
+    private val clock: Clock,
 ) {
 
     /**
@@ -94,7 +97,7 @@ class SubscriptionService(
         val state = revenueCatClient.fetchEntitlementState(appUserId) ?: return SyncOutcome.UNAVAILABLE
 
         if (state.hasPurchaseHistory && user.revenueCatUserId == null) {
-            userRepository.linkRevenueCatUserId(userId, appUserId, Instant.now())
+            userRepository.linkRevenueCatUserId(userId, appUserId, Instant.now(clock))
         }
 
         val target = targetState(user, state) ?: return SyncOutcome.UNCHANGED
@@ -102,7 +105,7 @@ class SubscriptionService(
             return SyncOutcome.UNCHANGED
         }
 
-        userRepository.updateSubscription(userId, target.first, target.second, Instant.now())
+        userRepository.updateSubscription(userId, target.first, target.second, Instant.now(clock))
         logger.info {
             "RevenueCat sync updated userId=$userId: ${user.subscriptionStatus} -> ${target.first}, expiresAt=${target.second}"
         }
@@ -122,6 +125,14 @@ class SubscriptionService(
         user.subscriptionStatus in STORE_DERIVED_STATUSES -> SubscriptionStatus.EXPIRED to null
         else -> null
     }
+
+    /** Re-syncs every user in [scope]; see [ReconcileScope]. */
+    fun reconcile(scope: ReconcileScope): ReconcileReport = reconcile(
+        when (scope) {
+            ReconcileScope.LINKED -> userRepository.findIdsLinkedToRevenueCat()
+            ReconcileScope.ALL -> userRepository.findActiveUserIds()
+        }
+    )
 
     /**
      * Re-syncs the given users against RevenueCat, then expires lapsed statuses.
@@ -143,7 +154,7 @@ class SubscriptionService(
     }
 
     fun expireLapsedSubscriptions(): Int =
-        userRepository.expireLapsedSubscriptions(Instant.now(), STORE_DERIVED_STATUSES, SubscriptionStatus.EXPIRED)
+        userRepository.expireLapsedSubscriptions(Instant.now(clock), STORE_DERIVED_STATUSES, SubscriptionStatus.EXPIRED)
 
     // ── Webhook handlers ─────────────────────────────────────────────────────────────────────
 
@@ -163,8 +174,8 @@ class SubscriptionService(
 
         if (user.revenueCatUserId == null) {
             logger.info { "Linking RevenueCat id to userId=${user.id}" }
-            userRepository.linkRevenueCatUserId(user.id!!, candidate, Instant.now())
-            return user.copy(revenueCatUserId = candidate)
+            userRepository.linkRevenueCatUserId(user.requireId(), candidate, Instant.now(clock))
+            user.mirrorRevenueCatUserId(candidate)
         }
         return user
     }
@@ -180,7 +191,7 @@ class SubscriptionService(
             return
         }
         users.forEach { user ->
-            val outcome = syncFromRevenueCat(user.id!!)
+            val outcome = syncFromRevenueCat(user.requireId())
             logger.info { "RevenueCat TRANSFER re-synced userId=${user.id}: $outcome" }
         }
     }
@@ -191,7 +202,7 @@ class SubscriptionService(
      * The push is sent after commit so a rolled-back (and later redelivered) event can't notify twice.
      */
     private fun handleBillingIssue(user: User, event: RevenueCatEvent) {
-        val userId = user.id!!
+        val userId = user.requireId()
         eventService.trackAsync(userId, "subscription_billing_issue", mapOf("product_id" to event.product_id.orEmpty()))
         afterCommit {
             runCatching {
@@ -218,7 +229,7 @@ class SubscriptionService(
         val productId = event.product_id
 
         if (productId != null) {
-            val now = Instant.now()
+            val now = Instant.now(clock)
             val subscription = findSubscription(event)
                 ?: Subscription(
                     user = user,
@@ -227,17 +238,16 @@ class SubscriptionService(
                     status = SubscriptionStatus.ACTIVE,
                     startedAt = event.purchased_at_ms?.let { Instant.ofEpochMilli(it) } ?: now,
                 )
-            subscriptionRepository.save(
-                subscription.copy(
-                    productId = productId,
-                    status = SubscriptionStatus.ACTIVE,
-                    expiresAt = expiresAt,
-                    cancelledAt = null,
-                    isTrial = event.isTrial,
-                    autoRenew = autoRenew,
-                    updatedAt = now,
-                )
-            )
+            subscription.also {
+                it.productId = productId
+                it.status = SubscriptionStatus.ACTIVE
+                it.expiresAt = expiresAt
+                it.cancelledAt = null
+                it.isTrial = event.isTrial
+                it.autoRenew = autoRenew
+                it.updatedAt = now
+            }
+            subscriptionRepository.save(subscription)
         } else {
             logger.warn { "RevenueCat ${event.type} without product_id for userId=${user.id}" }
         }
@@ -247,7 +257,7 @@ class SubscriptionService(
 
         if (analyticsEvent != null) {
             eventService.trackAsync(
-                user.id!!,
+                user.requireId(),
                 analyticsEvent,
                 mapOf("product_id" to productId.orEmpty(), "is_trial" to event.isTrial.toString())
             )
@@ -260,19 +270,16 @@ class SubscriptionService(
      * premium until [RevenueCatEvent.expiration_at_ms]; [FeatureAccessService] honours that.
      */
     private fun handleCancellation(user: User, event: RevenueCatEvent) {
-        val now = Instant.now()
+        val now = Instant.now(clock)
         val expiresAt = event.expiresAt()
 
         findSubscription(event)?.let { subscription ->
-            subscriptionRepository.save(
-                subscription.copy(
-                    status = SubscriptionStatus.CANCELLED,
-                    cancelledAt = now,
-                    autoRenew = false,
-                    expiresAt = expiresAt ?: subscription.expiresAt,
-                    updatedAt = now,
-                )
-            )
+            subscription.status = SubscriptionStatus.CANCELLED
+            subscription.cancelledAt = now
+            subscription.autoRenew = false
+            if (expiresAt != null) subscription.expiresAt = expiresAt
+            subscription.updatedAt = now
+            subscriptionRepository.save(subscription)
         }
 
         val status = if (expiresAt != null && expiresAt.isAfter(now)) {
@@ -282,7 +289,7 @@ class SubscriptionService(
         }
         updateUserSubscriptionStatus(user, status, expiresAt)
         eventService.trackAsync(
-            user.id!!,
+            user.requireId(),
             "subscription_cancelled",
             mapOf("product_id" to event.product_id.orEmpty(), "reason" to event.cancel_reason.orEmpty())
         )
@@ -292,9 +299,9 @@ class SubscriptionService(
 
     private fun handleExpiration(user: User, event: RevenueCatEvent) {
         findSubscription(event)?.let { subscription ->
-            subscriptionRepository.save(
-                subscription.copy(status = SubscriptionStatus.EXPIRED, updatedAt = Instant.now())
-            )
+            subscription.status = SubscriptionStatus.EXPIRED
+            subscription.updatedAt = Instant.now(clock)
+            subscriptionRepository.save(subscription)
         }
 
         // Events can arrive out of order; don't let an old subscription's expiry revoke a newer one.
@@ -307,7 +314,7 @@ class SubscriptionService(
 
         updateUserSubscriptionStatus(user, SubscriptionStatus.EXPIRED, null)
         eventService.trackAsync(
-            user.id!!,
+            user.requireId(),
             "subscription_expired",
             mapOf("product_id" to event.product_id.orEmpty())
         )
@@ -319,7 +326,7 @@ class SubscriptionService(
         subscriptionRepository.findByRevenueCatSubscriptionId(event.subscriptionKey).orElse(null)
 
     private fun updateUserSubscriptionStatus(user: User, status: SubscriptionStatus, expiresAt: Instant?) {
-        userRepository.updateSubscription(user.id!!, status, expiresAt, Instant.now())
+        userRepository.updateSubscription(user.requireId(), status, expiresAt, Instant.now(clock))
     }
 
     private fun initialPurchaseEvent(event: RevenueCatEvent): String =
@@ -336,6 +343,14 @@ class SubscriptionService(
         /** Statuses that come from the store (and so may be lapsed/expired by it). */
         val STORE_DERIVED_STATUSES = listOf(SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL, SubscriptionStatus.CANCELLED)
     }
+}
+
+enum class ReconcileScope {
+    /** Users already linked to RevenueCat — the nightly job. */
+    LINKED,
+
+    /** Every active user; recovers purchases whose webhooks never arrived. */
+    ALL,
 }
 
 enum class SyncOutcome { UPDATED, UNCHANGED, UNAVAILABLE, UNKNOWN_USER }

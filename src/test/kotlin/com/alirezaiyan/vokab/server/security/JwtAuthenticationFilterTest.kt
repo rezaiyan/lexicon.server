@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.security
 
+import java.time.Duration
+import com.alirezaiyan.vokab.server.MutableClock
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.JwtConfig
 import com.alirezaiyan.vokab.server.config.SecurityConfig
@@ -29,6 +31,8 @@ import jakarta.servlet.http.HttpServletResponse
 
 class JwtAuthenticationFilterTest {
 
+    private val clock = MutableClock()
+
     private lateinit var jwtTokenProvider: RS256JwtTokenProvider
     private lateinit var userRepository: UserRepository
     private lateinit var appProperties: AppProperties
@@ -41,7 +45,7 @@ class JwtAuthenticationFilterTest {
     fun setUp() {
         testKeyPair = generateTestKeyPair()
         appProperties = createAppProperties(testKeyPair)
-        jwtTokenProvider = RS256JwtTokenProvider(appProperties)
+        jwtTokenProvider = RS256JwtTokenProvider(appProperties, clock)
         userRepository = mockk()
         appConfigService = mockk()
         every { appConfigService.getTestEmails() } returns emptySet()
@@ -209,9 +213,9 @@ class JwtAuthenticationFilterTest {
     fun `should return 401 when JWT is expired`() {
         // Arrange — create a token that expires immediately
         val shortLivedProps = createAppProperties(testKeyPair, expirationMs = 1L)
-        val shortLivedProvider = RS256JwtTokenProvider(shortLivedProps)
+        val shortLivedProvider = RS256JwtTokenProvider(shortLivedProps, clock)
         val token = shortLivedProvider.generateAccessToken(1L, "test@example.com")
-        Thread.sleep(50)
+        clock.advance(Duration.ofSeconds(1))
 
         val request = MockHttpServletRequest().apply {
             requestURI = "/api/v1/words"
@@ -334,7 +338,7 @@ class JwtAuthenticationFilterTest {
         // Arrange — configure a test email in appProperties
         val testEmail = "ci@test.example.com"
         val propsWithTestEmail = createAppProperties(testKeyPair, testEmails = testEmail)
-        val providerForTest = RS256JwtTokenProvider(propsWithTestEmail)
+        val providerForTest = RS256JwtTokenProvider(propsWithTestEmail, clock)
         val configServiceForTest = mockk<AppConfigService>()
         every { configServiceForTest.getTestEmails() } returns setOf(testEmail)
         val filterForTest = JwtAuthenticationFilter(providerForTest, userRepository, propsWithTestEmail, configServiceForTest)

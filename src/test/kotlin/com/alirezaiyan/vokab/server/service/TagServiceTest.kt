@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.Tag
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.TagRepository
@@ -11,7 +13,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
 
 class TagServiceTest {
 
@@ -21,7 +22,7 @@ class TagServiceTest {
     @BeforeEach
     fun setUp() {
         tagRepository = mockk()
-        tagService = TagService(tagRepository)
+        tagService = TagService(tagRepository, clock = fixedClock())
     }
 
     // --- list ---
@@ -261,8 +262,8 @@ class TagServiceTest {
         currentStreak = 0,
         longestStreak = 0,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createTag(
@@ -273,8 +274,8 @@ class TagServiceTest {
         val tag = Tag(
             id = id,
             name = name,
-            createdAt = Instant.now(),
-            updatedAt = Instant.now()
+            createdAt = TEST_NOW,
+            updatedAt = TEST_NOW
         )
         tag.user = user
         return tag

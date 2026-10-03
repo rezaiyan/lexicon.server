@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.service.ReconcileReport
+import com.alirezaiyan.vokab.server.service.ReconcileScope
 import com.alirezaiyan.vokab.server.service.SubscriptionService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ResponseEntity
@@ -18,7 +18,6 @@ private val logger = KotlinLogging.logger {}
 @RequestMapping("/admin/subscriptions")
 class SubscriptionAdminController(
     private val subscriptionService: SubscriptionService,
-    private val userRepository: UserRepository,
 ) {
     /**
      * Re-syncs premium state from RevenueCat.
@@ -34,14 +33,13 @@ class SubscriptionAdminController(
         @RequestParam(defaultValue = "linked") scope: String,
         @RequestParam(required = false) userIds: List<Long>?,
     ): ResponseEntity<ApiResponse<ReconcileReport>> {
-        val ids = when {
-            !userIds.isNullOrEmpty() -> userIds
-            scope == "all" -> userRepository.findActiveUserIds()
-            scope == "linked" -> userRepository.findIdsLinkedToRevenueCat()
-            else -> return ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = "scope must be 'linked' or 'all'"))
+        logger.info { "Admin subscription reconcile: scope=$scope, userIds=$userIds" }
+        val report = when {
+            !userIds.isNullOrEmpty() -> subscriptionService.reconcile(userIds)
+            scope == "linked" -> subscriptionService.reconcile(ReconcileScope.LINKED)
+            scope == "all" -> subscriptionService.reconcile(ReconcileScope.ALL)
+            else -> throw IllegalArgumentException("scope must be 'linked' or 'all'")
         }
-        logger.info { "Admin subscription reconcile: scope=$scope, users=${ids.size}" }
-        return ResponseEntity.ok(ApiResponse(success = true, data = subscriptionService.reconcile(ids)))
+        return ResponseEntity.ok(ApiResponse(success = true, data = report))
     }
 }

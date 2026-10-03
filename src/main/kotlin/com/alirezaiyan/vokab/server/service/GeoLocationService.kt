@@ -78,11 +78,9 @@ class GeoLocationService(
     fun updateUserCountry(userId: Long, ipAddress: String, isNewUser: Boolean) {
         val country = resolveCountry(ipAddress) ?: return
         val user = userRepository.findById(userId).orElse(null) ?: return
-        val updatedUser = user.copy(
-            lastLoginCountry = country,
-            signupCountry = if (isNewUser || user.signupCountry == null) country else user.signupCountry,
-        )
-        userRepository.save(updatedUser)
+        user.lastLoginCountry = country
+        if (isNewUser || user.signupCountry == null) user.signupCountry = country
+        userRepository.save(user)
         logger.info { "Updated country for userId=$userId: country=$country (isNewUser=$isNewUser)" }
     }
 }

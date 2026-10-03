@@ -8,10 +8,10 @@ import java.time.Instant
     name = "push_tokens",
     indexes = [Index(name = "idx_push_token", columnList = "token")]
 )
-data class PushToken(
+class PushToken(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -35,7 +35,7 @@ data class PushToken(
     
     @Column(nullable = false)
     val active: Boolean = true
-)
+) : JpaEntity<Long>()
 
 enum class Platform {
     ANDROID,

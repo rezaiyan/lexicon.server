@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.Tag
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.entity.Word
@@ -34,7 +36,7 @@ class WordServiceTest {
         tagRepository = mockk()
         wordUpsertPreparer = mockk()
         userRepository = mockk()
-        wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository)
+        wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock = fixedClock())
     }
 
     // ── list ──────────────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ class WordServiceTest {
 
     @Test
     fun `upsert should save entities from preparer`() {
-        val user = createUser(firstWordAddedAt = Instant.now())
+        val user = createUser(firstWordAddedAt = TEST_NOW)
         val dto = createWordDto()
         val entity = createWord(id = 1L, user = user)
         every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(entity)
@@ -96,7 +98,7 @@ class WordServiceTest {
         val newEntity = createWord(id = null, user = user)
         every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(newEntity)
         every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(newEntity)
-        every { userRepository.save(any()) } returns user.copy(firstWordAddedAt = Instant.now())
+        every { userRepository.save(any()) } answers { firstArg() }
 
         wordService.upsert(user, listOf(dto))
 
@@ -431,8 +433,8 @@ class WordServiceTest {
         longestStreak = 0,
         firstWordAddedAt = firstWordAddedAt,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW,
     )
 
     private fun createWord(
@@ -475,8 +477,8 @@ class WordServiceTest {
         id = id,
         user = user,
         name = name,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now(),
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW,
     )
 
     private fun createWordDto(

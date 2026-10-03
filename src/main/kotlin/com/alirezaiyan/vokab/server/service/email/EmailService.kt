@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.domain.repository.EmailLogRepository
 import com.alirezaiyan.vokab.server.domain.repository.EmailSubscriptionRepository
 import com.alirezaiyan.vokab.server.domain.repository.EmailTemplateRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -19,7 +20,8 @@ class EmailService(
     private val emailConfig: EmailConfig,
     private val emailLogRepository: EmailLogRepository,
     private val emailSubscriptionRepository: EmailSubscriptionRepository,
-    private val emailTemplateRepository: EmailTemplateRepository
+    private val emailTemplateRepository: EmailTemplateRepository,
+    private val clock: Clock
 ) {
 
     /**
@@ -35,7 +37,7 @@ class EmailService(
         dedupHours: Long = 24
     ): Boolean {
         if (!emailConfig.enabled) {
-            logger.debug { "Email disabled, skipping: $templateId to $recipientEmail" }
+            logger.debug { "Email disabled, skipping: $templateId for userId=$userId" }
             return false
         }
 
@@ -54,7 +56,7 @@ class EmailService(
 
         // Dedup: skip if same template was sent recently
         if (dedupHours > 0) {
-            val cutoff = Instant.now().minus(dedupHours, ChronoUnit.HOURS)
+            val cutoff = Instant.now(clock).minus(dedupHours, ChronoUnit.HOURS)
             if (emailLogRepository.existsByUserIdAndTemplateIdAndCreatedAtAfter(userId, templateId, cutoff)) {
                 logger.info { "Dedup: $templateId already sent to user $userId within ${dedupHours}h" }
                 return false
@@ -90,7 +92,7 @@ class EmailService(
         bodyText: String? = null
     ): Boolean {
         if (!emailConfig.enabled) {
-            logger.debug { "Email disabled, skipping raw send to $recipientEmail" }
+            logger.debug { "Email disabled, skipping raw send for userId=$userId" }
             return false
         }
 
@@ -115,24 +117,18 @@ class EmailService(
                 )
             )
 
-            emailLogRepository.save(
-                log.copy(
-                    status = EmailStatus.SENT,
-                    provider = result.provider,
-                    providerId = result.providerId,
-                    sentAt = Instant.now()
-                )
-            )
+            log.status = EmailStatus.SENT
+            log.provider = result.provider
+            log.providerId = result.providerId
+            log.sentAt = Instant.now(clock)
+            emailLogRepository.save(log)
             true
         } catch (e: Exception) {
-            logger.error(e) { "Failed to send email to $recipientEmail: ${e.message}" }
-            emailLogRepository.save(
-                log.copy(
-                    status = EmailStatus.FAILED,
-                    provider = emailProvider.name,
-                    errorMessage = e.message?.take(1000)
-                )
-            )
+            logger.error(e) { "Failed to send email (log id=${log.id}): ${e.message}" }
+            log.status = EmailStatus.FAILED
+            log.provider = emailProvider.name
+            log.errorMessage = e.message?.take(1000)
+            emailLogRepository.save(log)
             false
         }
     }

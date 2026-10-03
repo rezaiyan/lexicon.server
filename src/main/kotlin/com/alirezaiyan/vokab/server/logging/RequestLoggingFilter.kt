@@ -14,8 +14,9 @@ import org.springframework.util.AntPathMatcher
 import org.springframework.web.filter.OncePerRequestFilter
 import java.nio.charset.StandardCharsets
 import java.util.*
+import java.util.concurrent.TimeUnit
 
-private val logger = KotlinLogging.logger {}
+private val log = KotlinLogging.logger {}
 private const val REQUEST_ID_MDC_KEY = "requestId"
 private const val MAX_BODY_DISPLAY_LENGTH = 1000
 
@@ -51,18 +52,19 @@ class RequestLoggingFilter(
         val requestId = UUID.randomUUID().toString()
         MDC.put(REQUEST_ID_MDC_KEY, requestId)
         
-        val startTime = System.currentTimeMillis()
+        val startNanos = System.nanoTime()
         val cachingRequest = CachingRequestWrapper(request)
         val cachingResponse = CachingResponseWrapper(response)
-        
-        logRequest(cachingRequest)
-        
-        filterChain.doFilter(cachingRequest, cachingResponse)
-        
-        val executionTime = System.currentTimeMillis() - startTime
-        logResponse(cachingRequest, cachingResponse, executionTime)
-        
-        MDC.remove(REQUEST_ID_MDC_KEY)
+
+        try {
+            logRequest(cachingRequest)
+            filterChain.doFilter(cachingRequest, cachingResponse)
+            val executionTime = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startNanos)
+            logResponse(cachingRequest, cachingResponse, executionTime)
+        } finally {
+            // Pooled threads: a leaked requestId would tag the next request's logs
+            MDC.remove(REQUEST_ID_MDC_KEY)
+        }
     }
     
     private fun logRequest(request: HttpServletRequest) {
@@ -77,7 +79,7 @@ class RequestLoggingFilter(
         val userId = user?.id?.toString() ?: "anonymous"
         val userEmail = user?.email ?: "anonymous"
         
-        logger.info {
+        log.info {
             """
             |[REQUEST START] RequestID: $requestId
             |  Method: $method
@@ -92,7 +94,7 @@ class RequestLoggingFilter(
         
         val headers = getRequestHeaders(request)
         val maskedHeaders = SensitiveDataMasker.maskHeaders(headers)
-        logger.debug {
+        log.debug {
             """
             |[REQUEST HEADERS] RequestID: $requestId
             |${formatHeaders(maskedHeaders)}
@@ -107,7 +109,7 @@ class RequestLoggingFilter(
             } else {
                 maskedBody
             }
-            logger.debug {
+            log.debug {
                 """
                 |[REQUEST BODY] RequestID: $requestId
                 |  Content-Type: ${request.contentType ?: "unknown"}
@@ -130,7 +132,7 @@ class RequestLoggingFilter(
         val responseBody = getResponseBody(response)
         val contentLength = responseBody.size
         
-        logger.info {
+        log.info {
             """
             |[REQUEST END] RequestID: $requestId
             |  Method: $method
@@ -142,7 +144,7 @@ class RequestLoggingFilter(
         }
         
         val headers = getResponseHeaders(response)
-        logger.debug {
+        log.debug {
             """
             |[RESPONSE HEADERS] RequestID: $requestId
             |${formatHeaders(headers)}
@@ -157,7 +159,7 @@ class RequestLoggingFilter(
             } else {
                 maskedBody
             }
-            logger.debug {
+            log.debug {
                 """
                 |[RESPONSE BODY] RequestID: $requestId
                 |  Content-Type: $contentType
@@ -168,7 +170,7 @@ class RequestLoggingFilter(
         }
         
         if (executionTime > 1000) {
-            logger.warn {
+            log.warn {
                 "[SLOW REQUEST] RequestID: $requestId, URI: $uri, Execution Time: ${executionTime}ms"
             }
         }

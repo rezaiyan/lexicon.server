@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.service.email
 import com.alirezaiyan.vokab.server.domain.entity.EmailSubscription
 import com.alirezaiyan.vokab.server.domain.repository.EmailSubscriptionRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -11,7 +12,8 @@ private val logger = KotlinLogging.logger {}
 
 @Service
 class EmailSubscriptionService(
-    private val emailSubscriptionRepository: EmailSubscriptionRepository
+    private val emailSubscriptionRepository: EmailSubscriptionRepository,
+    private val clock: Clock
 ) {
 
     @Transactional(readOnly = true)
@@ -23,7 +25,9 @@ class EmailSubscriptionService(
     fun subscribe(userId: Long, category: String): EmailSubscription {
         val existing = emailSubscriptionRepository.findByUserIdAndCategory(userId, category)
         return if (existing != null) {
-            emailSubscriptionRepository.save(existing.copy(subscribed = true, updatedAt = Instant.now()))
+            existing.subscribed = true
+            existing.updatedAt = Instant.now(clock)
+            emailSubscriptionRepository.save(existing)
         } else {
             emailSubscriptionRepository.save(
                 EmailSubscription(userId = userId, category = category, subscribed = true)
@@ -35,7 +39,9 @@ class EmailSubscriptionService(
     fun unsubscribe(userId: Long, category: String): EmailSubscription {
         val existing = emailSubscriptionRepository.findByUserIdAndCategory(userId, category)
         return if (existing != null) {
-            emailSubscriptionRepository.save(existing.copy(subscribed = false, updatedAt = Instant.now()))
+            existing.subscribed = false
+            existing.updatedAt = Instant.now(clock)
+            emailSubscriptionRepository.save(existing)
         } else {
             emailSubscriptionRepository.save(
                 EmailSubscription(userId = userId, category = category, subscribed = false)

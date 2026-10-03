@@ -13,6 +13,7 @@ import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
+import java.time.Clock
 import java.util.*
 import java.util.Base64
 import java.io.File
@@ -29,7 +30,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Component
 class RS256JwtTokenProvider(
-    private val appProperties: AppProperties
+    private val appProperties: AppProperties,
+    private val clock: Clock,
 ) {
     private val keyPair: KeyPair = initializeKeyPair()
 
@@ -169,7 +171,7 @@ class RS256JwtTokenProvider(
     val privateKey: RSAPrivateKey get() = keyPair.private as RSAPrivateKey
     
     fun generateAccessToken(userId: Long, email: String, jti: String = UUID.randomUUID().toString()): String {
-        val now = Date()
+        val now = Date.from(clock.instant())
         val expiryDate = Date(now.time + appProperties.jwt.expirationMs)
         
         return Jwts.builder()
@@ -210,6 +212,7 @@ class RS256JwtTokenProvider(
     private fun getClaims(token: String): Claims {
         return Jwts.parser()
             .verifyWith(publicKey)
+            .clock { Date.from(clock.instant()) }
             .requireIssuer(appProperties.jwt.issuer)
             .requireAudience(appProperties.jwt.audience)
             .build()

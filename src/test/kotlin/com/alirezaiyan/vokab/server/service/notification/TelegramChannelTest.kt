@@ -3,93 +3,82 @@ package com.alirezaiyan.vokab.server.service.notification
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.NotificationsConfig
 import com.alirezaiyan.vokab.server.config.TelegramConfig
-import io.mockk.every
-import io.mockk.mockk
-import io.mockk.verify
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Mono
+import org.springframework.http.HttpMethod
+import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import org.springframework.test.web.client.MockRestServiceServer
+import org.springframework.test.web.client.match.MockRestRequestMatchers.content
+import org.springframework.test.web.client.match.MockRestRequestMatchers.method
+import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
+import org.springframework.test.web.client.response.MockRestResponseCreators.withException
+import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
+import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
+import org.springframework.web.client.RestClient
+import java.io.IOException
 
 class TelegramChannelTest {
 
-    private lateinit var webClient: WebClient
-    private lateinit var webClientBuilder: WebClient.Builder
-    private lateinit var requestBodyUriSpec: WebClient.RequestBodyUriSpec
-    private lateinit var requestBodySpec: WebClient.RequestBodySpec
-    private lateinit var requestHeadersSpec: WebClient.RequestHeadersSpec<*>
-    private lateinit var responseSpec: WebClient.ResponseSpec
-
-    @BeforeEach
-    fun setUp() {
-        webClient = mockk()
-        webClientBuilder = mockk()
-        every { webClientBuilder.build() } returns webClient
-        requestBodyUriSpec = mockk()
-        requestBodySpec = mockk()
-        requestHeadersSpec = mockk()
-        responseSpec = mockk()
-    }
+    private val sendMessageUrl = "https://api.telegram.org/bot123:ABC/sendMessage"
 
     @Test
-    fun `send should call Telegram Bot API with correct payload`() {
-        val config = createConfig(botToken = "123:ABC", chatId = "87659200")
-        val channel = TelegramChannel(config, webClientBuilder)
-
-        stubWebClient()
-        every { responseSpec.bodyToMono(String::class.java) } returns Mono.just("{\"ok\":true}")
+    fun `send posts the chat id and text to the Bot API`() {
+        val (channel, server) = channel(botToken = "123:ABC", chatId = "87659200")
+        server.expect(requestTo(sendMessageUrl))
+            .andExpect(method(HttpMethod.POST))
+            .andExpect(content().json("""{"chat_id":"87659200","text":"Test Title\nTest body message"}"""))
+            .andRespond(withSuccess("""{"ok":true}""", MediaType.APPLICATION_JSON))
 
         channel.send("Test Title", "Test body message")
 
-        verify(exactly = 1) { webClient.post() }
+        server.verify()
     }
 
     @Test
-    fun `send should be a no-op when bot token is blank`() {
-        val config = createConfig(botToken = "", chatId = "87659200")
-        val channel = TelegramChannel(config, webClientBuilder)
+    fun `send is a no-op when bot token is blank`() {
+        val (channel, server) = channel(botToken = "", chatId = "87659200")
 
         channel.send("Title", "Body")
 
-        verify(exactly = 0) { webClient.post() }
+        server.verify() // no expectations: any request would have failed
     }
 
     @Test
-    fun `send should be a no-op when chat id is blank`() {
-        val config = createConfig(botToken = "123:ABC", chatId = "")
-        val channel = TelegramChannel(config, webClientBuilder)
+    fun `send is a no-op when chat id is blank`() {
+        val (channel, server) = channel(botToken = "123:ABC", chatId = "")
 
         channel.send("Title", "Body")
 
-        verify(exactly = 0) { webClient.post() }
+        server.verify()
     }
 
     @Test
-    fun `send should not propagate exceptions`() {
-        val config = createConfig(botToken = "123:ABC", chatId = "87659200")
-        val channel = TelegramChannel(config, webClientBuilder)
+    fun `send swallows an error status`() {
+        val (channel, server) = channel(botToken = "123:ABC", chatId = "87659200")
+        server.expect(requestTo(sendMessageUrl)).andRespond(withStatus(HttpStatus.UNAUTHORIZED))
 
-        every { webClient.post() } throws RuntimeException("network error")
-
-        // Must not throw
         channel.send("Title", "Body")
     }
 
-    private fun stubWebClient() {
-        every { webClient.post() } returns requestBodyUriSpec
-        every { requestBodyUriSpec.uri(any<String>()) } returns requestBodySpec
-        every { requestBodySpec.bodyValue(any()) } returns requestHeadersSpec
-        every { requestHeadersSpec.retrieve() } returns responseSpec
+    @Test
+    fun `send swallows a network failure`() {
+        val (channel, server) = channel(botToken = "123:ABC", chatId = "87659200")
+        server.expect(requestTo(sendMessageUrl)).andRespond(withException(IOException("connection reset")))
+
+        channel.send("Title", "Body")
+    }
+
+    private fun channel(botToken: String, chatId: String): Pair<TelegramChannel, MockRestServiceServer> {
+        val builder = RestClient.builder()
+        val server = MockRestServiceServer.bindTo(builder).build()
+        return TelegramChannel(createConfig(botToken, chatId), builder) to server
     }
 
     private fun createConfig(botToken: String, chatId: String) = AppProperties(
         notifications = NotificationsConfig(
             admin = NotificationsConfig.AdminConfig(
                 enabled = true,
-                telegram = TelegramConfig(
-                    botToken = botToken,
-                    chatId = chatId
-                )
+                telegram = TelegramConfig(botToken = botToken, chatId = chatId)
             )
         )
     )

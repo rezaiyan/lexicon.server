@@ -38,6 +38,7 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.LocalDate
 import java.time.Instant
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
@@ -88,7 +89,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `POST sync should return 400 when service throws exception`() {
+    fun `POST sync should return 500 when service throws exception`() {
         val request = createSyncRequest()
         `when`(analyticsService.syncSessions(mockUser, request))
             .thenThrow(RuntimeException("sync failed"))
@@ -99,7 +100,7 @@ class AnalyticsControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -148,7 +149,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET insights should return 400 when service throws exception`() {
+    fun `GET insights should return 500 when service throws exception`() {
         `when`(analyticsService.getStudyInsights(mockUser))
             .thenThrow(RuntimeException("database error"))
 
@@ -156,7 +157,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/insights")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -177,7 +178,7 @@ class AnalyticsControllerTest {
                 wordsLeveledDown = 1,
             )
         )
-        `when`(analyticsService.getDailyStats(mockUser, "2024-01-01", "2024-01-07")).thenReturn(stats)
+        `when`(analyticsService.getDailyStats(mockUser, LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-07"))).thenReturn(stats)
 
         mockMvc.perform(
             get("/api/v1/analytics/daily-stats")
@@ -193,10 +194,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET daily-stats should return 400 when service throws exception`() {
-        `when`(analyticsService.getDailyStats(mockUser, "bad-date", "2024-01-07"))
-            .thenThrow(IllegalArgumentException("invalid date format"))
-
+    fun `GET daily-stats should return 400 when a date is malformed`() {
         mockMvc.perform(
             get("/api/v1/analytics/daily-stats")
                 .param("start", "bad-date")
@@ -252,7 +250,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET difficult-words should return 400 when service throws exception`() {
+    fun `GET difficult-words should return 500 when service throws exception`() {
         `when`(analyticsService.getDifficultWords(mockUser, 3, 20))
             .thenThrow(RuntimeException("query failed"))
 
@@ -262,7 +260,7 @@ class AnalyticsControllerTest {
                 .param("limit", "20")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -292,7 +290,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET most-reviewed should return 400 when service throws exception`() {
+    fun `GET most-reviewed should return 500 when service throws exception`() {
         `when`(analyticsService.getMostReviewedWords(mockUser, 10))
             .thenThrow(RuntimeException("query failed"))
 
@@ -301,7 +299,7 @@ class AnalyticsControllerTest {
                 .param("limit", "10")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -331,7 +329,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET accuracy-by-level should return 400 when service throws exception`() {
+    fun `GET accuracy-by-level should return 500 when service throws exception`() {
         `when`(analyticsService.getAccuracyByLevel(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -339,7 +337,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/accuracy-by-level")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -362,7 +360,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET accuracy-by-hour should return 400 when service throws exception`() {
+    fun `GET accuracy-by-hour should return 500 when service throws exception`() {
         `when`(analyticsService.getAccuracyByHour(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -370,7 +368,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/accuracy-by-hour")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -393,7 +391,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET accuracy-by-day-of-week should return 400 when service throws exception`() {
+    fun `GET accuracy-by-day-of-week should return 500 when service throws exception`() {
         `when`(analyticsService.getAccuracyByDayOfWeek(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -401,7 +399,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/accuracy-by-day-of-week")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -436,7 +434,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET sessions should return 400 when service throws exception`() {
+    fun `GET sessions should return 500 when service throws exception`() {
         `when`(analyticsService.getRecentSessions(mockUser, 10))
             .thenThrow(RuntimeException("query failed"))
 
@@ -445,7 +443,7 @@ class AnalyticsControllerTest {
                 .param("limit", "10")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -469,7 +467,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET heatmap should return 400 when service throws exception`() {
+    fun `GET heatmap should return 500 when service throws exception`() {
         `when`(analyticsService.getHeatmap(mockUser, 1704067200000L, 1704672000000L))
             .thenThrow(RuntimeException("query failed"))
 
@@ -479,7 +477,7 @@ class AnalyticsControllerTest {
                 .param("end", "1704672000000")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -501,7 +499,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET level-transitions should return 400 when service throws exception`() {
+    fun `GET level-transitions should return 500 when service throws exception`() {
         `when`(analyticsService.getLevelTransitions(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -509,7 +507,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/level-transitions")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -539,7 +537,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET words-mastered should return 400 when service throws exception`() {
+    fun `GET words-mastered should return 500 when service throws exception`() {
         `when`(analyticsService.getWordsMastered(mockUser, 20))
             .thenThrow(RuntimeException("query failed"))
 
@@ -548,7 +546,7 @@ class AnalyticsControllerTest {
                 .param("limit", "20")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -579,7 +577,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET language-stats should return 400 when service throws exception`() {
+    fun `GET language-stats should return 500 when service throws exception`() {
         `when`(analyticsService.getStatsByLanguagePair(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -587,7 +585,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/language-stats")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -617,7 +615,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET monthly-stats should return 400 when service throws exception`() {
+    fun `GET monthly-stats should return 500 when service throws exception`() {
         `when`(analyticsService.getMonthlyStats(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -625,7 +623,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/monthly-stats")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -649,7 +647,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET response-time-trend should return 400 when service throws exception`() {
+    fun `GET response-time-trend should return 500 when service throws exception`() {
         `when`(analyticsService.getResponseTimeTrend(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -657,7 +655,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/response-time-trend")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -679,7 +677,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET comeback-words should return 400 when service throws exception`() {
+    fun `GET comeback-words should return 500 when service throws exception`() {
         `when`(analyticsService.getComebackWords(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -687,7 +685,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/comeback-words")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -709,7 +707,7 @@ class AnalyticsControllerTest {
     }
 
     @Test
-    fun `GET weekly-report should return 400 when service throws exception`() {
+    fun `GET weekly-report should return 500 when service throws exception`() {
         `when`(analyticsService.getWeeklyReport(mockUser))
             .thenThrow(RuntimeException("query failed"))
 
@@ -717,7 +715,7 @@ class AnalyticsControllerTest {
             get("/api/v1/analytics/weekly-report")
                 .with(authentication(auth))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 

@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.scheduler
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.service.EngagementSegmentScheduler
 import com.alirezaiyan.vokab.server.service.NotificationTimingService
+import com.alirezaiyan.vokab.server.service.ReconcileScope
 import com.alirezaiyan.vokab.server.service.ReviewReminderDispatcher
 import com.alirezaiyan.vokab.server.service.SmartNotificationDispatcher
 import com.alirezaiyan.vokab.server.service.SubscriptionService
@@ -25,7 +26,7 @@ class ScheduledTasks(
     @Scheduled(cron = "0 10 0 * * *")          // 00:10 UTC nightly (before notification refresh)
     fun reconcileSubscriptions() {
         try {
-            val report = subscriptionService.reconcile(userRepository.findIdsLinkedToRevenueCat())
+            val report = subscriptionService.reconcile(ReconcileScope.LINKED)
             logger.info { "Subscription reconcile complete: $report" }
         } catch (e: Exception) {
             logger.error(e) { "Error in subscription reconcile" }

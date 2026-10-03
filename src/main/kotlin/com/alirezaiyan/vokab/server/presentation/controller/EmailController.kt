@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.service.email.EmailSubscriptionService
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @RestController
 @RequestMapping("/api/v1/email")
@@ -17,7 +18,7 @@ class EmailController(
     fun getPreferences(
         @AuthenticationPrincipal user: User
     ): ResponseEntity<ApiResponse<List<EmailPreferenceDto>>> {
-        val prefs = emailSubscriptionService.getPreferences(user.id!!)
+        val prefs = emailSubscriptionService.getPreferences(user.requireId())
             .map { EmailPreferenceDto(category = it.category, subscribed = it.subscribed) }
         return ResponseEntity.ok(ApiResponse(success = true, data = prefs))
     }
@@ -27,7 +28,7 @@ class EmailController(
         @AuthenticationPrincipal user: User,
         @RequestBody request: EmailCategoryRequest
     ): ResponseEntity<ApiResponse<EmailPreferenceDto>> {
-        val sub = emailSubscriptionService.subscribe(user.id!!, request.category)
+        val sub = emailSubscriptionService.subscribe(user.requireId(), request.category)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = EmailPreferenceDto(category = sub.category, subscribed = sub.subscribed))
         )
@@ -38,7 +39,7 @@ class EmailController(
         @AuthenticationPrincipal user: User,
         @RequestBody request: EmailCategoryRequest
     ): ResponseEntity<ApiResponse<EmailPreferenceDto>> {
-        val sub = emailSubscriptionService.unsubscribe(user.id!!, request.category)
+        val sub = emailSubscriptionService.unsubscribe(user.requireId(), request.category)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = EmailPreferenceDto(category = sub.category, subscribed = sub.subscribed))
         )

@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.service
 
 import com.alirezaiyan.vokab.server.domain.repository.NotificationLogRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -21,7 +22,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Service
 class EngagementSegmentService(
-    private val notificationLogRepository: NotificationLogRepository
+    private val notificationLogRepository: NotificationLogRepository,
+    private val clock: Clock
 ) {
     enum class EngagementSegment { HOT, WARM, COOLING, COLD, DORMANT }
 
@@ -44,7 +46,7 @@ class EngagementSegmentService(
             .findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId)
 
         val daysSinceLastOpen = lastOpenLog?.openedAt?.let { openedAt ->
-            ChronoUnit.DAYS.between(openedAt, Instant.now())
+            ChronoUnit.DAYS.between(openedAt, Instant.now(clock))
         }
 
         return when {

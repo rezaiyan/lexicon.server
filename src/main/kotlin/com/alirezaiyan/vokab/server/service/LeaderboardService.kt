@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -46,7 +47,7 @@ class LeaderboardService(
 
         val userInTop = entries.any { it.isCurrentUser }
         val userEntry = if (!userInTop) {
-            val userMastered = wordRepository.countMasteredWordsByUserId(requestingUser.id!!)
+            val userMastered = wordRepository.countMasteredWordsByUserId(requestingUser.requireId())
             val userScore = computeScore(userMastered, requestingUser.currentStreak, requestingUser.longestStreak)
             val userRank = userRepository.findUserRankByScore(userScore, excludedEmails).toInt()
             toEntryDto(
@@ -65,7 +66,7 @@ class LeaderboardService(
     }
 
     private fun toEntryDto(user: User, rank: Int, masteredWords: Int, isCurrentUser: Boolean): LeaderboardEntryDto {
-        val displayName = user.displayAlias ?: aliasGenerator.generate(user.id!!)
+        val displayName = user.displayAlias ?: aliasGenerator.generate(user.requireId())
         return LeaderboardEntryDto(
             rank = rank,
             displayName = displayName,

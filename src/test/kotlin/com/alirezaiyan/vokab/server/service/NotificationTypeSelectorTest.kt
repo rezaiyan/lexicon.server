@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -12,8 +15,6 @@ import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneOffset
 
 class NotificationTypeSelectorTest {
@@ -38,7 +39,8 @@ class NotificationTypeSelectorTest {
             userProgressService,
             analyticsService,
             featureAccessService,
-            milestoneDetector
+            milestoneDetector,
+            clock = fixedClock()
         )
     }
 
@@ -47,12 +49,12 @@ class NotificationTypeSelectorTest {
         // Arrange
         // Compute an offset that guarantees (utcHour + offset + 24) % 24 >= 20.
         // We pick offset so that localHour is always exactly 20 by deriving it from the current UTC hour.
-        val utcHour = java.time.LocalTime.now(ZoneOffset.UTC).hour
+        val utcHour = java.time.LocalTime.ofInstant(TEST_NOW, ZoneOffset.UTC).hour
         // We want (utcHour + offset + 24) % 24 == 20, so offset = (20 - utcHour + 24) % 24
         val offset = (20 - utcHour + 24) % 24
         val user = createUser(currentStreak = 5)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = offset)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { userProgressService.calculateProgressStats(user) } returns createProgressStats(dueCards = 0)
@@ -69,11 +71,11 @@ class NotificationTypeSelectorTest {
     @Test
     fun `selectType should not return STREAK_RISK when user has no streak even at late local hour`() {
         // Arrange
-        val utcHour = java.time.LocalTime.now(ZoneOffset.UTC).hour
+        val utcHour = java.time.LocalTime.ofInstant(TEST_NOW, ZoneOffset.UTC).hour
         val offset = (20 - utcHour + 24) % 24
         val user = createUser(currentStreak = 0)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = offset)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { analyticsService.getWeeklyReport(user) } throws RuntimeException("not monday")
@@ -94,7 +96,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, consecutiveIgnores = 0)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns true
         every { milestoneDetector.hasPendingMilestone(user) } returns true
 
@@ -110,7 +112,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, consecutiveIgnores = 0)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns true
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
@@ -127,7 +129,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, consecutiveIgnores = 0)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns true
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
@@ -147,7 +149,7 @@ class NotificationTypeSelectorTest {
         // timezoneOffsetHrs = 0 so localHour = UTC hour, which is < 20 at most times;
         // use offset=-4 to further reduce effective hour away from 20
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = -4)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { analyticsService.getWeeklyReport(user) } throws RuntimeException("not monday")
@@ -165,7 +167,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser(currentStreak = 0)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = -4)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { analyticsService.getWeeklyReport(user) } throws RuntimeException("not monday")
@@ -184,7 +186,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser(currentStreak = 0)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = -4)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { analyticsService.getWeeklyReport(user) } throws RuntimeException("not monday")
@@ -204,7 +206,7 @@ class NotificationTypeSelectorTest {
         // Arrange
         val user = createUser(currentStreak = 0)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = -4)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { analyticsService.getWeeklyReport(user) } throws RuntimeException("not monday")
@@ -271,7 +273,7 @@ class NotificationTypeSelectorTest {
         // the test degrades gracefully to the fallback NONE path which is also verified.
         val user = createUser(currentStreak = 0)
         val schedule = createSchedule(user, consecutiveIgnores = 0, timezoneOffsetHrs = -4)
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = TEST_TODAY
         val weeklyReport = WeeklyReportResponse(
             cardsReviewed = 50,
             previousWeekCardsReviewed = 30,
@@ -317,8 +319,8 @@ class NotificationTypeSelectorTest {
         currentStreak = currentStreak,
         longestStreak = longestStreak,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createSchedule(

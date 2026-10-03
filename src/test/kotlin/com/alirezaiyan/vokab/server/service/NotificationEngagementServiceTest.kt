@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationLog
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
@@ -36,7 +39,8 @@ class NotificationEngagementServiceTest {
         notificationEngagementService = NotificationEngagementService(
             notificationLogRepository,
             notificationScheduleRepository,
-            userSettingsRepository
+            userSettingsRepository,
+            clock = fixedClock()
         )
     }
 
@@ -66,7 +70,7 @@ class NotificationEngagementServiceTest {
     fun `recordOpen should not update if notification already opened`() {
         // Arrange
         val userId = 1L
-        val alreadyOpenedAt = Instant.now().minusSeconds(3600)
+        val alreadyOpenedAt = TEST_NOW.minusSeconds(3600)
         val log = createNotificationLog(id = 10L, userId = userId, openedAt = alreadyOpenedAt)
         val schedule = createSchedule(createUser(id = userId))
         every { notificationLogRepository.findById(10L) } returns Optional.of(log)
@@ -124,7 +128,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val userId = 1L
         val log = createNotificationLog(id = 10L, userId = userId, openedAt = null)
-        val schedule = createSchedule(createUser(id = userId), suppressedUntil = LocalDate.now().plusDays(5))
+        val schedule = createSchedule(createUser(id = userId), suppressedUntil = TEST_TODAY.plusDays(5))
         every { notificationLogRepository.findById(10L) } returns Optional.of(log)
         every { notificationLogRepository.save(log) } returns log
         every { notificationScheduleRepository.findByUserId(userId) } returns schedule
@@ -159,7 +163,7 @@ class NotificationEngagementServiceTest {
     fun `recordSend should increment consecutiveIgnores when previous not opened`() {
         // Arrange
         val user = createUser(id = 1L)
-        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -192,7 +196,7 @@ class NotificationEngagementServiceTest {
     fun `recordSend should increment when no log but previously sent (log insert failed)`() {
         // Arrange — no log but lastSentDate is set means a previous send happened (log failed to save)
         val user = createUser(id = 1L)
-        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = TEST_TODAY.minusDays(1))
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns null
         every { notificationScheduleRepository.save(schedule) } returns schedule
         every { userSettingsRepository.findByUserId(1L) } returns null
@@ -209,7 +213,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 0; after incrementing = 1 → 1-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -220,7 +224,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(1, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1)
+        val expectedDate = TEST_TODAY.plusDays(1)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -229,7 +233,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 1; after incrementing = 2 → 2-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 1, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 1, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -240,7 +244,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(2, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(2)
+        val expectedDate = TEST_TODAY.plusDays(2)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -249,7 +253,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 2; after incrementing = 3 → 3-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 2, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 2, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -260,7 +264,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(3, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(3)
+        val expectedDate = TEST_TODAY.plusDays(3)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -269,7 +273,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 5; after incrementing = 6 → 7-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 5, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 5, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -280,7 +284,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(6, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(7)
+        val expectedDate = TEST_TODAY.plusDays(7)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -289,7 +293,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 9; after incrementing = 10 → 14-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 9, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 9, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -300,7 +304,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(10, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(14)
+        val expectedDate = TEST_TODAY.plusDays(14)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -309,7 +313,7 @@ class NotificationEngagementServiceTest {
         // Arrange
         val user = createUser(id = 1L)
         // consecutiveIgnores is 14; after incrementing = 15 → 30-day suppression
-        val schedule = createSchedule(user, consecutiveIgnores = 14, lastSentDate = LocalDate.now(java.time.ZoneOffset.UTC).minusDays(1))
+        val schedule = createSchedule(user, consecutiveIgnores = 14, lastSentDate = TEST_TODAY.minusDays(1))
         val previousLog = createNotificationLog(userId = 1L, openedAt = null)
         every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
         every { notificationScheduleRepository.save(schedule) } returns schedule
@@ -320,7 +324,7 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(15, schedule.consecutiveIgnores)
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(30)
+        val expectedDate = TEST_TODAY.plusDays(30)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -338,7 +342,7 @@ class NotificationEngagementServiceTest {
         notificationEngagementService.recordSend(schedule, "DAILY_INSIGHT")
 
         // Assert
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(1)
+        val expectedDate = TEST_TODAY.plusDays(1)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -356,7 +360,7 @@ class NotificationEngagementServiceTest {
         notificationEngagementService.recordSend(schedule, "DAILY_INSIGHT")
 
         // Assert
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(6)
+        val expectedDate = TEST_TODAY.plusDays(6)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -374,7 +378,7 @@ class NotificationEngagementServiceTest {
         notificationEngagementService.recordSend(schedule, "DAILY_INSIGHT")
 
         // Assert
-        val expectedDate = LocalDate.now(java.time.ZoneOffset.UTC).plusDays(365)
+        val expectedDate = TEST_TODAY.plusDays(365)
         assertEquals(expectedDate, schedule.suppressedUntil)
     }
 
@@ -399,10 +403,10 @@ class NotificationEngagementServiceTest {
     fun `getEngagementStats should return correct open rate`() {
         // Arrange
         val userId = 1L
-        val since = Instant.now().minusSeconds(60 * 60 * 24 * 30)
+        val since = TEST_NOW.minusSeconds(60 * 60 * 24 * 30)
         val logs = listOf(
-            createNotificationLog(userId = userId, openedAt = Instant.now()),
-            createNotificationLog(userId = userId, openedAt = Instant.now()),
+            createNotificationLog(userId = userId, openedAt = TEST_NOW),
+            createNotificationLog(userId = userId, openedAt = TEST_NOW),
             createNotificationLog(userId = userId, openedAt = null),
             createNotificationLog(userId = userId, openedAt = null)
         )
@@ -496,7 +500,7 @@ class NotificationEngagementServiceTest {
         val userId   = 1L
         val log      = createNotificationLog(id = 10L, userId = userId, openedAt = null)
         val schedule = createSchedule(createUser(id = userId)).apply {
-            aiDecidedAt = Instant.now().minusSeconds(3600)
+            aiDecidedAt = TEST_NOW.minusSeconds(3600)
         }
         every { notificationLogRepository.findById(10L) } returns Optional.of(log)
         every { notificationLogRepository.save(log) } returns log
@@ -513,7 +517,7 @@ class NotificationEngagementServiceTest {
     @Test
     fun `getDaysSinceLastOpen should return days since last open`() {
         val userId     = 1L
-        val fiveDaysAgo = Instant.now().minusSeconds(60L * 60 * 24 * 5)
+        val fiveDaysAgo = TEST_NOW.minusSeconds(60L * 60 * 24 * 5)
         val log        = createNotificationLog(userId = userId, openedAt = fiveDaysAgo)
         every {
             notificationLogRepository.findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId)
@@ -549,8 +553,8 @@ class NotificationEngagementServiceTest {
         currentStreak = 0,
         longestStreak = 0,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createSchedule(

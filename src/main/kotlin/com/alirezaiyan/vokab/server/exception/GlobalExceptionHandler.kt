@@ -29,6 +29,50 @@ class GlobalExceptionHandler {
             .body(ApiResponse(success = false, message = ex.message ?: "Invalid argument"))
     }
 
+    @ExceptionHandler(UserFacingException::class)
+    fun handleUserFacingException(ex: UserFacingException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn(ex.cause) { "UserFacingException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse(success = false, message = ex.message))
+    }
+
+    @ExceptionHandler(PremiumRequiredException::class)
+    fun handlePremiumRequiredException(ex: PremiumRequiredException): ResponseEntity<ApiResponse<Unit>> {
+        logger.info { "PremiumRequiredException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.PAYMENT_REQUIRED)
+            .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.PREMIUM_REQUIRED))
+    }
+
+    @ExceptionHandler(RateLimitExceededException::class)
+    fun handleRateLimitExceededException(ex: RateLimitExceededException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn { "RateLimitExceededException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.TOO_MANY_REQUESTS)
+            .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.RATE_LIMITED))
+    }
+
+    @ExceptionHandler(UpstreamServiceException::class)
+    fun handleUpstreamServiceException(ex: UpstreamServiceException): ResponseEntity<ApiResponse<Unit>> {
+        logger.error { "UpstreamServiceException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.BAD_GATEWAY)
+            .body(ApiResponse(
+                success = false,
+                message = "A service we depend on is unavailable. Please try again shortly.",
+                code = ApiErrorCode.UPSTREAM_UNAVAILABLE,
+            ))
+    }
+
+    @ExceptionHandler(AuthRejectedException::class)
+    fun handleAuthRejectedException(ex: AuthRejectedException): ResponseEntity<ApiResponse<Unit>> {
+        logger.warn { "AuthRejectedException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(ApiResponse(success = false, message = ex.message))
+    }
+
     @ExceptionHandler(AuthenticationException::class)
     fun handleAuthenticationException(ex: AuthenticationException): ResponseEntity<ApiResponse<Unit>> {
         logger.warn { "AuthenticationException: ${ex.message}" }

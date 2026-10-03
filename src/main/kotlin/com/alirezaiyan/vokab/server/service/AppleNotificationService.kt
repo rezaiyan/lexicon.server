@@ -7,9 +7,12 @@ import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -25,7 +28,8 @@ class AppleNotificationService(
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
     private val objectMapper: ObjectMapper,
     private val pushNotificationService: PushNotificationService,
-    private val authService: AuthService
+    private val authService: AuthService,
+    private val clock: Clock
 ) {
     
     /**
@@ -85,7 +89,7 @@ class AppleNotificationService(
      * Handle email-disabled event
      * User stopped sharing their email or switched to private relay
      */
-    private fun handleEmailDisabled(user: com.alirezaiyan.vokab.server.domain.entity.User, event: EmailDisabledEvent?) {
+    private fun handleEmailDisabled(user: User, event: EmailDisabledEvent?) {
         logger.info { "Email disabled for userId=${user.id}" }
 
         if (event != null) {
@@ -93,12 +97,9 @@ class AppleNotificationService(
         }
         
         // Update user record to note the change
-        val updatedUser = user.copy(
-            updatedAt = Instant.now()
-            // Note: We keep the original email for account continuity
-            // Apple will provide the new relay email on next sign-in
-        )
-        userRepository.save(updatedUser)
+        // Keep the original email for account continuity; Apple sends the new relay email on next sign-in
+        user.updatedAt = Instant.now(clock)
+        userRepository.save(user)
         
         logger.info { "✅ Processed email-disabled event for user: ${user.id}" }
     }
@@ -107,18 +108,16 @@ class AppleNotificationService(
      * Handle email-enabled event
      * User started sharing their real email
      */
-    private fun handleEmailEnabled(user: com.alirezaiyan.vokab.server.domain.entity.User, event: EmailEnabledEvent?) {
+    private fun handleEmailEnabled(user: User, event: EmailEnabledEvent?) {
         logger.info { "Email enabled for userId=${user.id}" }
 
         if (event != null) {
             logger.info { "  Is private relay: ${event.is_private_email}" }
 
             // Update user with the new email
-            val updatedUser = user.copy(
-                email = event.email,
-                updatedAt = Instant.now()
-            )
-            userRepository.save(updatedUser)
+            user.email = event.email
+            user.updatedAt = Instant.now(clock)
+            userRepository.save(user)
             logger.info { "✅ Updated user email" }
         }
     }
@@ -127,7 +126,7 @@ class AppleNotificationService(
      * Handle consent-revoked event
      * User revoked app's access - we should deactivate their account
      */
-    private fun handleConsentRevoked(user: com.alirezaiyan.vokab.server.domain.entity.User, event: ConsentRevokedEvent?) {
+    private fun handleConsentRevoked(user: User, event: ConsentRevokedEvent?) {
         logger.info { "Consent revoked for userId=${user.id}" }
         logger.info { "  Reason: ${event?.reason ?: "Not provided"}" }
         
@@ -135,7 +134,7 @@ class AppleNotificationService(
         // This ensures all devices are notified that the account access has been revoked
         try {
             val notificationResults = pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
+                userId = user.requireId(),
                 title = "Account Access Revoked",
                 body = "Your account access has been revoked. Please sign in again.",
                 data = mapOf(
@@ -151,11 +150,9 @@ class AppleNotificationService(
         }
         
         // Mark user as inactive but don't delete data
-        val updatedUser = user.copy(
-            active = false,
-            updatedAt = Instant.now()
-        )
-        userRepository.save(updatedUser)
+        user.active = false
+        user.updatedAt = Instant.now(clock)
+        userRepository.save(user)
         
         logger.info { "✅ Deactivated user account: ${user.id}" }
     }
@@ -165,11 +162,11 @@ class AppleNotificationService(
      * User permanently deleted their Apple ID
      * According to Apple's guidelines, we should delete user data
      */
-    private fun handleAccountDelete(user: com.alirezaiyan.vokab.server.domain.entity.User, event: AccountDeleteEvent?) {
+    private fun handleAccountDelete(user: User, event: AccountDeleteEvent?) {
         logger.info { "Account deletion requested for userId=${user.id}, reason: ${event?.reason ?: "Not provided"}" }
 
         // Delegate to the shared hard-delete flow (push notification + Firebase + RevenueCat + all local data)
-        authService.deleteAccount(user.id!!)
+        authService.deleteAccount(user.requireId())
 
         logger.info { "✅ Processed account deletion for user: ${user.id}" }
     }

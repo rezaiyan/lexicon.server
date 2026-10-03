@@ -10,11 +10,13 @@ import com.alirezaiyan.vokab.server.domain.repository.PushTokenRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -28,7 +30,8 @@ class StreakNotificationService(
     private val openRouterService: OpenRouterService,
     private val pushNotificationService: PushNotificationService,
     private val userProgressService: UserProgressService,
-    private val notificationLogRepository: NotificationLogRepository
+    private val notificationLogRepository: NotificationLogRepository,
+    private val clock: Clock
 ) {
 
     /**
@@ -70,7 +73,7 @@ class StreakNotificationService(
      */
     @Transactional(readOnly = true)
     fun getUsersNeedingNotifications(): List<User> {
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         val todayStr = today.toString()
         val startOfToday = today.atStartOfDay().toInstant(ZoneOffset.UTC)
 
@@ -109,7 +112,8 @@ class StreakNotificationService(
 
             logger.debug { "User=${user.id} has ${pushTokens.size} active push token(s)" }
 
-            val streakInfo = streakService.getUserStreak(user.id!!)
+            val userId = user.requireId()
+            val streakInfo = streakService.getUserStreak(userId)
             val currentStreak = streakInfo.currentStreak
 
             if (!isMilestoneStreak(currentStreak)) {
@@ -122,10 +126,10 @@ class StreakNotificationService(
                 currentStreak = currentStreak,
                 progressStats = progressStats,
                 userName = user.name
-            ).block() ?: getDefaultStreakMessage(currentStreak)
+            )
 
             val responses = pushNotificationService.sendNotificationToUser(
-                userId = user.id,
+                userId = userId,
                 title = "🔥 Don't Lose Your Streak!",
                 body = message,
                 data = mapOf(
@@ -178,20 +182,5 @@ class StreakNotificationService(
 
         logger.info { "Sent $sentCount streak reset notifications" }
         return sentCount
-    }
-
-    /**
-     * Default message fallback if AI generation fails.
-     */
-    private fun getDefaultStreakMessage(streak: Int): String {
-        return when {
-            streak >= 100 -> "You're on a $streak-day streak! 🏆 Keep it going - log in today!"
-            streak >= 50 -> "Amazing $streak-day streak! 💪 Don't let it slip away - review now!"
-            streak >= 20 -> "Wow! $streak days strong! 🔥 Your streak needs you today!"
-            streak >= 10 -> "$streak days of dedication! 🌟 Log in to keep your streak alive!"
-            streak >= 5 -> "You've built a $streak-day streak! 💫 Keep it going today!"
-            streak >= 3 -> "Nice $streak-day streak! ✨ Don't miss today!"
-            else -> "Your $streak-day streak is waiting! 🎯 Log in now to keep it going!"
-        }
     }
 }

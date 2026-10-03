@@ -1,20 +1,17 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.config.AppProperties
+import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.bodyToMono
 
 private val logger = KotlinLogging.logger {}
 
 /**
- * Calls Claude Haiku via OpenRouter to decide the notification strategy for a
- * COLD or DORMANT user. Result is cached on NotificationSchedule for 7 days.
+ * Asks the configured OpenRouter model (through [OpenRouterService], so the shared timeout applies)
+ * to decide the notification strategy for a COLD or DORMANT user. Result is cached on
+ * NotificationSchedule for 7 days.
  *
  * Decision is deliberately simple and structured — AI picks one of three actions
  * and one of five content angles. No free-text generation; templates handle copy.
@@ -24,7 +21,7 @@ private val logger = KotlinLogging.logger {}
  */
 @Service
 class NotificationAiAdvisor(
-    private val appProperties: AppProperties,
+    private val openRouterService: OpenRouterService,
     private val objectMapper: ObjectMapper
 ) {
     data class UserNotificationContext(
@@ -46,39 +43,11 @@ class NotificationAiAdvisor(
     )
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class OpenRouterRequest(val model: String, val messages: List<Message>)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class Message(val role: String, val content: String)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class OpenRouterResponse(val choices: List<Choice>?, val error: ErrorBody?)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class Choice(val message: MessageBody)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class MessageBody(val content: String)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private data class ErrorBody(val message: String)
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
     private data class AiResponse(
         val action: String = "send",
         val intervalDays: Int = 3,
         val contentHint: String? = null
     )
-
-    private val webClient: WebClient by lazy {
-        WebClient.builder()
-            .baseUrl(appProperties.openrouter.baseUrl)
-            .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer ${appProperties.openrouter.apiKey}")
-            .defaultHeader("HTTP-Referer", "https://vokab.app")
-            .defaultHeader("X-Title", "Vokab")
-            .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-            .build()
-    }
 
     private val validActions   = setOf("send", "pause", "motivate")
     private val validHints     = setOf("loss_aversion", "curiosity", "social_proof", "fresh_start", "achievement")
@@ -89,13 +58,17 @@ class NotificationAiAdvisor(
      */
     fun advise(context: UserNotificationContext): AiAdvice {
         val prompt = buildPrompt(context)
-        return runCatching {
-            val raw = callOpenRouter(prompt)
-            parseResponse(raw, context.userId)
-        }.getOrElse { e ->
-            logger.warn(e) { "AI advisor failed for user=${context.userId} — using default advice" }
-            defaultAdvice
+        val raw = try {
+            openRouterService.complete(prompt, "notification advice")
+        } catch (e: UpstreamServiceException) {
+            logger.warn { "AI advisor unavailable for user=${context.userId} — using default advice: ${e.message}" }
+            return defaultAdvice
         }
+        if (raw == null) {
+            logger.warn { "AI advisor returned no text for user=${context.userId} — using default advice" }
+            return defaultAdvice
+        }
+        return parseResponse(raw, context.userId)
     }
 
     private fun buildPrompt(ctx: UserNotificationContext): String = """
@@ -128,26 +101,6 @@ class NotificationAiAdvisor(
         Respond with ONLY valid JSON, no explanation, no markdown:
         {"action":"...","intervalDays":N,"contentHint":"..." or null}
     """.trimIndent()
-
-    internal fun callOpenRouter(prompt: String): String {
-        val request = OpenRouterRequest(
-            model = "anthropic/claude-haiku-4.5",
-            messages = listOf(Message(role = "user", content = prompt))
-        )
-        val response = webClient.post()
-            .uri("/chat/completions")
-            .bodyValue(request)
-            .retrieve()
-            .bodyToMono<OpenRouterResponse>()
-            .block()
-            ?: error("OpenRouter returned null response")
-
-        if (response.error != null) {
-            error("OpenRouter error: ${response.error.message}")
-        }
-        return response.choices?.firstOrNull()?.message?.content
-            ?: error("OpenRouter returned empty choices")
-    }
 
     internal fun parseResponse(raw: String, userId: Long): AiAdvice {
         val aiResponse = runCatching {

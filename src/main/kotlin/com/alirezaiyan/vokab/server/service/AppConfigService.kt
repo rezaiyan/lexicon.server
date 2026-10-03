@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.domain.entity.AppConfigHistory
 import com.alirezaiyan.vokab.server.domain.repository.AppConfigHistoryRepository
 import com.alirezaiyan.vokab.server.domain.repository.AppConfigRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -17,7 +18,8 @@ private const val CACHE_TTL_SECONDS = 30L
 @Service
 class AppConfigService(
     private val appConfigRepository: AppConfigRepository,
-    private val appConfigHistoryRepository: AppConfigHistoryRepository
+    private val appConfigHistoryRepository: AppConfigHistoryRepository,
+    private val clock: Clock
 ) {
     private data class CacheEntry(val value: String?, val expiresAt: Instant)
 
@@ -32,11 +34,11 @@ class AppConfigService(
     fun get(namespace: String, key: String): String? {
         val cacheKey = "$namespace:$key"
         val entry = cache[cacheKey]
-        if (entry != null && entry.expiresAt.isAfter(Instant.now())) {
+        if (entry != null && entry.expiresAt.isAfter(Instant.now(clock))) {
             return entry.value
         }
         val value = appConfigRepository.findByNamespaceAndKeyAndEnabledTrue(namespace, key)?.value
-        cache[cacheKey] = CacheEntry(value, Instant.now().plusSeconds(CACHE_TTL_SECONDS))
+        cache[cacheKey] = CacheEntry(value, Instant.now(clock).plusSeconds(CACHE_TTL_SECONDS))
         return value
     }
 
@@ -56,7 +58,9 @@ class AppConfigService(
         val config = appConfigRepository.findByNamespaceAndKey(namespace, key)
             ?: throw NoSuchElementException("Config not found: $namespace/$key")
         val oldValue = config.value
-        val updated = appConfigRepository.save(config.copy(value = value, updatedAt = Instant.now()))
+        config.value = value
+        config.updatedAt = Instant.now(clock)
+        val updated = appConfigRepository.save(config)
         appConfigHistoryRepository.save(
             AppConfigHistory(
                 namespace = namespace,

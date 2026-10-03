@@ -13,16 +13,20 @@ import com.alirezaiyan.vokab.server.domain.repository.UserPlatformRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.AuthResponse
 import com.alirezaiyan.vokab.server.presentation.dto.UserDto
+import com.alirezaiyan.vokab.server.exception.AuthRejectedException
 import com.alirezaiyan.vokab.server.security.AppleIdTokenVerifier
+import com.alirezaiyan.vokab.server.security.FirebaseIdClaims
+import com.alirezaiyan.vokab.server.security.FirebaseIdTokenVerifier
 import com.alirezaiyan.vokab.server.security.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.service.event.DomainEventPublisher
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseToken
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -40,6 +44,7 @@ class AuthService(
     private val jwtTokenProvider: RS256JwtTokenProvider,
     private val refreshTokenHashService: RefreshTokenHashService,
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
+    private val firebaseIdTokenVerifier: FirebaseIdTokenVerifier,
     private val userPlatformRepository: UserPlatformRepository,
     private val userDataPurger: UserDataPurger,
     private val pushNotificationService: PushNotificationService,
@@ -50,6 +55,7 @@ class AuthService(
     private val eventService: EventService,
     private val domainEventPublisher: DomainEventPublisher,
     private val geoLocationService: GeoLocationService,
+    private val clock: Clock,
 ) {
 
     /** Request metadata recorded on every interactive sign-in. */
@@ -69,7 +75,7 @@ class AuthService(
      * Authenticates with a Firebase ID token from Google Sign-In. Finds the user by Google id,
      * links by email, or creates a new one.
      *
-     * @throws IllegalArgumentException if the token is invalid or carries no email
+     * @throws AuthRejectedException if the token is invalid or carries no email
      */
     @Transactional
     fun authenticateWithGoogle(
@@ -78,13 +84,13 @@ class AuthService(
         appVersion: String? = null,
         ipAddress: String? = null,
     ): AuthResponse {
-        val firebaseToken = verifyFirebaseToken(idToken)
-            ?: throw IllegalArgumentException("Invalid Firebase ID token")
-        val email = firebaseToken.email
-            ?: throw IllegalArgumentException("Email not found in Firebase token")
+        val claims = firebaseIdTokenVerifier.verify(idToken)
+            ?: throw AuthRejectedException("Invalid Firebase ID token")
+        val email = claims.email
+            ?: throw AuthRejectedException("Email not found in Firebase token")
 
         logger.info { "Authenticating user" }
-        val user = findOrCreateGoogleUser(firebaseToken, email)
+        val user = findOrCreateGoogleUser(claims, email)
         return completeSignIn(user, SignInContext(SignInProvider.GOOGLE, platform, appVersion, ipAddress))
     }
 
@@ -94,7 +100,7 @@ class AuthService(
      * When the user hides their email, a stable fallback address derived from `sub` is used.
      *
      * @param fullName only sent by Apple on the very first sign-in
-     * @throws IllegalArgumentException if the token is invalid or doesn't match [appleUserId]
+     * @throws AuthRejectedException if the token is invalid or doesn't match [appleUserId]
      */
     @Transactional
     fun authenticateWithApple(
@@ -106,10 +112,10 @@ class AuthService(
         ipAddress: String? = null,
     ): AuthResponse {
         val claims = appleIdTokenVerifier.verify(idToken)
-            ?: throw IllegalArgumentException("Invalid Apple ID token")
+            ?: throw AuthRejectedException("Invalid Apple ID token")
         if (appleUserId != null && appleUserId != claims.subject) {
             logger.warn { "Apple sign-in rejected: client user identifier does not match token subject" }
-            throw IllegalArgumentException("Invalid Apple ID token")
+            throw AuthRejectedException("Invalid Apple ID token")
         }
 
         val appleId = claims.subject
@@ -132,9 +138,9 @@ class AuthService(
         val email = appProperties.ciAuth.testEmail
         logger.info { "CI authentication for test user (premium=$premium)" }
 
-        val now = Instant.now()
+        val now = Instant.now(clock)
         val user = userRepository.findByEmail(email).orElse(null)
-            ?.copy(lastLoginAt = now, updatedAt = now)
+            ?.also { it.recordLogin(now) }
             ?: User(email = email, name = "CI Test User", lastLoginAt = now)
                 .also { logger.info { "Creating new CI test user" } }
 
@@ -152,23 +158,24 @@ class AuthService(
      * Rotates tokens: issues a new access + refresh token and shortens the old refresh token to a
      * grace window, so a client that crashes before persisting the new pair can retry.
      *
-     * @throws IllegalArgumentException if the refresh token is unknown, revoked or expired
+     * @throws AuthRejectedException if the refresh token is unknown, revoked or expired
      */
     @Transactional
     fun refreshAccessToken(refreshToken: String): AuthResponse {
         val lookupHash = refreshTokenHashService.createLookupHash(refreshToken)
         val tokenEntity = refreshTokenRepository.findByTokenHash(lookupHash)
-            .orElseThrow { IllegalArgumentException("Refresh token not found") }
+            .orElseThrow { AuthRejectedException("Refresh token not found") }
 
-        require(!tokenEntity.revoked) { "Refresh token has been revoked" }
-        require(tokenEntity.expiresAt.isAfter(Instant.now())) { "Refresh token has expired" }
+        if (tokenEntity.revoked) throw AuthRejectedException("Refresh token has been revoked")
+        if (!tokenEntity.expiresAt.isAfter(Instant.now(clock))) throw AuthRejectedException("Refresh token has expired")
 
         val user = tokenEntity.user
         val userId = user.requireId()
         val response = issueTokens(user, userId)
 
-        val graceUntil = Instant.now().plusMillis(appProperties.jwt.refreshTokenGracePeriodMs)
-        refreshTokenRepository.save(tokenEntity.copy(expiresAt = graceUntil))
+        val graceUntil = Instant.now(clock).plusMillis(appProperties.jwt.refreshTokenGracePeriodMs)
+        tokenEntity.expiresAt = graceUntil
+        refreshTokenRepository.save(tokenEntity)
 
         logger.info { "✅ Tokens rotated for userId=$userId" }
         auditLogService.logRefresh(userId, user.email, "N/A", null, null)
@@ -305,7 +312,7 @@ class AuthService(
             RefreshToken(
                 tokenHash = refreshTokenHashService.createLookupHash(refreshToken),
                 user = user,
-                expiresAt = Instant.now().plusMillis(appProperties.jwt.refreshExpirationMs),
+                expiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshExpirationMs),
             )
         )
         return AuthResponse(
@@ -316,14 +323,18 @@ class AuthService(
         )
     }
 
-    private fun findOrCreateGoogleUser(token: FirebaseToken, email: String): User {
-        val now = Instant.now()
+    private fun findOrCreateGoogleUser(token: FirebaseIdClaims, email: String): User {
+        val now = Instant.now(clock)
         val name = token.name ?: email
         val user = userRepository.findByGoogleId(token.uid).orElse(null)
-            ?.copy(lastLoginAt = now, updatedAt = now)
+            ?.also { it.recordLogin(now) }
             ?: userRepository.findByEmail(email).orElse(null)?.let { existing ->
                 logger.info { "Linking Google account to existing userId=${existing.id}" }
-                existing.copy(googleId = token.uid, name = name, lastLoginAt = now, updatedAt = now)
+                existing.also {
+                    it.googleId = token.uid
+                    it.name = name
+                    it.recordLogin(now)
+                }
             }
             ?: User(email = email, name = name, googleId = token.uid, lastLoginAt = now)
                 .also { logger.info { "Creating new user" } }
@@ -336,25 +347,29 @@ class AuthService(
      * stored email: Apple omitting the claim must not replace a real address with the fallback.
      */
     private fun findOrCreateAppleUser(appleId: String, email: String, fullName: String?, emailHidden: Boolean): User {
-        val now = Instant.now()
+        val now = Instant.now(clock)
         val user = userRepository.findByAppleId(appleId).orElse(null)
-            ?.copy(lastLoginAt = now, updatedAt = now)
+            ?.also { it.recordLogin(now) }
             ?: (if (emailHidden) null else userRepository.findByEmail(email).orElse(null))?.let { existing ->
                 logger.info { "Linking Apple account to userId=${existing.id}" }
-                existing.copy(appleId = appleId, name = fullName ?: existing.name, lastLoginAt = now, updatedAt = now)
+                existing.also {
+                    it.appleId = appleId
+                    if (fullName != null) it.name = fullName
+                    it.recordLogin(now)
+                }
             }
             ?: User(email = email, name = fullName ?: email.substringBefore("@"), appleId = appleId, lastLoginAt = now)
                 .also { logger.info { "Creating new user with Apple (emailHidden=$emailHidden)" } }
         return applyTestUserPremiumAccess(user)
     }
 
+    private fun User.recordLogin(now: Instant) {
+        lastLoginAt = now
+        updatedAt = now
+    }
+
     private fun hiddenAppleEmail(appleId: String): String =
         "apple_${appleId.replace(".", "_").replace(" ", "_")}@apple.hidden"
-
-    private fun verifyFirebaseToken(idToken: String): FirebaseToken? =
-        runCatching { FirebaseAuth.getInstance().verifyIdToken(idToken) }
-            .onFailure { logger.warn { "Firebase token verification failed: ${it.message}" } }
-            .getOrNull()
 
     private fun recordPlatform(userId: Long, platform: String?, appVersion: String?) {
         if (platform.isNullOrBlank()) return
@@ -407,7 +422,7 @@ class AuthService(
     private fun applyTestUserPremiumAccess(user: User): User {
         if (isTestUser(user.email)) {
             logger.info { "Granting premium access to test user: userId=${user.id}" }
-            val farFuture = Instant.now().plusSeconds(100L * 365 * 24 * 60 * 60)
+            val farFuture = Instant.now(clock).plusSeconds(100L * 365 * 24 * 60 * 60)
             return withGrant(user, farFuture, GRANT_REASON_TEST_EMAIL)
         }
         if (user.premiumGrantReason == GRANT_REASON_TEST_EMAIL) {
@@ -432,16 +447,16 @@ class AuthService(
      * (id == null) get them through the INSERT.
      */
     private fun withGrant(user: User, until: Instant?, reason: String?): User {
-        user.id?.let { userRepository.updateGrant(it, until, reason, Instant.now()) }
-        return user.copy(premiumGrantUntil = until, premiumGrantReason = reason)
+        user.id?.let { userRepository.updateGrant(it, until, reason, Instant.now(clock)) }
+        user.mirrorGrant(until, reason)
+        return user
     }
 
     private fun withSubscription(user: User, status: SubscriptionStatus, expiresAt: Instant?): User {
-        user.id?.let { userRepository.updateSubscription(it, status, expiresAt, Instant.now()) }
-        return user.copy(subscriptionStatus = status, subscriptionExpiresAt = expiresAt)
+        user.id?.let { userRepository.updateSubscription(it, status, expiresAt, Instant.now(clock)) }
+        user.mirrorSubscription(status, expiresAt)
+        return user
     }
-
-    private fun User.requireId(): Long = requireNotNull(id) { "User id must not be null after save" }
 
     private fun User.toDto(userId: Long): UserDto = UserDto(
         id = userId,

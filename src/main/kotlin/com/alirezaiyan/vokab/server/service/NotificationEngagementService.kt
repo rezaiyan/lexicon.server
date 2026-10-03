@@ -10,12 +10,13 @@ import com.alirezaiyan.vokab.server.presentation.dto.NotificationAdminStatsDto
 import com.alirezaiyan.vokab.server.presentation.dto.SuppressedUsersDto
 import com.alirezaiyan.vokab.server.presentation.dto.TypeStatsDto
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -23,7 +24,8 @@ private val logger = KotlinLogging.logger {}
 class NotificationEngagementService(
     private val notificationLogRepository: NotificationLogRepository,
     private val notificationScheduleRepository: NotificationScheduleRepository,
-    private val userSettingsRepository: UserSettingsRepository
+    private val userSettingsRepository: UserSettingsRepository,
+    private val clock: Clock
 ) {
     /**
      * Called when a user taps a notification.
@@ -35,7 +37,7 @@ class NotificationEngagementService(
     fun recordOpen(userId: Long, notificationLogId: Long) {
         notificationLogRepository.findById(notificationLogId).ifPresent { log ->
             if (log.userId == userId && log.openedAt == null) {
-                log.openedAt = Instant.now()
+                log.openedAt = Instant.now(clock)
                 notificationLogRepository.save(log)
             }
         }
@@ -47,7 +49,7 @@ class NotificationEngagementService(
             schedule.engagementSegment  = "WARM"
             // Invalidate AI cache — next nightly batch will re-query if user goes cold again
             schedule.aiDecidedAt        = null
-            schedule.updatedAt          = Instant.now()
+            schedule.updatedAt          = Instant.now(clock)
             notificationScheduleRepository.save(schedule)
         }
 
@@ -73,7 +75,7 @@ class NotificationEngagementService(
         schedule: NotificationSchedule,
         notificationType: String
     ) {
-        val userId = schedule.user.id!!
+        val userId = schedule.user.requireId()
 
         // Increment ignore counter if a notification was previously sent and the user didn't open it.
         // Uses lastSentDate as the "sent-before" signal so suppression works even when saveLog fails.
@@ -95,9 +97,9 @@ class NotificationEngagementService(
             }
         }
 
-        schedule.lastSentDate = LocalDate.now(ZoneOffset.UTC)
+        schedule.lastSentDate = LocalDate.now(clock)
         schedule.lastSentType = notificationType
-        schedule.updatedAt = Instant.now()
+        schedule.updatedAt = Instant.now(clock)
         notificationScheduleRepository.save(schedule)
 
         logger.debug { "Notification send recorded: user=$userId type=$notificationType" }
@@ -127,7 +129,7 @@ class NotificationEngagementService(
     }
 
     private fun computeSuppressedUntil(ignoreCount: Int): LocalDate? {
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = LocalDate.now(clock)
         return when {
             ignoreCount < 1  -> null
             ignoreCount <= 2 -> today.plusDays(ignoreCount.toLong()) // 1st→+1d, 2nd→+2d
@@ -140,7 +142,7 @@ class NotificationEngagementService(
 
     private fun computeFrequencySuppression(userId: Long): LocalDate? {
         val settings = userSettingsRepository.findByUserId(userId) ?: return null
-        val today = LocalDate.now(ZoneOffset.UTC)
+        val today = LocalDate.now(clock)
         return when (settings.notificationFrequency) {
             "EVERY_OTHER_DAY" -> today.plusDays(1)
             "WEEKLY"          -> today.plusDays(6)
@@ -154,7 +156,7 @@ class NotificationEngagementService(
      */
     @Transactional(readOnly = true)
     fun getEngagementStats(userId: Long, windowDays: Long = 30): EngagementStats {
-        val since = Instant.now().minus(windowDays, ChronoUnit.DAYS)
+        val since = Instant.now(clock).minus(windowDays, ChronoUnit.DAYS)
         val recentLogs = notificationLogRepository.findRecentByUserId(userId, since)
         val totalSent   = recentLogs.size
         val totalOpened = recentLogs.count { it.openedAt != null }
@@ -173,7 +175,7 @@ class NotificationEngagementService(
      */
     @Transactional(readOnly = true)
     fun getAdminStats(): NotificationAdminStatsDto {
-        val since = Instant.now().minus(7, ChronoUnit.DAYS)
+        val since = Instant.now(clock).minus(7, ChronoUnit.DAYS)
 
         val totalSent   = notificationLogRepository.countBySentAtAfter(since)
         val totalOpened = notificationLogRepository.countBySentAtAfterAndOpenedAtIsNotNull(since)
@@ -209,7 +211,7 @@ class NotificationEngagementService(
     fun getDaysSinceLastOpen(userId: Long): Long? {
         val log = notificationLogRepository
             .findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId) ?: return null
-        return ChronoUnit.DAYS.between(log.openedAt, Instant.now())
+        return ChronoUnit.DAYS.between(log.openedAt, Instant.now(clock))
     }
 
     data class EngagementStats(

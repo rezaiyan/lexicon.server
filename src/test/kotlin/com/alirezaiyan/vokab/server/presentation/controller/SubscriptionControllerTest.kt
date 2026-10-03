@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.service.ClientFeatureFlags
 import com.alirezaiyan.vokab.server.service.FeatureAccessService
 import com.alirezaiyan.vokab.server.service.ReconcileReport
@@ -8,7 +9,6 @@ import com.alirezaiyan.vokab.server.service.SubscriptionService
 import com.alirezaiyan.vokab.server.service.SyncOutcome
 import com.alirezaiyan.vokab.server.service.UserFeatureAccess
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
@@ -47,19 +47,21 @@ class SubscriptionControllerTest {
         emptyList()
     )
 
-    private fun stubFeatureAccess(premium: Boolean) {
-        `when`(featureAccessService.getClientFeatureFlags()).thenReturn(ClientFeatureFlags(pushNotificationsEnabled = true))
-        `when`(featureAccessService.getUserFeatureAccess(anyUser())).thenReturn(UserFeatureAccess(hasPremiumAccess = premium))
+    private fun stubFeatureAccess(userId: Long, premium: Boolean) {
+        `when`(featureAccessService.getFeatureAccess(userId)).thenReturn(
+            FeatureAccessResponse(
+                featureFlags = ClientFeatureFlags(pushNotificationsEnabled = true),
+                userAccess = UserFeatureAccess(hasPremiumAccess = premium),
+            )
+        )
     }
-
-    private fun anyUser(): User = ArgumentMatchers.any(User::class.java) ?: User(email = "x", name = "x")
 
     // ── POST /api/v1/subscriptions/sync ────────────────────────────────────────
 
     @Test
     fun `sync returns fresh feature access`() {
         `when`(subscriptionService.syncFromRevenueCat(9001L)).thenReturn(SyncOutcome.UPDATED)
-        stubFeatureAccess(premium = true)
+        stubFeatureAccess(9001L, premium = true)
 
         mockMvc.perform(post("/api/v1/subscriptions/sync").with(authentication(userAuth(9001L))))
             .andExpect(status().isOk)
@@ -71,7 +73,7 @@ class SubscriptionControllerTest {
     @Test
     fun `sync is rate limited per user`() {
         `when`(subscriptionService.syncFromRevenueCat(9002L)).thenReturn(SyncOutcome.UNCHANGED)
-        stubFeatureAccess(premium = false)
+        stubFeatureAccess(9002L, premium = false)
 
         repeat(2) {
             mockMvc.perform(post("/api/v1/subscriptions/sync").with(authentication(userAuth(9002L))))
@@ -79,6 +81,7 @@ class SubscriptionControllerTest {
         }
         mockMvc.perform(post("/api/v1/subscriptions/sync").with(authentication(userAuth(9002L))))
             .andExpect(status().isTooManyRequests)
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
@@ -87,7 +90,7 @@ class SubscriptionControllerTest {
 
         mockMvc.perform(post("/api/v1/subscriptions/sync").with(authentication(userAuth(9003L))))
             .andExpect(status().isInternalServerError)
-            .andExpect(jsonPath("$.message").value("Subscription sync failed"))
+            .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
     }
 
     // ── POST /admin/subscriptions/reconcile ────────────────────────────────────

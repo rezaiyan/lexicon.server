@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.Platform
 import com.alirezaiyan.vokab.server.domain.entity.PushToken
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
@@ -20,9 +23,6 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import reactor.core.publisher.Mono
-import java.time.Instant
-import java.time.LocalDate
 
 class StreakNotificationServiceTest {
 
@@ -59,7 +59,8 @@ class StreakNotificationServiceTest {
             openRouterService = openRouterService,
             pushNotificationService = pushNotificationService,
             userProgressService = userProgressService,
-            notificationLogRepository = notificationLogRepository
+            notificationLogRepository = notificationLogRepository,
+            clock = fixedClock()
         )
     }
 
@@ -138,7 +139,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns Mono.just("Keep your streak!")
+        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep your streak!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -159,42 +160,6 @@ class StreakNotificationServiceTest {
                 userId = user.id!!,
                 title = any(),
                 body = any(),
-                data = any(),
-                category = any()
-            )
-        }
-    }
-
-    @Test
-    fun `should use default message when openRouter returns empty Mono`() {
-        // Arrange
-        val user = createUser(id = 1L, currentStreak = 5)
-        val token = createPushToken(user = user)
-        val stats = createProgressStats()
-        every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
-        every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 5)
-        every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateStreakResetWarning(5, stats, user.name) } returns Mono.empty()
-        every {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        } returns listOf(NotificationResponse(success = true))
-
-        // Act
-        val result = streakNotificationService.sendStreakResetWarning(user)
-
-        // Assert
-        assertTrue(result)
-        verify(exactly = 1) {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = match { it.contains("5") },
                 data = any(),
                 category = any()
             )
@@ -210,7 +175,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns Mono.just("Keep going!")
+        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -237,7 +202,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns Mono.just("Keep going!")
+        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -264,7 +229,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns Mono.just("Keep going!")
+        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -289,7 +254,7 @@ class StreakNotificationServiceTest {
         // Arrange
         val user1 = createUser(id = 1L, currentStreak = 10)
         val user2 = createUser(id = 2L, email = "user2@example.com", currentStreak = 5)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         val token1 = createPushToken(user = user1)
         val token2 = createPushToken(user = user2, id = 2L)
@@ -305,7 +270,7 @@ class StreakNotificationServiceTest {
         every { streakService.getUserStreak(user1.id!!) } returns StreakInfo(currentStreak = 10)
         every { streakService.getUserStreak(user2.id!!) } returns StreakInfo(currentStreak = 5)
         every { userProgressService.calculateProgressStats(any()) } returns stats
-        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns Mono.just("Keep going!")
+        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = any(),
@@ -328,7 +293,7 @@ class StreakNotificationServiceTest {
         // Arrange
         val user1 = createUser(id = 1L, currentStreak = 10)
         val user2 = createUser(id = 2L, email = "user2@example.com", currentStreak = 5)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         val token1 = createPushToken(user = user1)
         val token2 = createPushToken(user = user2, id = 2L)
@@ -345,7 +310,7 @@ class StreakNotificationServiceTest {
         every { streakService.getUserStreak(user1.id!!) } throws RuntimeException("DB timeout")
         every { streakService.getUserStreak(user2.id!!) } returns StreakInfo(currentStreak = 5)
         every { userProgressService.calculateProgressStats(user2) } returns stats
-        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns Mono.just("Keep going!")
+        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user2.id!!,
@@ -369,7 +334,7 @@ class StreakNotificationServiceTest {
     fun `should filter out users who already had activity today`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns true
@@ -390,7 +355,7 @@ class StreakNotificationServiceTest {
     fun `should filter out users without active push tokens`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
@@ -411,7 +376,7 @@ class StreakNotificationServiceTest {
     fun `should filter out users who already received an insight push today`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
@@ -432,7 +397,7 @@ class StreakNotificationServiceTest {
     fun `should include users who meet all notification criteria`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
@@ -454,7 +419,7 @@ class StreakNotificationServiceTest {
     fun `should filter out users with non-milestone streak`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 4)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
@@ -475,7 +440,7 @@ class StreakNotificationServiceTest {
     fun `should filter out users who already received a streak risk notification today`() {
         // Arrange
         val user = createUser(id = 1L, currentStreak = 10)
-        val today = LocalDate.now()
+        val today = TEST_TODAY
         val todayStr = today.toString()
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
@@ -508,8 +473,8 @@ class StreakNotificationServiceTest {
         longestStreak = longestStreak,
         subscriptionStatus = SubscriptionStatus.ACTIVE,
         active = true,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createPushToken(
@@ -524,8 +489,8 @@ class StreakNotificationServiceTest {
         token = token,
         platform = platform,
         active = active,
-        createdAt = Instant.now(),
-        updatedAt = Instant.now()
+        createdAt = TEST_NOW,
+        updatedAt = TEST_NOW
     )
 
     private fun createProgressStats(

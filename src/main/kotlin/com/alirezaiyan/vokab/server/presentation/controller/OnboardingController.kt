@@ -1,12 +1,11 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.exception.clientMessage
-import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.RateLimitConfig
+import com.alirezaiyan.vokab.server.exception.RateLimitExceededException
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.OnboardingPreferencesRequest
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyResponse
-import com.alirezaiyan.vokab.server.service.OpenRouterService
+import com.alirezaiyan.vokab.server.service.VocabularySuggestionService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
@@ -25,9 +24,8 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("/api/v1/onboarding")
 class OnboardingController(
-    private val openRouterService: OpenRouterService,
+    private val vocabularySuggestionService: VocabularySuggestionService,
     private val rateLimitConfig: RateLimitConfig,
-    private val appProperties: AppProperties
 ) {
 
     /**
@@ -63,46 +61,17 @@ class OnboardingController(
         val bucket = rateLimitConfig.getOnboardingBucket(clientIp)
         if (!bucket.tryConsume(1)) {
             logger.warn { "Onboarding rate limit exceeded for IP $clientIp" }
-            return ResponseEntity.status(429)
-                .body(ApiResponse(success = false, message = "Rate limit exceeded. Please try again in a minute."))
+            throw RateLimitExceededException("Rate limit exceeded. Please try again in a minute.")
         }
 
-        return try {
-            val cleanedInterests = request.interests
-                .map { it.trim() }
-                .filter { it.isNotBlank() }
-
-            val rawItems = openRouterService.generateVocabularyFromPreferences(
-                request.targetLanguage.trim(),
-                request.currentLevel.trim(),
-                request.nativeLanguage.trim(),
-                cleanedInterests
-            ).block() ?: emptyList()
-
-            // Deduplicate within the AI response itself by normalized originalWord
-            val seen = mutableSetOf<String>()
-            val dedupedItems = rawItems.filter { item ->
-                val key = item.originalWord.trim().lowercase()
-                if (key.isBlank()) return@filter false
-                seen.add(key)
-            }
-
-            val baseCount = appProperties.vocabulary.suggestionCount
-            val limitedItems = dedupedItems.take(baseCount)
-
-            val response = SuggestVocabularyResponse(
-                targetLanguage = request.targetLanguage.trim(),
-                nativeLanguage = request.nativeLanguage.trim(),
-                currentLevel = request.currentLevel.trim(),
-                items = limitedItems
-            )
-            logger.info { "Onboarding: returning ${limitedItems.size} vocabulary items to $clientIp (raw=${rawItems.size}, deduped=${dedupedItems.size}, targetCount=$baseCount)" }
-            ResponseEntity.ok(ApiResponse(success = true, data = response))
-        } catch (error: Exception) {
-            logger.error(error) { "Onboarding vocabulary generation failed for $clientIp" }
-            ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = error.clientMessage("Failed to generate vocabulary")))
-        }
+        val response = vocabularySuggestionService.suggestForOnboarding(
+            targetLanguage = request.targetLanguage,
+            currentLevel = request.currentLevel,
+            nativeLanguage = request.nativeLanguage,
+            interests = request.interests,
+        )
+        logger.info { "Onboarding: returning ${response.items.size} vocabulary items to $clientIp" }
+        return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 
     private fun getClientIp(request: HttpServletRequest): String {

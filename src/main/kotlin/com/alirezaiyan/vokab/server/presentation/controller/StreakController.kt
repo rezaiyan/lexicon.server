@@ -9,6 +9,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -29,7 +30,7 @@ class StreakController(
     ): ResponseEntity<ApiResponse<StreakResponse>> {
         val count = request?.count ?: 1
         logger.debug { "Recording activity for userId=${user.id}, count=$count" }
-        val updatedUser = streakService.recordActivity(user.id!!, count)
+        val updatedUser = streakService.recordActivity(user.requireId(), count)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = StreakResponse(currentStreak = updatedUser.currentStreak), message = "Activity recorded successfully")
         )
@@ -43,7 +44,7 @@ class StreakController(
     fun getStreak(
         @AuthenticationPrincipal user: User
     ): ResponseEntity<ApiResponse<StreakResponse>> {
-        val streakInfo = streakService.getUserStreak(user.id!!)
+        val streakInfo = streakService.getUserStreak(user.requireId())
         return ResponseEntity.ok(ApiResponse(success = true, data = StreakResponse(currentStreak = streakInfo.currentStreak)))
     }
 }

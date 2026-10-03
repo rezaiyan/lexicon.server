@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
@@ -14,7 +15,8 @@ private val logger = KotlinLogging.logger {}
 @Service
 class StreakService(
     private val dailyActivityRepository: DailyActivityRepository,
-    private val userRepository: UserRepository
+    private val userRepository: UserRepository,
+    private val clock: Clock
 ) {
     
     /**
@@ -26,7 +28,7 @@ class StreakService(
         val user = userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User not found") }
 
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
 
         // Check if activity already recorded today
         val existingActivity = dailyActivityRepository.findByUserAndActivityDate(user, today)
@@ -100,12 +102,10 @@ class StreakService(
 
         // Update user including longest streak
         val newLongestStreak = maxOf(user.longestStreak, newCurrentStreak)
-        val updatedUser = user.copy(
-            currentStreak = newCurrentStreak,
-            longestStreak = newLongestStreak
-        )
+        user.currentStreak = newCurrentStreak
+        user.longestStreak = newLongestStreak
 
-        val saved = userRepository.save(updatedUser)
+        val saved = userRepository.save(user)
         logger.info { "✅ Streak updated for userId=${user.id}: current=$newCurrentStreak, longest=$newLongestStreak" }
         
         return saved
@@ -121,17 +121,15 @@ class StreakService(
         val user = userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User not found") }
         
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         
         // Recalculate streak from activities
         val calculatedStreak = calculateCurrentStreak(user, today)
 
         // Update user if streak changed
         if (calculatedStreak != user.currentStreak) {
-            val updatedUser = user.copy(
-                currentStreak = calculatedStreak
-            )
-            userRepository.save(updatedUser)
+            user.currentStreak = calculatedStreak
+            userRepository.save(user)
             logger.debug { "Updated streak for userId=${user.id}: current=$calculatedStreak" }
         }
 

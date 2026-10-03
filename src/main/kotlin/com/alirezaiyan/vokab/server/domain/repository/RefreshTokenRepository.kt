@@ -25,6 +25,6 @@ interface RefreshTokenRepository : JpaRepository<RefreshToken, Long> {
 
     @Modifying
     @Query("DELETE FROM RefreshToken r WHERE r.expiresAt < :now")
-    fun deleteExpiredTokens(now: Instant = Instant.now()): Int
+    fun deleteExpiredTokens(now: Instant): Int
 }
 

@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "audit_log")
-data class AuditLog(
+class AuditLog(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(name = "event_type", nullable = false)
@@ -33,7 +33,7 @@ data class AuditLog(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
-) {
+) : JpaEntity<Long>() {
     override fun toString(): String =
         "AuditLog(id=$id, eventType=$eventType, userId=$userId, createdAt=$createdAt)"
 }

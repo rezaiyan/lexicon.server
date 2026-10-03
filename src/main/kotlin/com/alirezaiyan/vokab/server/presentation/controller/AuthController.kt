@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.exception.clientMessage
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.AuthService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
+import java.security.MessageDigest
 
 private val logger = KotlinLogging.logger {}
 
@@ -29,16 +30,9 @@ class AuthController(
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        return try {
-            val ipAddress = getClientIpAddress(httpRequest)
-            val response = authService.authenticateWithGoogle(request.idToken, platform, appVersion, ipAddress)
-
-            ResponseEntity.ok(ApiResponse(success = true, data = response))
-        } catch (e: Exception) {
-            logger.error(e) { "Google authentication failed" }
-            ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = e.clientMessage("Authentication failed")))
-        }
+        val ipAddress = getClientIpAddress(httpRequest)
+        val response = authService.authenticateWithGoogle(request.idToken, platform, appVersion, ipAddress)
+        return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 
     @PostMapping("/apple")
@@ -48,23 +42,16 @@ class AuthController(
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        return try {
-            val ipAddress = getClientIpAddress(httpRequest)
-            val response = authService.authenticateWithApple(
-                request.idToken,
-                request.fullName,
-                request.appleUserId,
-                platform,
-                appVersion,
-                ipAddress
-            )
-
-            ResponseEntity.ok(ApiResponse(success = true, data = response))
-        } catch (e: Exception) {
-            logger.error(e) { "Apple authentication failed" }
-            ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = e.clientMessage("Authentication failed")))
-        }
+        val ipAddress = getClientIpAddress(httpRequest)
+        val response = authService.authenticateWithApple(
+            request.idToken,
+            request.fullName,
+            request.appleUserId,
+            platform,
+            appVersion,
+            ipAddress
+        )
+        return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
     
     @PostMapping("/ci-token")
@@ -79,33 +66,21 @@ class AuthController(
                 .body(ApiResponse(success = false, message = "Not found"))
         }
 
-        if (ciSecret.isNullOrBlank() || ciSecret != appProperties.ciAuth.secret) {
+        if (ciSecret.isNullOrBlank() || !constantTimeEquals(ciSecret, appProperties.ciAuth.secret)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse(success = false, message = "Unauthorized"))
         }
 
-        return try {
-            val response = authService.authenticateForCi(premium = premium, platform = platform, appVersion = appVersion)
-            ResponseEntity.ok(ApiResponse(success = true, data = response))
-        } catch (e: Exception) {
-            logger.error(e) { "CI authentication failed" }
-            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse(success = false, message = e.clientMessage("CI authentication failed")))
-        }
+        val response = authService.authenticateForCi(premium = premium, platform = platform, appVersion = appVersion)
+        return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 
     @PostMapping("/refresh")
     fun refreshToken(
         @Valid @RequestBody request: RefreshTokenRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        return try {
-            val response = authService.refreshAccessToken(request.refreshToken)
-            ResponseEntity.ok(ApiResponse(success = true, data = response))
-        } catch (e: Exception) {
-            logger.error(e) { "Token refresh failed" }
-            ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse(success = false, message = e.clientMessage("Token refresh failed")))
-        }
+        val response = authService.refreshAccessToken(request.refreshToken)
+        return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
     
     @PostMapping("/logout")
@@ -113,14 +88,8 @@ class AuthController(
         @AuthenticationPrincipal user: User,
         @Valid @RequestBody request: RefreshTokenRequest
     ): ResponseEntity<ApiResponse<Unit>> {
-        return try {
-            authService.logout(user.id!!, request.refreshToken)
-            ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
-        } catch (e: Exception) {
-            logger.error(e) { "Logout failed" }
-            ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = e.clientMessage("Logout failed")))
-        }
+        authService.logout(user.requireId(), request.refreshToken)
+        return ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
     }
     
     private fun getClientIpAddress(request: HttpServletRequest): String {
@@ -144,29 +113,20 @@ class AuthController(
     fun logoutAll(
         @AuthenticationPrincipal user: User
     ): ResponseEntity<ApiResponse<Unit>> {
-        return try {
-            authService.logoutAll(user.id!!)
-            ResponseEntity.ok(ApiResponse(success = true, message = "All sessions logged out successfully"))
-        } catch (e: Exception) {
-            logger.error(e) { "Logout all failed" }
-            ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = e.clientMessage("Logout all failed")))
-        }
+        authService.logoutAll(user.requireId())
+        return ResponseEntity.ok(ApiResponse(success = true, message = "All sessions logged out successfully"))
     }
     
     @DeleteMapping("/delete-account")
     fun deleteAccount(
         @AuthenticationPrincipal user: User
     ): ResponseEntity<ApiResponse<Unit>> {
-        return try {
-            logger.info { "Delete account request received for user: ${user.id}" }
-            authService.deleteAccount(user.id!!)
-            ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
-        } catch (e: Exception) {
-            logger.error(e) { "Delete account failed" }
-            ResponseEntity.badRequest()
-                .body(ApiResponse(success = false, message = e.clientMessage("Failed to delete account")))
-        }
+        logger.info { "Delete account request received for user: ${user.id}" }
+        authService.deleteAccount(user.requireId())
+        return ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
     }
-}
 
+    /** Compares secrets without leaking, through timing, how many leading characters matched. */
+    private fun constantTimeEquals(a: String, b: String): Boolean =
+        MessageDigest.isEqual(a.toByteArray(), b.toByteArray())
+}

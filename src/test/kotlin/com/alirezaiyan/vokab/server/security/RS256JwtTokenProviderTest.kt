@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.security
 
+import java.time.Duration
+import com.alirezaiyan.vokab.server.MutableClock
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.JwtConfig
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -16,6 +18,8 @@ import java.util.UUID
 
 class RS256JwtTokenProviderTest {
 
+    private val clock = MutableClock()
+
     private lateinit var appProperties: AppProperties
     private lateinit var provider: RS256JwtTokenProvider
     private lateinit var testKeyPair: KeyPair
@@ -24,7 +28,7 @@ class RS256JwtTokenProviderTest {
     fun setUp() {
         testKeyPair = generateTestKeyPair()
         appProperties = createAppPropertiesWithInMemoryKeys(testKeyPair)
-        provider = RS256JwtTokenProvider(appProperties)
+        provider = RS256JwtTokenProvider(appProperties, clock)
     }
 
     // ── generateAccessToken ───────────────────────────────────────────────────
@@ -133,7 +137,7 @@ class RS256JwtTokenProviderTest {
         // Arrange — generate a second key pair and sign a token with it
         val otherKeyPair = generateTestKeyPair()
         val otherProps = createAppPropertiesWithInMemoryKeys(otherKeyPair)
-        val otherProvider = RS256JwtTokenProvider(otherProps)
+        val otherProvider = RS256JwtTokenProvider(otherProps, clock)
         val alienToken = otherProvider.generateAccessToken(1L, "alien@example.com")
 
         // Act — validate with the original provider
@@ -147,11 +151,10 @@ class RS256JwtTokenProviderTest {
     fun `validateToken should return false for an expired token`() {
         // Arrange — create a provider with a 1ms expiration
         val shortLivedProps = createAppPropertiesWithInMemoryKeys(testKeyPair, expirationMs = 1L)
-        val shortLivedProvider = RS256JwtTokenProvider(shortLivedProps)
+        val shortLivedProvider = RS256JwtTokenProvider(shortLivedProps, clock)
         val token = shortLivedProvider.generateAccessToken(1L, "expired@example.com")
 
-        // Sleep just enough for the token to expire
-        Thread.sleep(50)
+        clock.advance(Duration.ofSeconds(1))
 
         // Act
         val isValid = shortLivedProvider.validateToken(token)
@@ -167,7 +170,7 @@ class RS256JwtTokenProviderTest {
             testKeyPair,
             issuer = "wrong-issuer"
         )
-        val wrongIssuerProvider = RS256JwtTokenProvider(wrongIssuerProps)
+        val wrongIssuerProvider = RS256JwtTokenProvider(wrongIssuerProps, clock)
         val token = wrongIssuerProvider.generateAccessToken(1L, "test@example.com")
 
         // Act — validate with the original provider that expects the default issuer
@@ -217,7 +220,7 @@ class RS256JwtTokenProviderTest {
         // Arrange
         val expectedExpiration = 3600000L
         val props = createAppPropertiesWithInMemoryKeys(testKeyPair, expirationMs = expectedExpiration)
-        val providerWithCustomExpiry = RS256JwtTokenProvider(props)
+        val providerWithCustomExpiry = RS256JwtTokenProvider(props, clock)
 
         // Act
         val expirationTime = providerWithCustomExpiry.getExpirationTime()

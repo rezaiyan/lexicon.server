@@ -9,10 +9,10 @@ import java.time.Instant
     uniqueConstraints = [UniqueConstraint(name = "uq_user_platform", columnNames = ["user_id", "platform"])],
     indexes = [Index(name = "idx_user_platforms_user_id", columnList = "user_id")]
 )
-data class UserPlatform(
+class UserPlatform(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -30,4 +30,4 @@ data class UserPlatform(
 
     @Column(name = "app_version")
     val appVersion: String? = null
-)
+) : JpaEntity<Long>()

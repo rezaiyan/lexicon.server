@@ -8,10 +8,10 @@ import java.time.Instant
     name = "daily_insights",
     uniqueConstraints = [UniqueConstraint(columnNames = ["user_id", "date"])]
 )
-data class DailyInsight(
+class DailyInsight(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -27,11 +27,11 @@ data class DailyInsight(
     val date: String, // YYYY-MM-DD format
     
     @Column(name = "sent_via_push", nullable = false)
-    val sentViaPush: Boolean = false,
+    var sentViaPush: Boolean = false,
     
     @Column(name = "push_sent_at")
-    val pushSentAt: Instant? = null
-) {
+    var pushSentAt: Instant? = null
+) : JpaEntity<Long>() {
     constructor() : this(
         id = null,
         user = User(

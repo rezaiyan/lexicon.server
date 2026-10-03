@@ -4,22 +4,25 @@ import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
 @Service
 class UserProgressService(
-    private val wordRepository: WordRepository
+    private val wordRepository: WordRepository,
+    private val clock: Clock
 ) {
 
     @Transactional(readOnly = true)
     fun calculateProgressStats(user: User): ProgressStatsDto {
         logger.info { "Calculating progress stats for userId=${user.id}" }
 
-        val nowMs = System.currentTimeMillis()
-        val rows = wordRepository.findProgressRowsByUserId(user.id!!, nowMs)
+        val nowMs = clock.millis()
+        val rows = wordRepository.findProgressRowsByUserId(user.requireId(), nowMs)
 
         val levelCounts = IntArray(7)
         var dueCards = 0

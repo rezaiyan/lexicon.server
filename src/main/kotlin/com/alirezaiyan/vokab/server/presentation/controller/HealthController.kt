@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
+import java.time.Clock
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.info.BuildProperties
 import org.springframework.http.MediaType
@@ -16,7 +17,8 @@ import javax.sql.DataSource
 @RestController
 @RequestMapping("/api/v1")
 class HealthController(
-    private val dataSource: DataSource
+    private val dataSource: DataSource,
+    private val clock: Clock
 ) {
 
     @Autowired(required = false)
@@ -27,7 +29,7 @@ class HealthController(
         @RequestHeader(value = "Accept", defaultValue = "application/json") accept: String
     ): ResponseEntity<*> {
         val status = "UP"
-        val timestamp = Instant.now().toString()
+        val timestamp = Instant.now(clock).toString()
         val version = buildProperties?.version ?: "development"
         val name = buildProperties?.name ?: "vokab-server"
         val uptime = formatUptime(ManagementFactory.getRuntimeMXBean().uptime)
@@ -56,7 +58,7 @@ class HealthController(
             "version" to (buildProperties?.version ?: "development"),
             "name" to (buildProperties?.name ?: "vokab-server"),
             "group" to (buildProperties?.group ?: "com.alirezaiyan"),
-            "time" to (buildProperties?.time?.toString() ?: Instant.now().toString())
+            "time" to (buildProperties?.time?.toString() ?: Instant.now(clock).toString())
         )
         return ResponseEntity.ok(ApiResponse(success = true, data = versionData))
     }

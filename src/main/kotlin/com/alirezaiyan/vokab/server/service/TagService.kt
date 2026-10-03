@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.TagRepository
 import com.alirezaiyan.vokab.server.presentation.dto.TagDto
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -14,6 +15,7 @@ private val logger = KotlinLogging.logger {}
 @Service
 class TagService(
     private val tagRepository: TagRepository,
+    private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
     fun list(user: User): List<TagDto> {
@@ -49,7 +51,7 @@ class TagService(
             "A tag named '$trimmed' already exists"
         }
         tag.name = trimmed
-        tag.updatedAt = Instant.now()
+        tag.updatedAt = Instant.now(clock)
         tagRepository.save(tag)
         return tag.toDto(wordCount = tagRepository.countWordsByTagId(id))
     }
@@ -64,7 +66,7 @@ class TagService(
 }
 
 private fun Tag.toDto(wordCount: Long): TagDto = TagDto(
-    id = id!!,
+    id = checkNotNull(id) { "Tag has no id; it was never persisted" },
     name = name,
     wordCount = wordCount,
     createdAt = createdAt.toEpochMilli(),

@@ -138,7 +138,7 @@ class UserServiceTest {
     fun `should update user name when new name is provided`() {
         // Arrange
         val user = createUser(id = 1L, name = "Old Name")
-        val saved = user.copy(name = "New Name")
+        val saved = createUser(id = 1L, name = "New Name")
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { userRepository.save(any()) } returns saved
 
@@ -194,7 +194,7 @@ class UserServiceTest {
     fun `should update displayAlias when valid alias is provided`() {
         // Arrange
         val user = createUser(id = 1L, displayAlias = "old_alias")
-        val saved = user.copy(displayAlias = "new_alias")
+        val saved = createUser(id = 1L, displayAlias = "new_alias")
         every { userRepository.findById(1L) } returns Optional.of(user)
         every { userRepository.save(any()) } returns saved
 

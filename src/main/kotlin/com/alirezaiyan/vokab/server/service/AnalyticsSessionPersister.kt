@@ -8,6 +8,7 @@ import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.SyncSessionRequest
 import io.github.oshai.kotlinlogging.KotlinLogging
+import java.time.Clock
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Propagation
 import org.springframework.transaction.annotation.Transactional
@@ -30,6 +31,7 @@ class AnalyticsSessionPersister(
     private val studySessionRepository: StudySessionRepository,
     private val reviewEventRepository: ReviewEventRepository,
     private val userRepository: UserRepository,
+    private val clock: Clock,
 ) {
 
     /**
@@ -79,7 +81,8 @@ class AnalyticsSessionPersister(
             reviewEventRepository.saveAll(events)
 
             if (user.firstReviewAt == null) {
-                userRepository.save(user.copy(firstReviewAt = Instant.now()))
+                user.firstReviewAt = Instant.now(clock)
+                userRepository.save(user)
             }
 
             true

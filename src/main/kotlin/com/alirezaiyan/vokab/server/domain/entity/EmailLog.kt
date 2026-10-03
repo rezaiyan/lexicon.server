@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "email_log")
-data class EmailLog(
+class EmailLog(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(name = "user_id")
     val userId: Long? = null,
@@ -27,23 +27,23 @@ data class EmailLog(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
-    val status: EmailStatus = EmailStatus.QUEUED,
+    var status: EmailStatus = EmailStatus.QUEUED,
 
     @Column(length = 50)
-    val provider: String? = null,
+    var provider: String? = null,
 
     @Column(name = "provider_id")
-    val providerId: String? = null,
+    var providerId: String? = null,
 
     @Column(name = "error_message")
-    val errorMessage: String? = null,
+    var errorMessage: String? = null,
 
     @Column(name = "sent_at")
-    val sentAt: Instant? = null,
+    var sentAt: Instant? = null,
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now()
-)
+) : JpaEntity<Long>()
 
 enum class EmailStatus {
     QUEUED, SENT, FAILED, BOUNCED

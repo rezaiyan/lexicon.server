@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.AppEvent
 import com.alirezaiyan.vokab.server.domain.repository.AppEventRepository
 import com.alirezaiyan.vokab.server.presentation.dto.TrackEventRequest
@@ -12,7 +14,6 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.time.Instant
 
 class EventServiceTest {
 
@@ -26,7 +27,7 @@ class EventServiceTest {
         appEventRepository = mockk()
         objectMapper = ObjectMapper()
         notificationEngagementService = mockk()
-        eventService = EventService(appEventRepository, objectMapper, notificationEngagementService)
+        eventService = EventService(appEventRepository, objectMapper, notificationEngagementService, clock = fixedClock())
     }
 
     @Test
@@ -158,6 +159,6 @@ class EventServiceTest {
         properties = properties,
         platform = platform,
         appVersion = appVersion,
-        clientTimestampMs = Instant.now().toEpochMilli()
+        clientTimestampMs = TEST_NOW.toEpochMilli()
     )
 }

@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "app_config")
-data class AppConfig(
+class AppConfig(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(nullable = false)
     val namespace: String,
@@ -17,7 +17,7 @@ data class AppConfig(
     val key: String,
 
     @Column
-    val value: String? = null,
+    var value: String? = null,
 
     @Column(nullable = false)
     val type: String = "string",
@@ -32,15 +32,15 @@ data class AppConfig(
     val createdAt: Instant = Instant.now(),
 
     @Column(name = "updated_at", nullable = false)
-    val updatedAt: Instant = Instant.now()
-)
+    var updatedAt: Instant = Instant.now()
+) : JpaEntity<Long>()
 
 @Entity
 @Table(name = "app_config_history")
-data class AppConfigHistory(
+class AppConfigHistory(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     @Column(nullable = false)
     val namespace: String,
@@ -59,4 +59,4 @@ data class AppConfigHistory(
 
     @Column(name = "changed_at", nullable = false, updatable = false)
     val changedAt: Instant = Instant.now()
-)
+) : JpaEntity<Long>()

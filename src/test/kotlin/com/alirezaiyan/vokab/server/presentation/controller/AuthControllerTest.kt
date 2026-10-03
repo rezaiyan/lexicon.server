@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.presentation.controller
 
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.exception.AuthRejectedException
 import com.alirezaiyan.vokab.server.presentation.dto.AuthResponse
 import com.alirezaiyan.vokab.server.presentation.dto.UserDto
 import com.alirezaiyan.vokab.server.service.AuthService
@@ -73,9 +74,9 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `POST google should return 401 when service throws`() {
+    fun `POST google should return 401 when the token is rejected`() {
         `when`(authService.authenticateWithGoogle("bad-token", null, null, "127.0.0.1"))
-            .thenThrow(RuntimeException("Invalid Google token"))
+            .thenThrow(AuthRejectedException("Invalid Firebase ID token"))
 
         mockMvc.perform(
             post("/api/v1/auth/google")
@@ -84,6 +85,21 @@ class AuthControllerTest {
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("Invalid Firebase ID token"))
+    }
+
+    @Test
+    fun `POST google should return 500 without leaking details when the server fails`() {
+        `when`(authService.authenticateWithGoogle("bad-token", null, null, "127.0.0.1"))
+            .thenThrow(IllegalStateException("db password=secret"))
+
+        mockMvc.perform(
+            post("/api/v1/auth/google")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"idToken":"bad-token"}""")
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
     }
 
     @Test
@@ -131,9 +147,9 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `POST apple should return 401 when service throws`() {
+    fun `POST apple should return 401 when the token is rejected`() {
         `when`(authService.authenticateWithApple("bad-apple-token", null, null, null, null, "127.0.0.1"))
-            .thenThrow(RuntimeException("Invalid Apple token"))
+            .thenThrow(AuthRejectedException("Invalid Apple ID token"))
 
         mockMvc.perform(
             post("/api/v1/auth/apple")
@@ -142,6 +158,21 @@ class AuthControllerTest {
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("Invalid Apple ID token"))
+    }
+
+    @Test
+    fun `POST apple should return 500 without leaking details when the server fails`() {
+        `when`(authService.authenticateWithApple("bad-apple-token", null, null, null, null, "127.0.0.1"))
+            .thenThrow(IllegalStateException("db password=secret"))
+
+        mockMvc.perform(
+            post("/api/v1/auth/apple")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"idToken":"bad-apple-token"}""")
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
     }
 
     @Test
@@ -185,9 +216,9 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `POST refresh should return 401 when service throws`() {
+    fun `POST refresh should return 401 when the token is rejected`() {
         `when`(authService.refreshAccessToken("expired-refresh-token"))
-            .thenThrow(RuntimeException("Token expired"))
+            .thenThrow(AuthRejectedException("Refresh token has expired"))
 
         mockMvc.perform(
             post("/api/v1/auth/refresh")
@@ -196,6 +227,21 @@ class AuthControllerTest {
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.message").value("Refresh token has expired"))
+    }
+
+    @Test
+    fun `POST refresh should return 500 without leaking details when the server fails`() {
+        `when`(authService.refreshAccessToken("expired-refresh-token"))
+            .thenThrow(IllegalStateException("db password=secret"))
+
+        mockMvc.perform(
+            post("/api/v1/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refreshToken":"expired-refresh-token"}""")
+        )
+            .andExpect(status().isInternalServerError)
+            .andExpect(jsonPath("$.message").value("An unexpected error occurred"))
     }
 
     @Test
@@ -225,7 +271,7 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `POST logout should return 400 when service throws`() {
+    fun `POST logout should return 500 when service throws`() {
         doThrow(RuntimeException("Token not found")).`when`(authService).logout(1L, "unknown-token")
 
         mockMvc.perform(
@@ -234,7 +280,7 @@ class AuthControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"refreshToken":"unknown-token"}""")
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -264,7 +310,7 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `POST logout-all should return 400 when service throws`() {
+    fun `POST logout-all should return 500 when service throws`() {
         doThrow(RuntimeException("Logout all failed")).`when`(authService).logoutAll(1L)
 
         mockMvc.perform(
@@ -272,7 +318,7 @@ class AuthControllerTest {
                 .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -301,7 +347,7 @@ class AuthControllerTest {
     }
 
     @Test
-    fun `DELETE delete-account should return 400 when service throws`() {
+    fun `DELETE delete-account should return 500 when service throws`() {
         doThrow(RuntimeException("Deletion failed")).`when`(authService).deleteAccount(1L)
 
         mockMvc.perform(
@@ -309,7 +355,7 @@ class AuthControllerTest {
                 .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 

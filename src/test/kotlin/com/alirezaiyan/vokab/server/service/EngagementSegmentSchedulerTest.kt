@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -31,7 +33,8 @@ class EngagementSegmentSchedulerTest {
             engagementSegmentService,
             notificationEngagementService,
             notificationAiAdvisor,
-            userProgressService
+            userProgressService,
+            clock = fixedClock()
         )
     }
 
@@ -71,7 +74,7 @@ class EngagementSegmentSchedulerTest {
 
     @Test
     fun `needsAiRefresh should return true when aiDecidedAt is older than 7 days`() {
-        val eightDaysAgo = Instant.now().minusSeconds(60L * 60 * 24 * 8)
+        val eightDaysAgo = TEST_NOW.minusSeconds(60L * 60 * 24 * 8)
         val schedule     = testSchedule(testUser(), aiDecidedAt = eightDaysAgo)
         every { notificationScheduleRepository.findByUserId(1L) } returns schedule
 
@@ -80,7 +83,7 @@ class EngagementSegmentSchedulerTest {
 
     @Test
     fun `needsAiRefresh should return false when aiDecidedAt is within 7 days`() {
-        val twoDaysAgo = Instant.now().minusSeconds(60L * 60 * 24 * 2)
+        val twoDaysAgo = TEST_NOW.minusSeconds(60L * 60 * 24 * 2)
         val schedule   = testSchedule(testUser(), aiDecidedAt = twoDaysAgo)
         every { notificationScheduleRepository.findByUserId(1L) } returns schedule
 
@@ -164,7 +167,7 @@ class EngagementSegmentSchedulerTest {
 
     @Test
     fun `refreshAll should skip AI for COLD user when cache is fresh`() {
-        val oneDayAgo = Instant.now().minusSeconds(60L * 60 * 24)
+        val oneDayAgo = TEST_NOW.minusSeconds(60L * 60 * 24)
         val user      = testUser()
         val schedule  = testSchedule(user, segment = "COLD", aiDecidedAt = oneDayAgo)
 
@@ -204,8 +207,8 @@ class EngagementSegmentSchedulerTest {
         currentStreak    = 5,
         longestStreak    = 20,
         active           = true,
-        createdAt        = Instant.now().minusSeconds(60L * 60 * 24 * 90),
-        updatedAt        = Instant.now()
+        createdAt        = TEST_NOW.minusSeconds(60L * 60 * 24 * 90),
+        updatedAt        = TEST_NOW
     )
 
     private fun testSchedule(

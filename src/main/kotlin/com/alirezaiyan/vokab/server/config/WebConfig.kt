@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.config.annotation.EnableWebMvc
 import jakarta.servlet.http.HttpServletRequest
+import java.time.Clock
 
 @Configuration
 @EnableWebMvc
@@ -19,7 +20,9 @@ class WebConfig
  * This prevents the "Circular view path [error]" exception
  */
 @RestController
-class CustomErrorController : ErrorController {
+class CustomErrorController(
+    private val clock: Clock
+) : ErrorController {
     
     @RequestMapping("/error")
     fun handleError(request: HttpServletRequest): ResponseEntity<Map<String, Any>> {
@@ -35,7 +38,7 @@ class CustomErrorController : ErrorController {
             "error" to HttpStatus.valueOf(status).reasonPhrase,
             "message" to message,
             "path" to path,
-            "timestamp" to System.currentTimeMillis()
+            "timestamp" to clock.millis()
         )
         
         return ResponseEntity.status(status).body(errorResponse)

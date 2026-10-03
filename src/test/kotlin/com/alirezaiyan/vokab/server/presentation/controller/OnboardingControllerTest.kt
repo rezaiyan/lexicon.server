@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import reactor.core.publisher.Mono
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -60,7 +59,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.just(items))
+        )).thenReturn(items)
 
 
         val request = createPreferencesRequest()
@@ -92,6 +91,7 @@ class OnboardingControllerTest {
         )
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
     }
 
     @Test
@@ -108,7 +108,7 @@ class OnboardingControllerTest {
     }
 
     @Test
-    fun `POST preferences should return 400 when AI generation fails`() {
+    fun `POST preferences should return 500 when AI generation fails`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getOnboardingBucket(org.mockito.ArgumentMatchers.anyString())).thenReturn(bucket)
 
@@ -117,7 +117,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.error(RuntimeException("AI service unavailable")))
+        )).thenThrow(RuntimeException("AI service unavailable"))
 
 
         val request = createPreferencesRequest()
@@ -127,7 +127,7 @@ class OnboardingControllerTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(objectMapper.writeValueAsString(request))
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isInternalServerError)
             .andExpect(jsonPath("$.success").value(false))
     }
 
@@ -146,7 +146,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.just(itemsWithDuplicates))
+        )).thenReturn(itemsWithDuplicates)
 
 
         val request = createPreferencesRequest()
@@ -175,7 +175,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = interests
-        )).thenReturn(Mono.just(items))
+        )).thenReturn(items)
 
 
         val request = createPreferencesRequest(interests = interests)
@@ -204,7 +204,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.just(items))
+        )).thenReturn(items)
 
 
         val request = createPreferencesRequest()
@@ -233,7 +233,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.just(manyItems))
+        )).thenReturn(manyItems)
 
         val request = createPreferencesRequest()
 
@@ -248,7 +248,7 @@ class OnboardingControllerTest {
     }
 
     @Test
-    fun `POST preferences should return 200 with empty items when AI returns null`() {
+    fun `POST preferences should return 200 with empty items when AI returns no items`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getOnboardingBucket(org.mockito.ArgumentMatchers.anyString())).thenReturn(bucket)
 
@@ -257,7 +257,7 @@ class OnboardingControllerTest {
             currentLevel = "beginner",
             nativeLanguage = "English",
             interests = emptyList()
-        )).thenReturn(Mono.empty())
+        )).thenReturn(emptyList())
 
 
         val request = createPreferencesRequest()

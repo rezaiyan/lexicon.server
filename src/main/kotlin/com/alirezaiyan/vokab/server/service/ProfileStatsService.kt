@@ -6,22 +6,25 @@ import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.presentation.dto.DayActivity
 import com.alirezaiyan.vokab.server.presentation.dto.LanguagePair
 import com.alirezaiyan.vokab.server.presentation.dto.ProfileStatsResponse
+import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @Service
 class ProfileStatsService(
     private val dailyActivityRepository: DailyActivityRepository,
     private val wordRepository: WordRepository,
-    private val streakService: StreakService
+    private val streakService: StreakService,
+    private val clock: Clock
 ) {
 
     @Transactional(readOnly = true)
     fun getProfileStats(user: User): ProfileStatsResponse {
-        val streakInfo = streakService.getUserStreak(user.id!!)
+        val streakInfo = streakService.getUserStreak(user.requireId())
         val longestStreak = calculateLongestStreak(user)
 
         return ProfileStatsResponse(
@@ -56,7 +59,7 @@ class ProfileStatsService(
     }
 
     private fun getWeeklyActivity(user: User): List<DayActivity> {
-        val today = LocalDate.now()
+        val today = LocalDate.now(clock)
         val startDate = today.minusDays(6)
         val activities = dailyActivityRepository.findRecentActivities(user, startDate)
 

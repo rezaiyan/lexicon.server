@@ -60,7 +60,9 @@ class UserSubscriptionPersistenceTest {
         )
 
         // e.g. login / streak update saving an old copy
-        userRepository.saveAndFlush(staleSnapshot.copy(currentStreak = 7, updatedAt = Instant.now()))
+        staleSnapshot.currentStreak = 7
+        staleSnapshot.updatedAt = Instant.now()
+        userRepository.saveAndFlush(staleSnapshot)
 
         val reloaded = reload(staleSnapshot.id!!)
         assertEquals(7, reloaded.currentStreak)
@@ -111,7 +113,9 @@ class UserSubscriptionPersistenceTest {
         val until = Instant.now().plus(Duration.ofDays(365)).truncatedTo(ChronoUnit.MILLIS)
         userRepository.updateGrant(stale.id!!, until, "manual", Instant.now())
 
-        userRepository.saveAndFlush(stale.copy(currentStreak = 3, updatedAt = Instant.now()))
+        stale.currentStreak = 3
+        stale.updatedAt = Instant.now()
+        userRepository.saveAndFlush(stale)
 
         val reloaded = reload(stale.id!!)
         assertEquals("manual", reloaded.premiumGrantReason)

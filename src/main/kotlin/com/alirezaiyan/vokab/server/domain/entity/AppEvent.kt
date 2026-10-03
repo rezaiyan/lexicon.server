@@ -5,10 +5,10 @@ import java.time.Instant
 
 @Entity
 @Table(name = "app_events")
-data class AppEvent(
+class AppEvent(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
 
     // No FK constraint — records must survive account deletion for analytics integrity
     @Column(name = "user_id")
@@ -35,4 +35,4 @@ data class AppEvent(
 
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
-)
+) : JpaEntity<Long>()

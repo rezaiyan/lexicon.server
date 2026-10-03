@@ -1,101 +1,126 @@
 package com.alirezaiyan.vokab.server.domain.entity
 
-import com.fasterxml.jackson.annotation.JsonIgnore
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import jakarta.persistence.*
 import java.time.Instant
 
 @Entity
 @Table(name = "users")
-@JsonIgnoreProperties(value = ["pushTokens"], allowGetters = false)
-data class User(
+class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    val id: Long? = null,
+    override val id: Long? = null,
     
     @Column(nullable = false, unique = true)
-    val email: String,
+    var email: String,
     
     @Column(nullable = false)
-    val name: String,
+    var name: String,
 
     @Column(name = "google_id", unique = true)
-    val googleId: String? = null,
+    var googleId: String? = null,
 
     @Column(name = "apple_id", unique = true)
-    val appleId: String? = null,
+    var appleId: String? = null,
     
-    // Subscription columns are updatable = false on purpose: services save whole `user.copy(...)`
-    // snapshots (login, streaks, profile), which would otherwise silently revert a webhook or
-    // sync that landed in between. Change them only via UserRepository.updateSubscription /
-    // linkRevenueCatUserId.
-    @Column(name = "revenuecat_user_id", unique = true, updatable = false)
-    val revenueCatUserId: String? = null,
+    // Store-owned columns: see the properties of the same name in the class body.
+    revenueCatUserId: String? = null,
+    subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
+    subscriptionExpiresAt: Instant? = null,
+    premiumGrantUntil: Instant? = null,
+    premiumGrantReason: String? = null,
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false, updatable = false)
-    val subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE,
-
-    @Column(name = "subscription_expires_at", updatable = false)
-    val subscriptionExpiresAt: Instant? = null,
-
-    /** Premium granted outside the store (test users, comps). Written only via UserRepository.updateGrant. */
-    @Column(name = "premium_grant_until", updatable = false)
-    val premiumGrantUntil: Instant? = null,
-
-    /** Why the grant exists: test_email, legacy_grant, manual, ci. */
-    @Column(name = "premium_grant_reason", length = 64, updatable = false)
-    val premiumGrantReason: String? = null,
-    
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
     
     @Column(name = "updated_at", nullable = false)
-    val updatedAt: Instant = Instant.now(),
+    var updatedAt: Instant = Instant.now(),
     
     @Column(name = "last_login_at")
-    val lastLoginAt: Instant? = null,
+    var lastLoginAt: Instant? = null,
     
     @Column(name = "current_streak", nullable = false)
-    val currentStreak: Int = 0,
+    var currentStreak: Int = 0,
 
     @Column(name = "longest_streak", nullable = false)
-    val longestStreak: Int = 0,
+    var longestStreak: Int = 0,
 
     @Column(name = "display_alias", length = 50)
-    val displayAlias: String? = null,
+    var displayAlias: String? = null,
 
     @Column(name = "profile_image_url", length = 512)
-    val profileImageUrl: String? = null,
+    var profileImageUrl: String? = null,
 
     @Column(name = "first_word_added_at")
-    val firstWordAddedAt: Instant? = null,
+    var firstWordAddedAt: Instant? = null,
 
     @Column(name = "first_review_at")
-    val firstReviewAt: Instant? = null,
+    var firstReviewAt: Instant? = null,
 
     @Column(name = "signup_country", length = 2)
-    val signupCountry: String? = null,
+    var signupCountry: String? = null,
 
     @Column(name = "last_login_country", length = 2)
-    val lastLoginCountry: String? = null,
+    var lastLoginCountry: String? = null,
 
     @Column(nullable = false)
-    val active: Boolean = true,
+    var active: Boolean = true,
     
-    @JsonIgnore
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     val pushTokens: MutableList<PushToken> = mutableListOf()
-) {
-    /**
-     * Override toString() to prevent LazyInitializationException
-     * Kotlin data class auto-generates toString() that includes all fields
-     * We exclude pushTokens to avoid lazy loading after session is closed
-     */
-    override fun toString(): String {
-        return "User(id=$id, email='$email', name='$name', subscriptionStatus=$subscriptionStatus)"
+) : JpaEntity<Long>() {
+
+    // Store-owned columns are `updatable = false` on purpose: services save whole user rows (login,
+    // streaks, profile) from possibly stale instances, which would otherwise silently revert a webhook
+    // or sync that landed in between. They are written only by UserRepository.updateSubscription /
+    // updateGrant / linkRevenueCatUserId (or the initial INSERT); setters are private so the in-memory
+    // copy can only change through the mirror* functions below, after that repository write.
+
+    @Column(name = "revenuecat_user_id", unique = true, updatable = false)
+    var revenueCatUserId: String? = revenueCatUserId
+        private set
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, updatable = false)
+    var subscriptionStatus: SubscriptionStatus = subscriptionStatus
+        private set
+
+    @Column(name = "subscription_expires_at", updatable = false)
+    var subscriptionExpiresAt: Instant? = subscriptionExpiresAt
+        private set
+
+    /** Premium granted outside the store (test users, comps). */
+    @Column(name = "premium_grant_until", updatable = false)
+    var premiumGrantUntil: Instant? = premiumGrantUntil
+        private set
+
+    /** Why the grant exists: test_email, legacy_grant, manual, ci. */
+    @Column(name = "premium_grant_reason", length = 64, updatable = false)
+    var premiumGrantReason: String? = premiumGrantReason
+        private set
+
+    /** Reflects a UserRepository.updateSubscription write (or sets the value for a not-yet-inserted user). */
+    fun mirrorSubscription(status: SubscriptionStatus, expiresAt: Instant?) {
+        subscriptionStatus = status
+        subscriptionExpiresAt = expiresAt
     }
+
+    /** Reflects a UserRepository.updateGrant write (or sets the value for a not-yet-inserted user). */
+    fun mirrorGrant(until: Instant?, reason: String?) {
+        premiumGrantUntil = until
+        premiumGrantReason = reason
+    }
+
+    /** Reflects a UserRepository.linkRevenueCatUserId write. */
+    fun mirrorRevenueCatUserId(id: String) {
+        revenueCatUserId = id
+    }
+
+    // Id only: email and name are PII and must not reach logs
+    override fun toString(): String = "User(id=$id, subscriptionStatus=$subscriptionStatus)"
 }
+
+/** Id of a persisted user. A missing id is a programming error (unsaved entity), not bad input. */
+fun User.requireId(): Long = checkNotNull(id) { "User has no id; it was never persisted" }
 
 enum class SubscriptionStatus {
     FREE,

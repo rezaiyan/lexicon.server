@@ -2,7 +2,7 @@
 
 ## Overview
 
-Provider-based email system for transactional emails and newsletters. Disabled by default. Supports pluggable providers (Resend, SES, SMTP) via the `EmailProvider` interface.
+Provider-based email system for transactional emails and newsletters. Disabled by default. Pluggable providers (Resend, SES, SMTP) via `EmailProvider` interface.
 
 ## Architecture
 
@@ -28,14 +28,14 @@ EmailSubscriptionService  EmailProvider (interface)
 | Table | Purpose |
 |---|---|
 | `email_subscriptions` | Per-user opt-in/out per category (newsletter, product_updates, weekly_digest) |
-| `email_log` | Audit trail: every email sent, with status, provider ID, errors |
+| `email_log` | Audit trail: every email sent, status, provider ID, errors |
 | `email_templates` | DB-managed HTML templates with `{{variable}}` placeholders |
 
 Migration: `V10__create_email_tables.sql`
 
 ## Configuration
 
-Environment variables (all optional, email is disabled by default):
+Environment variables (all optional, email disabled by default):
 
 ```bash
 APP_EMAIL_ENABLED=true                          # Master switch
@@ -49,11 +49,11 @@ Maps to `EmailConfig` (`app.email.*` prefix in `application.yml`).
 
 ## API Endpoints
 
-All require authentication (`Authorization: Bearer <token>`).
+All require auth (`Authorization: Bearer <token>`).
 
 ### GET /api/v1/email/preferences
 
-Returns the user's email subscription preferences.
+Returns user's email subscription preferences.
 
 ```json
 {
@@ -68,7 +68,7 @@ Returns the user's email subscription preferences.
 
 ### POST /api/v1/email/subscribe
 
-Subscribe to a category.
+Subscribe to category.
 
 ```json
 // Request
@@ -80,7 +80,7 @@ Subscribe to a category.
 
 ### POST /api/v1/email/unsubscribe
 
-Unsubscribe from a category.
+Unsubscribe from category.
 
 ```json
 // Request
@@ -104,14 +104,14 @@ emailService.sendTemplated(
 )
 ```
 
-This will:
+Steps:
 1. Check `emailConfig.enabled`
-2. Look up the template by ID (must be `active = true`)
-3. Check user's subscription preference for the template's category
+2. Look up template by ID (must be `active = true`)
+3. Check user subscription preference for template's category
 4. Dedup against `email_log`
-5. Render `{{variables}}` in subject, HTML body, and text body
-6. Send via the configured provider
-7. Log the result to `email_log`
+5. Render `{{variables}}` in subject, HTML body, text body
+6. Send via configured provider
+7. Log result to `email_log`
 
 ### Raw (no template)
 
@@ -128,18 +128,18 @@ emailService.sendRaw(
 
 ## Email Templates
 
-Templates are stored in `email_templates` table. Insert via migration or admin tooling.
+Stored in `email_templates` table. Insert via migration or admin tooling.
 
 | Field | Description |
 |---|---|
 | `id` | Unique key, e.g. `welcome`, `weekly_digest`, `streak_lost` |
-| `subject` | Email subject with `{{variable}}` support |
+| `subject` | Subject with `{{variable}}` support |
 | `body_html` | HTML body with `{{variable}}` support |
 | `body_text` | Plain text fallback (optional) |
 | `category` | Maps to subscription categories |
 | `active` | Toggle without deleting |
 
-Example template insert:
+Example:
 
 ```sql
 INSERT INTO email_templates (id, name, subject, body_html, category) VALUES
@@ -150,19 +150,19 @@ INSERT INTO email_templates (id, name, subject, body_html, category) VALUES
 
 ## Subscription Categories
 
-Default categories (initialized on user signup via `EmailSubscriptionService.initDefaults`):
+Default categories (initialized on signup via `EmailSubscriptionService.initDefaults`):
 
 | Category | Description |
 |---|---|
-| `newsletter` | General announcements, tips, content |
+| `newsletter` | Announcements, tips, content |
 | `product_updates` | New features, releases, changelogs |
 | `weekly_digest` | Weekly progress summary |
 
-Add new categories by updating `EmailSubscriptionService.DEFAULT_CATEGORIES`.
+Add categories by updating `EmailSubscriptionService.DEFAULT_CATEGORIES`.
 
 ## Adding a New Provider
 
-1. Implement `EmailProvider` interface:
+1. Implement `EmailProvider`:
 
 ```kotlin
 @Component
@@ -175,17 +175,17 @@ class SesEmailProvider(private val emailConfig: EmailConfig) : EmailProvider {
 
 2. Set `APP_EMAIL_PROVIDER=ses` in environment.
 
-Spring auto-selects the matching provider via `@ConditionalOnProperty`.
+Spring auto-selects matching provider via `@ConditionalOnProperty`.
 
 ## Email Log & Monitoring
 
-Every email attempt is logged in `email_log` with status:
+Every attempt logged in `email_log`:
 
 | Status | Meaning |
 |---|---|
 | `QUEUED` | Created, about to send |
-| `SENT` | Provider accepted the email |
-| `FAILED` | Provider returned error (see `error_message`) |
+| `SENT` | Provider accepted |
+| `FAILED` | Provider error (see `error_message`) |
 | `BOUNCED` | Delivery failed (update via webhook) |
 
 Query recent failures:
@@ -196,9 +196,7 @@ SELECT * FROM email_log WHERE status = 'FAILED' ORDER BY created_at DESC LIMIT 2
 
 ## Integration Points
 
-To wire email into existing flows:
-
-- **User registration**: Call `emailSubscriptionService.initDefaults(userId)` after creating user
+- **User registration**: Call `emailSubscriptionService.initDefaults(userId)` after user created
 - **Welcome email**: Call `emailService.sendTemplated(userId, email, "welcome", ...)` after registration
-- **Weekly digest**: Add a scheduled job in `ScheduledTasks.kt` that queries active users and sends digest
-- **Streak reminders**: Use alongside existing push notifications as a fallback channel
+- **Weekly digest**: Add scheduled job in `ScheduledTasks.kt`, query active users, send digest
+- **Streak reminders**: Use alongside push notifications as fallback channel

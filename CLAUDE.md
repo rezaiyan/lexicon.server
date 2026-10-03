@@ -1,10 +1,10 @@
 # Vokab Server — Claude Code Context
 
-Spring Boot (Kotlin) backend for the Lexicon vocabulary learning app. Spaced-repetition word management, Google/Apple auth, streaks, leaderboards, AI vocabulary extraction, smart push notifications, email system, tags, Word Rush game, and subscription management.
+Spring Boot (Kotlin) backend for Lexicon vocabulary app. Spaced-repetition word management, Google/Apple auth, streaks, leaderboards, AI vocab extraction, smart push notifications, email, tags, Word Rush game, subscription management.
 
 ## Rules
 
-Project rules live in `.claude/rules/` as modular, path-scoped files — loaded only when editing the matching files to keep context lean.
+Project rules in `.claude/rules/` — modular, path-scoped. Load only when editing matching files.
 
 | Rule                                                                      | Loaded when editing                                                  |
 | ------------------------------------------------------------------------- | -------------------------------------------------------------------- |
@@ -27,7 +27,7 @@ Project rules live in `.claude/rules/` as modular, path-scoped files — loaded 
 | Agent              | Trigger                                                        |
 | ------------------ | -------------------------------------------------------------- |
 | `kotlin-reviewer`  | Review Kotlin/Spring code for correctness and conventions      |
-| `migration-writer` | Write a new Flyway SQL migration                               |
-| `test-writer`      | Write JUnit 5 + MockK tests for a service or controller       |
-| `api-designer`     | Design a new REST endpoint following project conventions      |
-| `e2e`              | Feature or bug fix spanning backend + KMP client (`~/projects/Lexicon`) |
+| `migration-writer` | Write new Flyway SQL migration                                 |
+| `test-writer`      | Write JUnit 5 + MockK tests for service or controller         |
+| `api-designer`     | Design new REST endpoint following project conventions        |
+| `e2e`              | Feature or bugfix spanning backend + KMP client (`~/projects/Lexicon`) |

@@ -13,7 +13,7 @@
 |---|---|
 | Spring Data JPA + Hibernate | ORM layer |
 | PostgreSQL | Production database |
-| H2 (in-memory) | Development / CI default |
+| H2 (in-memory) | Dev / CI default |
 | Flyway 11.8.0 | Schema migrations (`db/migration/V{N}__*.sql`) |
 
 ## Authentication & Security
@@ -21,18 +21,18 @@
 |---|---|
 | JJWT 0.12.3 | JWT access + refresh tokens |
 | RS256 (RSA) / HS256 (HMAC) | JWT signing (configurable) |
-| Firebase Admin SDK 9.2.0 | Google Sign-In token verification + FCM push |
+| Firebase Admin SDK 9.2.0 | Google Sign-In token verify + FCM push |
 | Spring Security | Filter chain, OAuth2 client support |
 | Bucket4j 8.10.1 | Rate limiting (token bucket) |
 
 ## External Services
 | Service | Integration |
 |---|---|
-| OpenRouter AI | Vocabulary extraction, daily insights (REST via WebFlux) |
+| OpenRouter AI | Vocab extraction, daily insights (REST via WebFlux) |
 | Firebase (FCM) | Android/Web push notifications |
 | Apple APNs | iOS push notifications |
 | RevenueCat | Subscription management (webhook + REST API) |
-| GitHub API | Vocabulary collection repository |
+| GitHub API | Vocab collection repository |
 
 ## HTTP & Reactive
 | Technology | Role |
@@ -69,4 +69,4 @@
 | V13 | Standalone audit_log table |
 | V14 | app_events table (Metabase analytics) |
 
-**Rule:** Always add a new `V{N}__description.sql` migration. Never edit existing migration files. `ddl-auto` is `validate`.
+**Rule:** Always add new `V{N}__description.sql` migration. Never edit existing migration files. `ddl-auto` is `validate`.

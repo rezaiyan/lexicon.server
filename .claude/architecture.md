@@ -3,29 +3,29 @@
 ## Domain Entities (13 total)
 
 ### User
-Core account record. Authentication is via Google (`googleId`) or Apple (`appleId`).
+Core account record. Auth via Google (`googleId`) or Apple (`appleId`).
 - `subscriptionStatus`: `FREE | TRIAL | ACTIVE | EXPIRED | CANCELLED`
 - `currentStreak`, `longestStreak`: Maintained by `StreakService`
 - `displayAlias`, `profileImageUrl`: Used on leaderboard
-- `active`: Soft-delete flag. Inactive users are blocked from the API.
+- `active`: Soft-delete flag. Inactive users blocked from API.
 - `revenueCatUserId`: Links to RevenueCat for subscription events.
 
 ### Word
-Vocabulary card with **SM-2 spaced repetition** fields:
+Vocab card with **SM-2 spaced repetition** fields:
 - `level` (0–6+), `easeFactor` (default 2.5), `interval` (days), `repetitions`
 - `lastReviewDate`, `nextReviewDate`: Unix ms timestamps
 - `@Version`: Optimistic locking — handle `OptimisticLockingFailureException`
 - `sourceLanguage`, `targetLanguage`: Max 10 chars (e.g., `"en"`, `"fa"`)
 
 ### StudySession
-One session per review round on the client.
+One session per review round on client.
 - `clientSessionId`: Client-generated UUID. Unique per `(user_id, client_session_id)` — prevents duplicate syncs.
 - `durationMs`, `totalCards`, `correctCount`, `incorrectCount`
-- `completedNormally`: `false` if session was abandoned mid-way.
+- `completedNormally`: `false` if session abandoned mid-way.
 
 ### ReviewEvent
-Individual word review within a session.
-- `wordId` is stored but **not a foreign key** — words can be deleted without losing history.
+Individual word review within session.
+- `wordId` stored but **not a foreign key** — words deletable without losing history.
 - `wordText`, `wordTranslation`, `sourceLanguage`, `targetLanguage`: Denormalized snapshot at review time.
 - `rating` (1–5), `previousLevel`, `newLevel`, `responseTimeMs`
 
@@ -40,17 +40,17 @@ One-to-one with User.
 - `notificationsEnabled`, `dailyReminderTime`
 
 ### PushToken
-Many-to-one with User. One user may have multiple devices.
+Many-to-one with User. One user, multiple devices.
 - `platform`: `ANDROID | IOS | WEB`
 - `token`: Unique per device (FCM/APNs/Web Push token).
-- `active`: Set to `false` to stop sending without deleting.
+- `active`: Set `false` to stop sending without deleting.
 
 ### DailyInsight
-AI-generated insight sent as push notification once per day per user.
+AI-generated insight pushed once per day per user.
 - `date`: `"YYYY-MM-DD"` — unique per `(user_id, date)`.
 
 ### DailyActivity
-One record per day a user does any review. Used to compute streaks.
+One record per day user does any review. Used to compute streaks.
 - Unique constraint on `(user_id, activity_date)`.
 
 ### RefreshToken
@@ -65,12 +65,12 @@ Security event log (login, refresh, logout, deletion).
 - `metadata`: JSON string for extra context.
 
 ### AppEvent
-Client-side analytics events for Metabase dashboards.
-- No FK on `userId` — analytics must survive account deletion.
+Client-side analytics for Metabase dashboards.
+- No FK on `userId` — analytics survive account deletion.
 - `eventName`: Max 100 chars (e.g., `"login"`, `"onboarding_complete"`, `"word_added"`)
 - `properties`: JSON string for event-specific params.
 - `platform`: `"android" | "ios"`
-- `clientTimestamp` vs `serverTimestamp`: Client reports time; server records receipt time.
+- `clientTimestamp` vs `serverTimestamp`: Client reports time; server records receipt.
 
 ### NotificationCategory
 Categorizes push notification types.
@@ -111,5 +111,5 @@ Request → JwtAuthenticationFilter → SecurityConfig → Controller → Servic
 - **JwtAuthenticationFilter**: Validates Bearer token, loads `User` entity, sets `SecurityContext`.
 - **SecurityConfig**: Stateless session, public route whitelist.
 - **RS256** (RSA) or **HS256** (HMAC) — configured via `JWT_PRIVATE_KEY` / `JWT_SECRET`.
-- **JWKS endpoint** at `/api/v1/auth/jwks` exposes the public key.
+- **JWKS endpoint** at `/api/v1/auth/jwks` exposes public key.
 - **Rate limiting**: Bucket4j token bucket on sensitive endpoints.

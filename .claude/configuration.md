@@ -2,7 +2,7 @@
 
 ## application.yml Summary
 
-All secrets and environment-specific values are injected via environment variables. Defaults fall back to H2/dev values.
+All secrets + env-specific values injected via env vars. Defaults fall back to H2/dev.
 
 ## Required in Production
 
@@ -49,23 +49,23 @@ All secrets and environment-specific values are injected via environment variabl
 
 ## AppProperties (Kotlin)
 
-Structured configuration via `@ConfigurationProperties`:
+Structured config via `@ConfigurationProperties`:
 - `app.jwt.*` → `JwtProperties`
 - `app.openrouter.*` → OpenRouter settings
-- `app.features.*` → Feature flags (checked by `FeatureAccessService`)
+- `app.features.*` → feature flags (checked by `FeatureAccessService`)
 - `app.cors.allowed-origins` → CORS
 - `app.ci-auth.*` → CI test auth
-- `app.security.testEmails` → Bypass active-user check
+- `app.security.testEmails` → bypass active-user check
 
 ## Local Development
 
-Default profile uses H2 in-memory database. Run:
+Default profile uses H2 in-memory DB. Run:
 ```bash
 ./gradlew bootRun
 ```
-H2 console available at `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:vokabdb`).
+H2 console at `http://localhost:8080/h2-console` (JDBC URL: `jdbc:h2:mem:vokabdb`).
 
-For scripts, see:
+Scripts:
 - `scripts/start-dev.sh` — local dev
 - `scripts/start-prod.sh` — prod mode with PostgreSQL
 - `scripts/test-endpoints.sh` — smoke test API

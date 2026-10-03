@@ -10,11 +10,13 @@ geoip2 = "4.2.0"
 kotlin-logging = "5.1.0"
 mockk = "1.14.11"
 detekt = "1.23.8"
+springdoc = "2.8.17"
 konsist = "0.17.3"
 
 [libraries]
 # Versions managed by the Spring Boot BOM
 spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+springdoc-openapi-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }

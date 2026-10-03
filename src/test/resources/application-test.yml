@@ -36,3 +36,8 @@ spring:
 management:
   server:
     port: 0
+
+# OpenApiContractTest renders the spec from the shared test context
+springdoc:
+  api-docs:
+    enabled: true

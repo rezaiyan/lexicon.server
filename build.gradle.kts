@@ -22,6 +22,8 @@ repositories {
 dependencies {
 	// Spring Boot Starters
 	implementation(libs.spring.boot.starter.web)
+	// OpenAPI spec of the API, rendered in tests and committed as openapi.json (no UI, route off in prod)
+	implementation(libs.springdoc.openapi.webmvc.api)
 	implementation(libs.spring.boot.starter.data.jpa)
 	implementation(libs.spring.boot.starter.security)
 	implementation(libs.spring.boot.starter.validation)
@@ -138,6 +140,8 @@ tasks.jar {
 tasks.test {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)
+	// `./gradlew test -PupdateOpenApi=true` rewrites openapi.json instead of failing on a diff
+	systemProperty("openapi.update", providers.gradleProperty("updateOpenApi").getOrElse("false"))
 }
 
 // JaCoCo configuration

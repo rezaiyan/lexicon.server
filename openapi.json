@@ -1,0 +1,5148 @@
+{
+  "components" : {
+    "schemas" : {
+      "AccuracyByLevelResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "correctCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "level" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "correctCount", "level", "totalReviews" ],
+        "type" : "object"
+      },
+      "ApiResponseAppConfigDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/AppConfigDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseAuthResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/AuthResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseAvatarResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/AvatarResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseBatchDeleteResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/BatchDeleteResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseBatchUpdateLanguagesResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/BatchUpdateLanguagesResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseClientFeatureFlags" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ClientFeatureFlags"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseEmailPreferenceDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/EmailPreferenceDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseFeatureAccessResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/FeatureAccessResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseInsightResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/InsightResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseInteger" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseLeaderboardResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/LeaderboardResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListAccuracyByLevelResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AccuracyByLevelResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListAppConfigDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AppConfigDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListAppConfigHistoryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/AppConfigHistoryDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListComebackWordResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ComebackWordResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListDailyStatsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DailyStatsResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListDayOfWeekAccuracyResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DayOfWeekAccuracyResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListDifficultWordResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DifficultWordResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListEmailPreferenceDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/EmailPreferenceDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListHeatmapDayResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HeatmapDayResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListHourlyAccuracyResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/HourlyAccuracyResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListLanguagePairStatsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LanguagePairStatsResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListLevelTransitionResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LevelTransitionResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListMasteredWordResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MasteredWordResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListMonthlyStatsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MonthlyStatsResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListMostReviewedWordResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/MostReviewedWordResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListNotificationResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListResponseTimeTrendResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ResponseTimeTrendResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListStudySessionResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/StudySessionResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListTagDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/TagDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListWordDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListWordRushGameResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordRushGameResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseMapStringString" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : [ "object", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseNotificationAdminStatsDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationAdminStatsDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseProfileStatsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ProfileStatsResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseReconcileReport" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ReconcileReport"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSettingsDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SettingsDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseStreakResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/StreakResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseStudyInsightsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/StudyInsightsResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSuggestVocabularyResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SuggestVocabularyResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSyncAnalyticsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SyncAnalyticsResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSyncWordRushResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SyncWordRushResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseTagDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TagDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseTranslateTextResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TranslateTextResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseUnit" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseUserDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/UserDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseVocabularyExtractionResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/VocabularyExtractionResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseWeeklyReportResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/WeeklyReportResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseWordRushInsightsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/WordRushInsightsResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "AppConfigDto" : {
+        "properties" : {
+          "description" : {
+            "type" : [ "string", "null" ]
+          },
+          "enabled" : {
+            "type" : "boolean"
+          },
+          "key" : {
+            "type" : "string"
+          },
+          "namespace" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "value" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "enabled", "key", "namespace", "type", "updatedAt" ],
+        "type" : "object"
+      },
+      "AppConfigHistoryDto" : {
+        "properties" : {
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "changedBy" : {
+            "type" : [ "string", "null" ]
+          },
+          "newValue" : {
+            "type" : [ "string", "null" ]
+          },
+          "oldValue" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "changedAt" ],
+        "type" : "object"
+      },
+      "AppConfigListItemRequest" : {
+        "properties" : {
+          "item" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "item" ],
+        "type" : "object"
+      },
+      "AppConfigUpdateRequest" : {
+        "properties" : {
+          "value" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "value" ],
+        "type" : "object"
+      },
+      "AppleAuthRequest" : {
+        "properties" : {
+          "appleUserId" : {
+            "type" : [ "string", "null" ]
+          },
+          "authorizationCode" : {
+            "type" : [ "string", "null" ]
+          },
+          "fullName" : {
+            "type" : [ "string", "null" ]
+          },
+          "idToken" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "idToken" ],
+        "type" : "object"
+      },
+      "AppleServerNotification" : {
+        "properties" : {
+          "payload" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "payload" ],
+        "type" : "object"
+      },
+      "AuthResponse" : {
+        "properties" : {
+          "accessToken" : {
+            "type" : "string"
+          },
+          "expiresIn" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "refreshToken" : {
+            "type" : "string"
+          },
+          "tokenType" : {
+            "type" : "string"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/UserDto"
+          }
+        },
+        "required" : [ "accessToken", "expiresIn", "refreshToken", "tokenType", "user" ],
+        "type" : "object"
+      },
+      "AvatarResponse" : {
+        "properties" : {
+          "profileImageUrl" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "profileImageUrl" ],
+        "type" : "object"
+      },
+      "BatchAssignTagsRequest" : {
+        "properties" : {
+          "tagIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 50,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "wordIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 500,
+            "minItems" : 1,
+            "type" : "array"
+          }
+        },
+        "required" : [ "tagIds", "wordIds" ],
+        "type" : "object"
+      },
+      "BatchDeleteRequest" : {
+        "properties" : {
+          "ids" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "ids" ],
+        "type" : "object"
+      },
+      "BatchDeleteResponse" : {
+        "properties" : {
+          "deletedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "deletedCount" ],
+        "type" : "object"
+      },
+      "BatchUpdateLanguagesRequest" : {
+        "properties" : {
+          "ids" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "sourceLanguage" : {
+            "type" : [ "string", "null" ]
+          },
+          "targetLanguage" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "ids" ],
+        "type" : "object"
+      },
+      "BatchUpdateLanguagesResponse" : {
+        "properties" : {
+          "updatedCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "updatedCount" ],
+        "type" : "object"
+      },
+      "BestDayResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "cardsReviewed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "dayName" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "accuracyPercent", "cardsReviewed", "dayName" ],
+        "type" : "object"
+      },
+      "ClientFeatureFlags" : {
+        "properties" : {
+          "pushNotificationsEnabled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "pushNotificationsEnabled" ],
+        "type" : "object"
+      },
+      "ComebackWordResponse" : {
+        "properties" : {
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordText" : {
+            "type" : "string"
+          },
+          "wordTranslation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "CreateTagRequest" : {
+        "properties" : {
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "name" ],
+        "type" : "object"
+      },
+      "DailyStatsResponse" : {
+        "properties" : {
+          "cardsReviewed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "correctCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "date" : {
+            "type" : "string"
+          },
+          "incorrectCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sessionsCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "studyTimeMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "uniqueWordsReviewed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "wordsLeveledDown" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "wordsLeveledUp" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "cardsReviewed", "correctCount", "date", "incorrectCount", "sessionsCount", "studyTimeMs", "uniqueWordsReviewed", "wordsLeveledDown", "wordsLeveledUp" ],
+        "type" : "object"
+      },
+      "DayActivity" : {
+        "properties" : {
+          "date" : {
+            "type" : "string"
+          },
+          "reviewCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "date", "reviewCount" ],
+        "type" : "object"
+      },
+      "DayOfWeekAccuracyResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "correctCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "dayOfWeek" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "correctCount", "dayOfWeek", "totalReviews" ],
+        "type" : "object"
+      },
+      "DifficultWordResponse" : {
+        "properties" : {
+          "errorCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "errorRate" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "totalReviews" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordText" : {
+            "type" : "string"
+          },
+          "wordTranslation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "errorCount", "errorRate", "sourceLanguage", "targetLanguage", "totalReviews", "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "EmailCategoryRequest" : {
+        "properties" : {
+          "category" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "category" ],
+        "type" : "object"
+      },
+      "EmailPreferenceDto" : {
+        "properties" : {
+          "category" : {
+            "type" : "string"
+          },
+          "subscribed" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "category", "subscribed" ],
+        "type" : "object"
+      },
+      "EngagementStatsDto" : {
+        "properties" : {
+          "consecutiveIgnores" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "openRatePercent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "suppressedUntil" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "consecutiveIgnores", "openRatePercent" ],
+        "type" : "object"
+      },
+      "ExtractVocabularyRequest" : {
+        "properties" : {
+          "extractSentences" : {
+            "type" : "boolean"
+          },
+          "extractWords" : {
+            "type" : "boolean"
+          },
+          "imageBase64" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "extractSentences", "extractWords", "imageBase64", "targetLanguage" ],
+        "type" : "object"
+      },
+      "FeatureAccessResponse" : {
+        "properties" : {
+          "featureFlags" : {
+            "$ref" : "#/components/schemas/ClientFeatureFlags"
+          },
+          "userAccess" : {
+            "$ref" : "#/components/schemas/UserFeatureAccess"
+          }
+        },
+        "required" : [ "featureFlags", "userAccess" ],
+        "type" : "object"
+      },
+      "GoogleAuthRequest" : {
+        "properties" : {
+          "idToken" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "idToken" ],
+        "type" : "object"
+      },
+      "HeatmapDayResponse" : {
+        "properties" : {
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "date" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "count", "date" ],
+        "type" : "object"
+      },
+      "HourlyAccuracyResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "correctCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "hour" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "correctCount", "hour", "totalReviews" ],
+        "type" : "object"
+      },
+      "InsightResponse" : {
+        "properties" : {
+          "generatedAt" : {
+            "type" : "string"
+          },
+          "insight" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "generatedAt", "insight" ],
+        "type" : "object"
+      },
+      "LanguagePair" : {
+        "properties" : {
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "wordCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "sourceLanguage", "targetLanguage", "wordCount" ],
+        "type" : "object"
+      },
+      "LanguagePairStatsResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "correctCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "uniqueWords" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "correctCount", "sourceLanguage", "targetLanguage", "totalReviews", "uniqueWords" ],
+        "type" : "object"
+      },
+      "Last7DaysDto" : {
+        "properties" : {
+          "openRatePercent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalOpened" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalSent" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "typeBreakdown" : {
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/TypeStatsDto"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "openRatePercent", "totalOpened", "totalSent", "typeBreakdown" ],
+        "type" : "object"
+      },
+      "LeaderboardEntryDto" : {
+        "properties" : {
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "isCurrentUser" : {
+            "type" : "boolean"
+          },
+          "longestStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "masteredWords" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "profileImageUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "currentStreak", "displayName", "isCurrentUser", "longestStreak", "masteredWords", "rank" ],
+        "type" : "object"
+      },
+      "LeaderboardResponse" : {
+        "properties" : {
+          "entries" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LeaderboardEntryDto"
+            },
+            "type" : "array"
+          },
+          "userEntry" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/LeaderboardEntryDto"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
+        "required" : [ "entries" ],
+        "type" : "object"
+      },
+      "LevelTransitionResponse" : {
+        "properties" : {
+          "count" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "fromLevel" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "toLevel" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "count", "fromLevel", "toLevel" ],
+        "type" : "object"
+      },
+      "MasteredWordResponse" : {
+        "properties" : {
+          "masteredAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordText" : {
+            "type" : "string"
+          },
+          "wordTranslation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "masteredAt", "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "MonthlyStatsResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "correctCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "month" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "year" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "correctCount", "month", "totalReviews", "year" ],
+        "type" : "object"
+      },
+      "MostReviewedWordResponse" : {
+        "properties" : {
+          "totalReviews" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordText" : {
+            "type" : "string"
+          },
+          "wordTranslation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "totalReviews", "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "NotificationAdminStatsDto" : {
+        "properties" : {
+          "last7Days" : {
+            "$ref" : "#/components/schemas/Last7DaysDto"
+          },
+          "suppressedUsers" : {
+            "$ref" : "#/components/schemas/SuppressedUsersDto"
+          },
+          "totalActiveSchedules" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "last7Days", "suppressedUsers", "totalActiveSchedules" ],
+        "type" : "object"
+      },
+      "NotificationResponse" : {
+        "properties" : {
+          "error" : {
+            "type" : [ "string", "null" ]
+          },
+          "messageId" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "OnboardingPreferencesRequest" : {
+        "properties" : {
+          "currentLevel" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "interests" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "nativeLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "currentLevel", "interests", "nativeLanguage", "targetLanguage" ],
+        "type" : "object"
+      },
+      "ProfileStatsResponse" : {
+        "properties" : {
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "languages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LanguagePair"
+            },
+            "type" : "array"
+          },
+          "longestStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "memberSince" : {
+            "type" : "string"
+          },
+          "weeklyActivity" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DayActivity"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "currentStreak", "languages", "longestStreak", "memberSince", "weeklyActivity" ],
+        "type" : "object"
+      },
+      "ReconcileReport" : {
+        "properties" : {
+          "checked" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "expired" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "outcomes" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "checked", "expired", "outcomes" ],
+        "type" : "object"
+      },
+      "RecordActivityRequest" : {
+        "properties" : {
+          "count" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "count" ],
+        "type" : "object"
+      },
+      "RefreshTokenRequest" : {
+        "properties" : {
+          "refreshToken" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "refreshToken" ],
+        "type" : "object"
+      },
+      "RegisterPushTokenRequest" : {
+        "properties" : {
+          "deviceId" : {
+            "type" : [ "string", "null" ]
+          },
+          "platform" : {
+            "enum" : [ "ANDROID", "IOS", "WEB" ],
+            "type" : "string"
+          },
+          "token" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "platform", "token" ],
+        "type" : "object"
+      },
+      "RenameTagRequest" : {
+        "properties" : {
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "name" ],
+        "type" : "object"
+      },
+      "ResponseTimeTrendResponse" : {
+        "properties" : {
+          "avgResponseTimeMs" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "week" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "year" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "avgResponseTimeMs", "week", "year" ],
+        "type" : "object"
+      },
+      "SendNotificationRequest" : {
+        "properties" : {
+          "body" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "data" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : [ "object", "null" ]
+          },
+          "imageUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "title" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "body", "title" ],
+        "type" : "object"
+      },
+      "SettingsDto" : {
+        "properties" : {
+          "dailyReminderTime" : {
+            "pattern" : "^([01]?\\d|2[0-3]):[0-5]\\d$",
+            "type" : "string"
+          },
+          "dataConfidence" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "engagementStats" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/EngagementStatsDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "languageCode" : {
+            "type" : "string"
+          },
+          "notificationFrequency" : {
+            "pattern" : "^(DAILY|EVERY_OTHER_DAY|WEEKLY|OFF)$",
+            "type" : "string"
+          },
+          "notificationsEnabled" : {
+            "type" : "boolean"
+          },
+          "optimalSendHour" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "reviewRemindersEnabled" : {
+            "type" : "boolean"
+          },
+          "themeMode" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "dailyReminderTime", "languageCode", "notificationFrequency", "notificationsEnabled", "reviewRemindersEnabled", "themeMode" ],
+        "type" : "object"
+      },
+      "StreakResponse" : {
+        "properties" : {
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "currentStreak" ],
+        "type" : "object"
+      },
+      "StudyInsightsResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "averageResponseTimeMs" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "averageSessionDurationMs" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "daysStudied" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sessionCompletionRate" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "totalCardsReviewed" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalCorrect" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalSessions" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalStudyTimeMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "uniqueWordsReviewed" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordsMasteredCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "daysStudied", "totalCardsReviewed", "totalCorrect", "totalSessions", "totalStudyTimeMs", "uniqueWordsReviewed", "wordsMasteredCount" ],
+        "type" : "object"
+      },
+      "StudySessionResponse" : {
+        "properties" : {
+          "clientSessionId" : {
+            "type" : "string"
+          },
+          "completedNormally" : {
+            "type" : "boolean"
+          },
+          "correctCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "durationMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "endedAt" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "incorrectCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reviewType" : {
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalCards" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "clientSessionId", "completedNormally", "correctCount", "durationMs", "incorrectCount", "reviewType", "startedAt", "totalCards" ],
+        "type" : "object"
+      },
+      "SuggestVocabularyItemResponse" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "originalWord" : {
+            "type" : "string"
+          },
+          "translation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "description", "originalWord", "translation" ],
+        "type" : "object"
+      },
+      "SuggestVocabularyRequest" : {
+        "properties" : {
+          "currentLevel" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "nativeLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "currentLevel", "nativeLanguage", "targetLanguage" ],
+        "type" : "object"
+      },
+      "SuggestVocabularyResponse" : {
+        "properties" : {
+          "currentLevel" : {
+            "type" : "string"
+          },
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SuggestVocabularyItemResponse"
+            },
+            "type" : "array"
+          },
+          "nativeLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "currentLevel", "items", "nativeLanguage", "targetLanguage" ],
+        "type" : "object"
+      },
+      "SuppressedUsersDto" : {
+        "properties" : {
+          "14day" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "30day" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "3day" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "7day" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "14day", "30day", "3day", "7day" ],
+        "type" : "object"
+      },
+      "SyncAnalyticsRequest" : {
+        "properties" : {
+          "sessions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SyncSessionRequest"
+            },
+            "maxItems" : 100,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "sessions" ],
+        "type" : "object"
+      },
+      "SyncAnalyticsResponse" : {
+        "properties" : {
+          "syncedSessionIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "syncedSessionIds" ],
+        "type" : "object"
+      },
+      "SyncReviewEventRequest" : {
+        "properties" : {
+          "newLevel" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "previousLevel" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "rating" : {
+            "format" : "int32",
+            "maximum" : 5,
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "responseTimeMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "reviewedAt" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordText" : {
+            "type" : "string"
+          },
+          "wordTranslation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "newLevel", "previousLevel", "rating", "responseTimeMs", "reviewedAt", "sourceLanguage", "targetLanguage", "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "SyncSessionRequest" : {
+        "properties" : {
+          "clientSessionId" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "completedNormally" : {
+            "type" : "boolean"
+          },
+          "correctCount" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "durationMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "endedAt" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "events" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SyncReviewEventRequest"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "incorrectCount" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "reviewType" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "sourceLanguage" : {
+            "type" : [ "string", "null" ]
+          },
+          "startedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "targetLanguage" : {
+            "type" : [ "string", "null" ]
+          },
+          "totalCards" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "triggerSource" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "clientSessionId", "completedNormally", "correctCount", "durationMs", "events", "incorrectCount", "reviewType", "startedAt", "totalCards", "triggerSource" ],
+        "type" : "object"
+      },
+      "SyncWordRushGameRequest" : {
+        "properties" : {
+          "avgResponseMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "bestStreak" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "clientGameId" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "completedNormally" : {
+            "type" : "boolean"
+          },
+          "correctCount" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "durationMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "grade" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "livesRemaining" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "playedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "totalQuestions" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "avgResponseMs", "bestStreak", "clientGameId", "completedNormally", "correctCount", "durationMs", "grade", "livesRemaining", "playedAt", "score", "totalQuestions" ],
+        "type" : "object"
+      },
+      "SyncWordRushRequest" : {
+        "properties" : {
+          "games" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SyncWordRushGameRequest"
+            },
+            "maxItems" : 100,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "games" ],
+        "type" : "object"
+      },
+      "SyncWordRushResponse" : {
+        "properties" : {
+          "syncedGameIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "syncedGameIds" ],
+        "type" : "object"
+      },
+      "TagDto" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "createdAt", "id", "name", "updatedAt", "wordCount" ],
+        "type" : "object"
+      },
+      "TrackEventRequest" : {
+        "properties" : {
+          "appVersion" : {
+            "maxLength" : 30,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
+          "clientTimestampMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "eventName" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "platform" : {
+            "maxLength" : 20,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
+          "properties" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          }
+        },
+        "required" : [ "clientTimestampMs", "eventName", "properties" ],
+        "type" : "object"
+      },
+      "TranslateTextRequest" : {
+        "properties" : {
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "text" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "targetLanguage", "text" ],
+        "type" : "object"
+      },
+      "TranslateTextResponse" : {
+        "properties" : {
+          "originalText" : {
+            "type" : "string"
+          },
+          "translation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "originalText", "translation" ],
+        "type" : "object"
+      },
+      "TypeStatsDto" : {
+        "properties" : {
+          "openRate" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "opened" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sent" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "openRate", "opened", "sent" ],
+        "type" : "object"
+      },
+      "UpdateProfileRequest" : {
+        "properties" : {
+          "displayAlias" : {
+            "maxLength" : 30,
+            "minLength" : 2,
+            "type" : [ "string", "null" ]
+          },
+          "name" : {
+            "maxLength" : 100,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          }
+        },
+        "type" : "object"
+      },
+      "UpdateWordRequest" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "easeFactor" : {
+            "format" : "float",
+            "type" : "number"
+          },
+          "interval" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastReviewDate" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "level" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextReviewDate" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "originalWord" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "repetitions" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sourceLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "tagIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "translation" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "description", "easeFactor", "interval", "lastReviewDate", "level", "nextReviewDate", "originalWord", "repetitions", "sourceLanguage", "tagIds", "targetLanguage", "translation" ],
+        "type" : "object"
+      },
+      "UpdateWordTagsRequest" : {
+        "properties" : {
+          "tagIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 50,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "tagIds" ],
+        "type" : "object"
+      },
+      "UpsertWordsRequest" : {
+        "properties" : {
+          "words" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordDto"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "words" ],
+        "type" : "object"
+      },
+      "UserDto" : {
+        "properties" : {
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "displayAlias" : {
+            "type" : [ "string", "null" ]
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "profileImageUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "subscriptionExpiresAt" : {
+            "type" : [ "string", "null" ]
+          },
+          "subscriptionStatus" : {
+            "enum" : [ "FREE", "TRIAL", "ACTIVE", "EXPIRED", "CANCELLED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "currentStreak", "email", "id", "name", "subscriptionStatus" ],
+        "type" : "object"
+      },
+      "UserFeatureAccess" : {
+        "properties" : {
+          "expiresAt" : {
+            "type" : [ "string", "null" ]
+          },
+          "hasPremiumAccess" : {
+            "type" : "boolean"
+          },
+          "isTrial" : {
+            "type" : "boolean"
+          },
+          "source" : {
+            "enum" : [ "STORE", "GRANT", "NONE" ],
+            "type" : "string"
+          },
+          "willRenew" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "hasPremiumAccess", "isTrial", "source", "willRenew" ],
+        "type" : "object"
+      },
+      "VocabularyExtractionResponse" : {
+        "properties" : {
+          "extractedText" : {
+            "type" : "string"
+          },
+          "wordCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "extractedText", "wordCount" ],
+        "type" : "object"
+      },
+      "WeeklyReportResponse" : {
+        "properties" : {
+          "accuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "bestDay" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/BestDayResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "cardsReviewed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "changePercent" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "previousWeekCardsReviewed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sessionsCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalStudyTimeMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "weekEndDate" : {
+            "type" : "string"
+          },
+          "weekStartDate" : {
+            "type" : "string"
+          },
+          "wordsMastered" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPercent", "cardsReviewed", "previousWeekCardsReviewed", "sessionsCount", "totalStudyTimeMs", "weekEndDate", "weekStartDate", "wordsMastered" ],
+        "type" : "object"
+      },
+      "WordDto" : {
+        "properties" : {
+          "description" : {
+            "type" : "string"
+          },
+          "easeFactor" : {
+            "format" : "float",
+            "type" : "number"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "interval" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastReviewDate" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "level" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "nextReviewDate" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "originalWord" : {
+            "type" : "string"
+          },
+          "repetitions" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sourceLanguage" : {
+            "type" : "string"
+          },
+          "tagIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          },
+          "targetLanguage" : {
+            "type" : "string"
+          },
+          "translation" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          }
+        },
+        "required" : [ "description", "easeFactor", "interval", "lastReviewDate", "level", "nextReviewDate", "originalWord", "repetitions", "sourceLanguage", "tagIds", "targetLanguage", "translation" ],
+        "type" : "object"
+      },
+      "WordRushGameResponse" : {
+        "properties" : {
+          "avgResponseMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "bestStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "clientGameId" : {
+            "type" : "string"
+          },
+          "completedNormally" : {
+            "type" : "boolean"
+          },
+          "correctCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "durationMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "grade" : {
+            "type" : "string"
+          },
+          "livesRemaining" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "playedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "score" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalQuestions" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "avgResponseMs", "bestStreak", "clientGameId", "completedNormally", "correctCount", "durationMs", "grade", "livesRemaining", "playedAt", "score", "totalQuestions" ],
+        "type" : "object"
+      },
+      "WordRushInsightsResponse" : {
+        "properties" : {
+          "avgAccuracyPercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "avgDurationMs" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "avgResponseMs" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "avgScore" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "bestStreakEver" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "completionRatePercent" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "totalCompleted" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalGames" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalTimePlayedMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "avgAccuracyPercent", "avgDurationMs", "avgResponseMs", "avgScore", "bestStreakEver", "completionRatePercent", "totalCompleted", "totalGames", "totalTimePlayedMs" ],
+        "type" : "object"
+      }
+    }
+  },
+  "info" : {
+    "title" : "OpenAPI definition",
+    "version" : "v0"
+  },
+  "openapi" : "3.1.0",
+  "paths" : {
+    "/admin/config" : {
+      "get" : {
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListAppConfigDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      }
+    },
+    "/admin/config/{namespace}/{key}" : {
+      "get" : {
+        "operationId" : "get",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAppConfigDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      },
+      "put" : {
+        "operationId" : "set",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Changed-By",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AppConfigUpdateRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAppConfigDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      }
+    },
+    "/admin/config/{namespace}/{key}/history" : {
+      "get" : {
+        "operationId" : "history",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListAppConfigHistoryDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      }
+    },
+    "/admin/config/{namespace}/{key}/items" : {
+      "post" : {
+        "operationId" : "addItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Changed-By",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AppConfigListItemRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAppConfigDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      }
+    },
+    "/admin/config/{namespace}/{key}/items/{item}" : {
+      "delete" : {
+        "operationId" : "removeItem",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "namespace",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "key",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "path",
+          "name" : "item",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Changed-By",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAppConfigDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "app-config-admin-controller" ]
+      }
+    },
+    "/admin/notifications/stats" : {
+      "get" : {
+        "operationId" : "getStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationAdminStatsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/subscriptions/reconcile" : {
+      "post" : {
+        "operationId" : "reconcile",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "scope",
+          "required" : false,
+          "schema" : {
+            "default" : "linked",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "userIds",
+          "required" : false,
+          "schema" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseReconcileReport"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "subscription-admin-controller" ]
+      }
+    },
+    "/api/v1/ai/extract-vocabulary" : {
+      "post" : {
+        "operationId" : "extractVocabulary",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExtractVocabularyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseVocabularyExtractionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/ai/generate-insight" : {
+      "get" : {
+        "operationId" : "generateInsight",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInsightResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/ai/health" : {
+      "get" : {
+        "operationId" : "healthCheck_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/ai/suggest-vocabulary" : {
+      "post" : {
+        "operationId" : "suggestVocabulary",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SuggestVocabularyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSuggestVocabularyResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/ai/translate-text" : {
+      "post" : {
+        "operationId" : "translateText",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TranslateTextRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTranslateTextResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/analytics/accuracy-by-day-of-week" : {
+      "get" : {
+        "operationId" : "getAccuracyByDayOfWeek",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListDayOfWeekAccuracyResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/accuracy-by-hour" : {
+      "get" : {
+        "operationId" : "getAccuracyByHour",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListHourlyAccuracyResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/accuracy-by-level" : {
+      "get" : {
+        "operationId" : "getAccuracyByLevel",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListAccuracyByLevelResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/comeback-words" : {
+      "get" : {
+        "operationId" : "getComebackWords",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListComebackWordResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/daily-stats" : {
+      "get" : {
+        "operationId" : "getDailyStats",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "start",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "end",
+          "required" : true,
+          "schema" : {
+            "format" : "date",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListDailyStatsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/difficult-words" : {
+      "get" : {
+        "operationId" : "getDifficultWords",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "minReviews",
+          "required" : false,
+          "schema" : {
+            "default" : 3,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListDifficultWordResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/heatmap" : {
+      "get" : {
+        "operationId" : "getHeatmap",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "start",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "end",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListHeatmapDayResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/insights" : {
+      "get" : {
+        "operationId" : "getInsights_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStudyInsightsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/language-stats" : {
+      "get" : {
+        "operationId" : "getLanguageStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListLanguagePairStatsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/level-transitions" : {
+      "get" : {
+        "operationId" : "getLevelTransitions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListLevelTransitionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/monthly-stats" : {
+      "get" : {
+        "operationId" : "getMonthlyStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMonthlyStatsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/most-reviewed" : {
+      "get" : {
+        "operationId" : "getMostReviewedWords",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMostReviewedWordResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/response-time-trend" : {
+      "get" : {
+        "operationId" : "getResponseTimeTrend",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListResponseTimeTrendResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/sessions" : {
+      "get" : {
+        "operationId" : "getRecentSessions",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 10,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListStudySessionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/sync" : {
+      "post" : {
+        "operationId" : "syncAnalytics",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SyncAnalyticsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSyncAnalyticsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/weekly-report" : {
+      "get" : {
+        "operationId" : "getWeeklyReport",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseWeeklyReportResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/words-mastered" : {
+      "get" : {
+        "operationId" : "getWordsMastered",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMasteredWordResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/auth/apple" : {
+      "post" : {
+        "operationId" : "authenticateWithApple",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AppleAuthRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/ci-token" : {
+      "post" : {
+        "operationId" : "authenticateForCi",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-CI-Secret",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "premium",
+          "required" : false,
+          "schema" : {
+            "default" : true,
+            "type" : "boolean"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/delete-account" : {
+      "delete" : {
+        "operationId" : "deleteAccount",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/google" : {
+      "post" : {
+        "operationId" : "authenticateWithGoogle",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/GoogleAuthRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/jwks" : {
+      "get" : {
+        "operationId" : "getJwks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "jwks-controller" ]
+      }
+    },
+    "/api/v1/auth/logout" : {
+      "post" : {
+        "operationId" : "logout",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/logout-all" : {
+      "post" : {
+        "operationId" : "logoutAll",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/auth/refresh" : {
+      "post" : {
+        "operationId" : "refreshToken",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RefreshTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/email/preferences" : {
+      "get" : {
+        "operationId" : "getPreferences",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListEmailPreferenceDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "email-controller" ]
+      }
+    },
+    "/api/v1/email/subscribe" : {
+      "post" : {
+        "operationId" : "subscribe",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailCategoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseEmailPreferenceDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "email-controller" ]
+      }
+    },
+    "/api/v1/email/unsubscribe" : {
+      "post" : {
+        "operationId" : "unsubscribe",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/EmailCategoryRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseEmailPreferenceDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "email-controller" ]
+      }
+    },
+    "/api/v1/events" : {
+      "post" : {
+        "operationId" : "trackEvent",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TrackEventRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "event-controller" ]
+      }
+    },
+    "/api/v1/health" : {
+      "get" : {
+        "operationId" : "health",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Accept",
+          "required" : false,
+          "schema" : {
+            "default" : "application/json",
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "health-controller" ]
+      }
+    },
+    "/api/v1/leaderboard" : {
+      "get" : {
+        "operationId" : "getLeaderboard",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseLeaderboardResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "leaderboard-controller" ]
+      }
+    },
+    "/api/v1/notifications/register-token" : {
+      "post" : {
+        "operationId" : "registerPushToken",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RegisterPushTokenRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/notifications/send" : {
+      "post" : {
+        "operationId" : "sendNotification",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SendNotificationRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListNotificationResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/notifications/token/{token}" : {
+      "delete" : {
+        "operationId" : "deactivateToken",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "token",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/notifications/tokens" : {
+      "delete" : {
+        "operationId" : "deactivateAllTokens",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      },
+      "get" : {
+        "operationId" : "getUserTokens",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInteger"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/notifications/{notificationLogId}/opened" : {
+      "post" : {
+        "operationId" : "markOpened",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "notificationLogId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/onboarding/preferences" : {
+      "post" : {
+        "operationId" : "submitPreferences",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/OnboardingPreferencesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSuggestVocabularyResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "onboarding-controller" ]
+      }
+    },
+    "/api/v1/settings" : {
+      "get" : {
+        "operationId" : "get_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSettingsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "settings-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update_1",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SettingsDto"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSettingsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "settings-controller" ]
+      }
+    },
+    "/api/v1/streak" : {
+      "get" : {
+        "operationId" : "getStreak",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStreakResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "streak-controller" ]
+      }
+    },
+    "/api/v1/streak/record" : {
+      "post" : {
+        "operationId" : "recordActivity",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RecordActivityRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseStreakResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "streak-controller" ]
+      }
+    },
+    "/api/v1/subscriptions/sync" : {
+      "post" : {
+        "operationId" : "syncWithStore",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseFeatureAccessResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "subscription-controller" ]
+      }
+    },
+    "/api/v1/tags" : {
+      "get" : {
+        "operationId" : "list_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListTagDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tag-controller" ]
+      },
+      "post" : {
+        "operationId" : "create",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/CreateTagRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTagDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tag-controller" ]
+      }
+    },
+    "/api/v1/tags/{id}" : {
+      "delete" : {
+        "operationId" : "delete",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : { },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tag-controller" ]
+      },
+      "put" : {
+        "operationId" : "rename",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RenameTagRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTagDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "tag-controller" ]
+      }
+    },
+    "/api/v1/users/feature-access" : {
+      "get" : {
+        "operationId" : "getFeatureAccess",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseFeatureAccessResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
+    "/api/v1/users/feature-flags" : {
+      "get" : {
+        "operationId" : "getFeatureFlags",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseClientFeatureFlags"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
+    "/api/v1/users/me" : {
+      "delete" : {
+        "operationId" : "deleteCurrentUser",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      },
+      "get" : {
+        "operationId" : "getCurrentUser",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      },
+      "patch" : {
+        "operationId" : "updateCurrentUser",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateProfileRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUserDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
+    "/api/v1/users/me/avatar" : {
+      "delete" : {
+        "operationId" : "deleteAvatar",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      },
+      "post" : {
+        "operationId" : "uploadAvatar",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "properties" : {
+                  "file" : {
+                    "format" : "binary",
+                    "type" : "string"
+                  }
+                },
+                "required" : [ "file" ],
+                "type" : "object"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAvatarResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
+    "/api/v1/users/profile-stats" : {
+      "get" : {
+        "operationId" : "getProfileStats",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseProfileStatsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "user-controller" ]
+      }
+    },
+    "/api/v1/version" : {
+      "get" : {
+        "operationId" : "version",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseMapStringString"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "health-controller" ]
+      }
+    },
+    "/api/v1/webhooks/apple" : {
+      "get" : {
+        "operationId" : "healthCheck",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : {
+                    "type" : "string"
+                  },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "apple-webhook-controller" ]
+      },
+      "post" : {
+        "operationId" : "handleAppleNotification",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AppleServerNotification"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "apple-webhook-controller" ]
+      }
+    },
+    "/api/v1/webhooks/revenuecat" : {
+      "post" : {
+        "operationId" : "handleRevenueCatWebhook",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "Authorization",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-RevenueCat-Webhook-Signature",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "format" : "byte",
+                "type" : "string"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "webhook-controller" ]
+      }
+    },
+    "/api/v1/word-rush/history" : {
+      "get" : {
+        "operationId" : "getHistory",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListWordRushGameResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-rush-controller" ]
+      }
+    },
+    "/api/v1/word-rush/insights" : {
+      "get" : {
+        "operationId" : "getInsights",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseWordRushInsightsResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-rush-controller" ]
+      }
+    },
+    "/api/v1/word-rush/sync" : {
+      "post" : {
+        "operationId" : "syncGames",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SyncWordRushRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSyncWordRushResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-rush-controller" ]
+      }
+    },
+    "/api/v1/words" : {
+      "get" : {
+        "operationId" : "list",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "updatedAfter",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListWordDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      },
+      "post" : {
+        "operationId" : "upsert",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpsertWordsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/batch-assign-tags" : {
+      "post" : {
+        "operationId" : "batchAssignTags",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchAssignTagsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/batch-delete" : {
+      "post" : {
+        "operationId" : "batchDelete",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchDeleteRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBatchDeleteResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/batch-update" : {
+      "post" : {
+        "operationId" : "batchUpdate",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/BatchUpdateLanguagesRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseBatchUpdateLanguagesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/{id}" : {
+      "delete" : {
+        "operationId" : "delete_1",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      },
+      "patch" : {
+        "operationId" : "update",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateWordRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/{id}/tags" : {
+      "put" : {
+        "operationId" : "updateTags",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateWordTagsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/error" : {
+      "delete" : {
+        "operationId" : "handleError_3",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "get" : {
+        "operationId" : "handleError",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "head" : {
+        "operationId" : "handleError_5",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "options" : {
+        "operationId" : "handleError_6",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "patch" : {
+        "operationId" : "handleError_4",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "post" : {
+        "operationId" : "handleError_1",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      },
+      "put" : {
+        "operationId" : "handleError_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "custom-error-controller" ]
+      }
+    }
+  }
+}

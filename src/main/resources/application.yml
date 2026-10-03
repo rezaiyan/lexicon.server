@@ -202,3 +202,8 @@ management:
     tags:
       application: ${spring.application.name}
 
+# The spec is rendered by OpenApiContractTest into openapi.json; no public docs route.
+springdoc:
+  api-docs:
+    enabled: false
+  writer-with-order-by-keys: true

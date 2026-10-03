@@ -3,7 +3,11 @@ package com.alirezaiyan.vokab.server.presentation.controller
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import java.time.Clock
 import org.springframework.beans.factory.annotation.Autowired
+import org.springframework.boot.actuate.health.CompositeHealth
+import org.springframework.boot.actuate.health.HealthEndpoint
+import org.springframework.boot.actuate.health.Status
 import org.springframework.boot.info.BuildProperties
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
@@ -12,44 +16,50 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.lang.management.ManagementFactory
 import java.time.Instant
-import javax.sql.DataSource
 
 @RestController
 @RequestMapping("/api/v1")
 class HealthController(
-    private val dataSource: DataSource,
+    private val healthEndpoint: HealthEndpoint,
     private val clock: Clock
 ) {
 
     @Autowired(required = false)
     private var buildProperties: BuildProperties? = null
 
+    /**
+     * Public alias of the actuator readiness group (app state + database), which lives on the
+     * internal management port. 503 when not ready, so the Docker healthcheck and the deploy script
+     * notice a lost database instead of reading "UP" with "database":"DOWN".
+     */
     @GetMapping("/health")
     fun health(
         @RequestHeader(value = "Accept", defaultValue = "application/json") accept: String
     ): ResponseEntity<*> {
-        val status = "UP"
+        val readiness = healthEndpoint.healthForPath("readiness")
+        val status = readiness?.status ?: Status.UNKNOWN
+        val dbStatus = ((readiness as? CompositeHealth)?.components?.get("db")?.status ?: Status.UNKNOWN).code
+        val httpStatus = if (status == Status.UP) HttpStatus.OK else HttpStatus.SERVICE_UNAVAILABLE
         val timestamp = Instant.now(clock).toString()
         val version = buildProperties?.version ?: "development"
         val name = buildProperties?.name ?: "vokab-server"
         val uptime = formatUptime(ManagementFactory.getRuntimeMXBean().uptime)
-        val dbStatus = checkDatabase()
 
         if (accept.contains("text/html")) {
-            return ResponseEntity.ok()
+            return ResponseEntity.status(httpStatus)
                 .contentType(MediaType.TEXT_HTML)
-                .body(buildHtmlPage(status, timestamp, version, name, uptime, dbStatus))
+                .body(buildHtmlPage(status.code, timestamp, version, name, uptime, dbStatus))
         }
 
         val healthData = mapOf(
-            "status" to status,
+            "status" to status.code,
             "timestamp" to timestamp,
             "version" to version,
             "name" to name,
             "uptime" to uptime,
             "database" to dbStatus
         )
-        return ResponseEntity.ok(ApiResponse(success = true, data = healthData))
+        return ResponseEntity.status(httpStatus).body(ApiResponse(success = status == Status.UP, data = healthData))
     }
 
     @GetMapping("/version")
@@ -61,13 +71,6 @@ class HealthController(
             "time" to (buildProperties?.time?.toString() ?: Instant.now(clock).toString())
         )
         return ResponseEntity.ok(ApiResponse(success = true, data = versionData))
-    }
-
-    private fun checkDatabase(): String = try {
-        dataSource.connection.use { it.prepareStatement("SELECT 1").executeQuery() }
-        "UP"
-    } catch (e: Exception) {
-        "DOWN"
     }
 
     private fun formatUptime(ms: Long): String {

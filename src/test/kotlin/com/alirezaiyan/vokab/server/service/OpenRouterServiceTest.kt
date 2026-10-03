@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.fixedClock
+import com.alirezaiyan.vokab.server.health.AiCallTracker
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.OpenRouterConfig
@@ -40,7 +42,7 @@ class OpenRouterServiceTest {
 
     private val builder = RestClient.builder()
     private val server = MockRestServiceServer.bindTo(builder).build()
-    private val service = OpenRouterService(builder, appProperties(), meterRegistry)
+    private val service = OpenRouterService(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock()))
 
     // ── transport ─────────────────────────────────────────────────────────────
 
@@ -48,7 +50,7 @@ class OpenRouterServiceTest {
     fun `requests post the configured model with auth and attribution headers`() {
         val custom = RestClient.builder()
         val customServer = MockRestServiceServer.bindTo(custom).build()
-        val customService = OpenRouterService(custom, meterRegistry = meterRegistry, appProperties = appProperties(model = "anthropic/custom-model"))
+        val customService = OpenRouterService(custom, meterRegistry = meterRegistry, aiCallTracker = AiCallTracker(fixedClock()), appProperties = appProperties(model = "anthropic/custom-model"))
         customServer.expect(requestTo(chatUrl))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-api-key"))

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.health.AiCallTracker
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.config.AiRestClient
 import com.alirezaiyan.vokab.server.config.AppProperties
@@ -35,6 +36,7 @@ class OpenRouterService(
     @AiRestClient restClientBuilder: RestClient.Builder,
     private val appProperties: AppProperties,
     private val meterRegistry: MeterRegistry,
+    private val aiCallTracker: AiCallTracker,
 ) {
     private val restClient: RestClient = restClientBuilder
         .baseUrl(appProperties.openrouter.baseUrl)
@@ -378,6 +380,8 @@ class OpenRouterService(
             else -> "success"
         }
         meterRegistry.counter("ai.requests", "operation", operation, "outcome", outcome).increment()
+        // An empty answer still means OpenRouter is reachable
+        aiCallTracker.record(success = result.isSuccess)
         return result.getOrThrow()
     }
 

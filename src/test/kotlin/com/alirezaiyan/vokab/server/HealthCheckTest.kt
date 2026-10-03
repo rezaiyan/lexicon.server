@@ -52,6 +52,8 @@ class HealthCheckTest {
     @Test
     fun `management port serves health and prometheus metrics`() {
         assertEquals(200, managementGet("/actuator/health").statusCode())
+        assertEquals(200, managementGet("/actuator/health/liveness").statusCode())
+        assertEquals(200, managementGet("/actuator/health/readiness").statusCode())
 
         val metrics = managementGet("/actuator/prometheus")
         assertEquals(200, metrics.statusCode())

@@ -191,6 +191,13 @@ management:
   endpoint:
     health:
       show-details: never
+      # /actuator/health/liveness and /readiness (internal port). Readiness = can serve traffic:
+      # app state + database. Firebase/OpenRouter stay out: their outages degrade single features.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
   metrics:
     tags:
       application: ${spring.application.name}

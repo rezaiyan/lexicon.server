@@ -1,0 +1,61 @@
+# Mirrors the client's detekt.yml (~/projects/Lexicon/detekt.yml); Compose/Android-only rules removed.
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  CyclomaticComplexMethod:
+    threshold: 15
+  TooManyFunctions:
+    thresholdInFiles: 20
+    thresholdInClasses: 15
+    thresholdInInterfaces: 10
+
+style:
+  UnusedImports:
+    active: true
+  MagicNumber:
+    active: false
+  ReturnCount:
+    max: 4
+  ForbiddenComment:
+    active: false
+  MaxLineLength:
+    maxLineLength: 120
+    excludeCommentStatements: true
+    excludes:
+      - '**/test/**'
+  UnusedPrivateMember:
+    active: true
+
+naming:
+  TopLevelPropertyNaming:
+    constantPattern: '[A-Z][A-Za-z0-9_]*'
+
+empty-blocks:
+  EmptyFunctionBlock:
+    active: true
+    excludes:
+      - '**/test/**'
+
+exceptions:
+  TooGenericExceptionThrown:
+    active: true
+    excludes:
+      - '**/test/**'
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - 'Exception'
+      - 'RuntimeException'
+      - 'Throwable'
+  SwallowedException:
+    active: true
+
+performance:
+  SpreadOperator:
+    active: false

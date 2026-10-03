@@ -1,5 +1,6 @@
-package com.alirezaiyan.vokab.server.domain.entity
+package com.alirezaiyan.vokab.server.architecture
 
+import com.alirezaiyan.vokab.server.domain.entity.JpaEntity
 import jakarta.persistence.Column
 import jakarta.persistence.Entity
 import org.hibernate.annotations.JdbcTypeCode

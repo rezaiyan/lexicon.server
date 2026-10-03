@@ -1,0 +1,248 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ConstructorParameterNaming:AppleNotificationDto.kt$AppleNotificationEvents$val event_time: Long</ID>
+    <ID>ConstructorParameterNaming:AppleNotificationDto.kt$EmailDisabledEvent$val is_private_email: Boolean</ID>
+    <ID>ConstructorParameterNaming:AppleNotificationDto.kt$EmailEnabledEvent$val is_private_email: Boolean</ID>
+    <ID>ConstructorParameterNaming:OpenRouterService.kt$OpenRouterService.Content$val image_url: ImageUrl? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$/** NORMAL, TRIAL, INTRO, PROMOTIONAL or PREPAID. */ val period_type: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$/** Stable across renewals of the same subscription; used as our subscription key. */ val original_transaction_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$/** TRANSFER only: customers the entitlement moved away from / to. TRANSFER has no app_user_id. */ val transferred_from: List&lt;String&gt;? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val app_user_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val cancel_reason: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val expiration_at_ms: Long? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val original_app_user_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val product_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val purchased_at_ms: Long? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val transaction_id: String? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatEvent$val transferred_to: List&lt;String&gt;? = null</ID>
+    <ID>ConstructorParameterNaming:SubscriptionDto.kt$RevenueCatWebhookEvent$val api_version: String? = null</ID>
+    <ID>CyclomaticComplexMethod:MilestoneDetector.kt$MilestoneDetector$@Transactional(readOnly = true) fun getPendingMilestone(user: User): MilestoneEvent?</ID>
+    <ID>CyclomaticComplexMethod:NotificationTypeSelector.kt$NotificationTypeSelector$@Transactional(readOnly = true) fun selectType(user: User, schedule: NotificationSchedule): NotificationType</ID>
+    <ID>CyclomaticComplexMethod:OpenRouterService.kt$OpenRouterService$fun extractVocabularyFromImage( imageBase64: String, targetLanguage: String, extractWords: Boolean = true, extractSentences: Boolean = false ): String</ID>
+    <ID>LargeClass:AnalyticsControllerTest.kt$AnalyticsControllerTest</ID>
+    <ID>LargeClass:AuthServiceTest.kt$AuthServiceTest</ID>
+    <ID>LongMethod:AnalyticsService.kt$AnalyticsService$@Transactional(readOnly = true) fun getWeeklyReport(user: User): WeeklyReportResponse</ID>
+    <ID>LongMethod:HealthController.kt$HealthController$private fun buildHtmlPage( status: String, timestamp: String, version: String, name: String, uptime: String, dbStatus: String ): String</ID>
+    <ID>LongMethod:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain )</ID>
+    <ID>LongMethod:OpenRouterService.kt$OpenRouterService$fun extractVocabularyFromImage( imageBase64: String, targetLanguage: String, extractWords: Boolean = true, extractSentences: Boolean = false ): String</ID>
+    <ID>LongMethod:StreakReminderServiceTest.kt$StreakReminderServiceTest$@Test fun `sendReminderNotifications should send notifications to users needing reminders`()</ID>
+    <ID>LongParameterList:AuthService.kt$AuthService$( private val userRepository: UserRepository, private val refreshTokenRepository: RefreshTokenRepository, private val jwtTokenProvider: RS256JwtTokenProvider, private val refreshTokenHashService: RefreshTokenHashService, private val appleIdTokenVerifier: AppleIdTokenVerifier, private val firebaseIdTokenVerifier: FirebaseIdTokenVerifier, private val userPlatformRepository: UserPlatformRepository, private val userDataPurger: UserDataPurger, private val pushNotificationService: PushNotificationService, private val revenueCatClient: RevenueCatClient, private val appProperties: AppProperties, private val appConfigService: AppConfigService, private val auditLogService: AuditLogService, private val eventService: EventService, private val domainEventPublisher: DomainEventPublisher, private val geoLocationService: GeoLocationService, private val clock: Clock, )</ID>
+    <ID>LongParameterList:DailyInsightService.kt$DailyInsightService$( private val dailyInsightRepository: DailyInsightRepository, private val userSettingsRepository: UserSettingsRepository, private val dailyActivityRepository: DailyActivityRepository, private val openRouterService: OpenRouterService, private val userProgressService: UserProgressService, private val pushNotificationService: PushNotificationService, private val featureAccessService: FeatureAccessService, private val analyticsService: AnalyticsService, private val notificationScheduleRepository: NotificationScheduleRepository, private val clock: Clock )</ID>
+    <ID>LongParameterList:EmailLog.kt$EmailLog$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @Column(name = "user_id") val userId: Long? = null, @Column(name = "recipient_email", nullable = false) val recipientEmail: String, @Column(nullable = false, length = 50) val category: String, @Column(name = "template_id", nullable = false, length = 100) val templateId: String, @Column(nullable = false, length = 500) val subject: String, @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) var status: EmailStatus = EmailStatus.QUEUED, @Column(length = 50) var provider: String? = null, @Column(name = "provider_id") var providerId: String? = null, @Column(name = "error_message") var errorMessage: String? = null, @Column(name = "sent_at") var sentAt: Instant? = null, @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now() )</ID>
+    <ID>LongParameterList:MilestoneDetectorTest.kt$MilestoneDetectorTest$( totalWords: Int = 0, dueCards: Int = 0, level0Count: Int = 0, level1Count: Int = 0, level2Count: Int = 0, level3Count: Int = 0, level4Count: Int = 0, level5Count: Int = 0, level6Count: Int = 0 )</ID>
+    <ID>LongParameterList:NotificationAiAdvisorTest.kt$NotificationAiAdvisorTest$( segment: String = "COLD", openRate7d: Int = 0, openRate30d: Int = 10, daysSinceLastOpen: Long? = 12, currentStreak: Int = 0, longestStreak: Int = 14, dueCards: Int = 8, accountAgeDays: Long = 90 )</ID>
+    <ID>LongParameterList:NotificationContentBuilderTest.kt$NotificationContentBuilderTest$( totalWords: Int = 10, dueCards: Int = 3, level0Count: Int = 0, level1Count: Int = 2, level2Count: Int = 2, level3Count: Int = 2, level4Count: Int = 2, level5Count: Int = 1, level6Count: Int = 1 )</ID>
+    <ID>LongParameterList:NotificationContentBuilderTest.kt$NotificationContentBuilderTest$( wordId: Long = 1L, wordText: String = "apple", wordTranslation: String = "Apfel", sourceLanguage: String = "en", targetLanguage: String = "de", totalReviews: Int = 5, errorCount: Int = 3, errorRate: Double = 0.6 )</ID>
+    <ID>LongParameterList:NotificationSchedule.kt$NotificationSchedule$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long = 0, @OneToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false, unique = true) val user: User, @Column(name = "optimal_send_hour", nullable = false) var optimalSendHour: Int = 18, @Column(name = "timezone_offset_hrs", nullable = false) var timezoneOffsetHrs: Int = 0, @Column(name = "data_confidence", nullable = false) var dataConfidence: Int = 0, @Column(name = "last_computed_at") var lastComputedAt: Instant? = null, @Column(name = "last_sent_date") var lastSentDate: LocalDate? = null, @Column(name = "last_sent_type") var lastSentType: String? = null, @Column(name = "consecutive_ignores", nullable = false) var consecutiveIgnores: Int = 0, @Column(name = "suppressed_until") var suppressedUntil: LocalDate? = null, @JdbcTypeCode(SqlTypes.JSON) @Column(name = "last_milestone_snapshot", columnDefinition = "jsonb") var lastMilestoneSnapshot: String? = null, // Engagement segment — computed nightly from notification_log history @Column(name = "engagement_segment", nullable = false) var engagementSegment: String = "WARM", // AI advisor fields — populated by NotificationAiAdvisor for COLD/DORMANT users @Column(name = "ai_action") var aiAction: String? = null, @Column(name = "ai_interval_days") var aiIntervalDays: Int? = null, @Column(name = "ai_content_hint") var aiContentHint: String? = null, @Column(name = "ai_decided_at") var aiDecidedAt: Instant? = null, @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(), @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now() )</ID>
+    <ID>LongParameterList:ReviewEvent.kt$ReviewEvent$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "session_id", nullable = false) val session: StudySession, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) val user: User, @Column(name = "word_id", nullable = false) val wordId: Long, @Column(name = "word_text", nullable = false) val wordText: String = "", @Column(name = "word_translation", nullable = false) val wordTranslation: String = "", @Column(name = "source_language", nullable = false) val sourceLanguage: String = "", @Column(name = "target_language", nullable = false) val targetLanguage: String = "", @Column(nullable = false) val rating: Int, @Column(name = "previous_level", nullable = false) val previousLevel: Int, @Column(name = "new_level", nullable = false) val newLevel: Int, @Column(name = "response_time_ms", nullable = false) val responseTimeMs: Long = 0, @Column(name = "reviewed_at", nullable = false) val reviewedAt: Long, )</ID>
+    <ID>LongParameterList:SmartNotificationDispatcher.kt$SmartNotificationDispatcher$( private val notificationScheduleRepository: NotificationScheduleRepository, private val notificationTypeSelector: NotificationTypeSelector, private val notificationContentBuilder: NotificationContentBuilder, private val pushNotificationService: PushNotificationService, private val milestoneDetector: MilestoneDetector, private val userProgressService: UserProgressService, private val notificationEngagementService: NotificationEngagementService, private val objectMapper: ObjectMapper, private val clock: Clock, private val meterRegistry: MeterRegistry, )</ID>
+    <ID>LongParameterList:StreakNotificationService.kt$StreakNotificationService$( private val userRepository: UserRepository, private val dailyActivityRepository: DailyActivityRepository, private val dailyInsightRepository: DailyInsightRepository, private val pushTokenRepository: PushTokenRepository, private val streakService: StreakService, private val openRouterService: OpenRouterService, private val pushNotificationService: PushNotificationService, private val userProgressService: UserProgressService, private val notificationLogRepository: NotificationLogRepository, private val clock: Clock )</ID>
+    <ID>LongParameterList:StudySession.kt$StudySession$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) val user: User, @Column(name = "client_session_id", nullable = false) val clientSessionId: String, @Column(name = "started_at", nullable = false) val startedAt: Long, @Column(name = "ended_at") val endedAt: Long? = null, @Column(name = "duration_ms", nullable = false) val durationMs: Long = 0, @Column(name = "total_cards", nullable = false) val totalCards: Int = 0, @Column(name = "correct_count", nullable = false) val correctCount: Int = 0, @Column(name = "incorrect_count", nullable = false) val incorrectCount: Int = 0, @Column(name = "review_type", nullable = false) val reviewType: String = "REVIEW", @Column(name = "completed_normally", nullable = false) val completedNormally: Boolean = true, @Column(name = "source_language") val sourceLanguage: String? = null, @Column(name = "target_language") val targetLanguage: String? = null, @Column(name = "trigger_source", nullable = false) val triggerSource: String = "unknown", @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(), )</ID>
+    <ID>LongParameterList:Subscription.kt$Subscription$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) val user: User, @Column(name = "revenuecat_subscription_id", unique = true) val revenueCatSubscriptionId: String? = null, @Column(name = "product_id", nullable = false) var productId: String, @Enumerated(EnumType.STRING) @Column(nullable = false) var status: SubscriptionStatus, @Column(name = "started_at", nullable = false) val startedAt: Instant, @Column(name = "expires_at") var expiresAt: Instant? = null, @Column(name = "cancelled_at") var cancelledAt: Instant? = null, @Column(name = "is_trial") var isTrial: Boolean = false, @Column(name = "auto_renew") var autoRenew: Boolean = true, @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(), @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now() )</ID>
+    <ID>LongParameterList:User.kt$User$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @Column(nullable = false, unique = true) var email: String, @Column(nullable = false) var name: String, @Column(name = "google_id", unique = true) var googleId: String? = null, @Column(name = "apple_id", unique = true) var appleId: String? = null, // Store-owned columns: see the properties of the same name in the class body. revenueCatUserId: String? = null, subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE, subscriptionExpiresAt: Instant? = null, premiumGrantUntil: Instant? = null, premiumGrantReason: String? = null, @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(), @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(), @Column(name = "last_login_at") var lastLoginAt: Instant? = null, @Column(name = "current_streak", nullable = false) var currentStreak: Int = 0, @Column(name = "longest_streak", nullable = false) var longestStreak: Int = 0, @Column(name = "display_alias", length = 50) var displayAlias: String? = null, @Column(name = "profile_image_url", length = 512) var profileImageUrl: String? = null, @Column(name = "first_word_added_at") var firstWordAddedAt: Instant? = null, @Column(name = "first_review_at") var firstReviewAt: Instant? = null, @Column(name = "signup_country", length = 2) var signupCountry: String? = null, @Column(name = "last_login_country", length = 2) var lastLoginCountry: String? = null, @Column(nullable = false) var active: Boolean = true, @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY) val pushTokens: MutableList&lt;PushToken&gt; = mutableListOf() )</ID>
+    <ID>LongParameterList:UserServiceTest.kt$UserServiceTest$( id: Long = 1L, email: String = "test@example.com", name: String = "Test User", subscriptionStatus: SubscriptionStatus = SubscriptionStatus.FREE, currentStreak: Int = 0, displayAlias: String? = null, profileImageUrl: String? = null, active: Boolean = true, )</ID>
+    <ID>LongParameterList:Word.kt$Word$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override var id: Long? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) var user: User? = null, @Column(nullable = false) var originalWord: String = "", @Column(nullable = false) var translation: String = "", @Column(columnDefinition = "TEXT") var description: String = "", @Column(length = 10) var sourceLanguage: String = "", @Column(length = 10) var targetLanguage: String = "", @Column(nullable = false) var level: Int = 0, @Column(nullable = false) var easeFactor: Float = 2.5f, @Column(name = "review_interval", nullable = false) var interval: Int = 0, @Column(nullable = false) var repetitions: Int = 0, @Column(nullable = false) var lastReviewDate: Long = 0L, @Column(nullable = false) var nextReviewDate: Long = 0L, @Column(name = "created_at", nullable = false, updatable = false) var createdAt: Instant = Instant.now(), @Column(name = "updated_at", nullable = false) var updatedAt: Instant = Instant.now(), @Version var version: Long = 0, @ManyToMany(fetch = FetchType.LAZY) @JoinTable( name = "word_tags", joinColumns = [JoinColumn(name = "word_id")], inverseJoinColumns = [JoinColumn(name = "tag_id")] ) var tags: MutableSet&lt;Tag&gt; = mutableSetOf(), )</ID>
+    <ID>LongParameterList:WordControllerTest.kt$WordControllerTest$( id: Long? = null, originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tagIds: List&lt;Long&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:WordControllerTest.kt$WordControllerTest$( originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tagIds: List&lt;Long&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:WordRushGame.kt$WordRushGame$( @Id @GeneratedValue(strategy = GenerationType.IDENTITY) override val id: Long? = null, @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name = "user_id", nullable = false) val user: User, @Column(name = "client_game_id", nullable = false) val clientGameId: String, @Column(nullable = false) val score: Int = 0, @Column(name = "total_questions", nullable = false) val totalQuestions: Int = 0, @Column(name = "correct_count", nullable = false) val correctCount: Int = 0, @Column(name = "best_streak", nullable = false) val bestStreak: Int = 0, @Column(name = "duration_ms", nullable = false) val durationMs: Long = 0, @Column(name = "avg_response_ms", nullable = false) val avgResponseMs: Long = 0, @Column(nullable = false) val grade: String = "D", @Column(name = "lives_remaining", nullable = false) val livesRemaining: Int = 0, @Column(name = "completed_normally", nullable = false) val completedNormally: Boolean = false, @Column(name = "played_at", nullable = false) val playedAt: Long, @Column(name = "created_at", nullable = false, updatable = false) val createdAt: Instant = Instant.now(), )</ID>
+    <ID>LongParameterList:WordRushIntegrationTest.kt$WordRushIntegrationTest$( clientGameId: String, score: Int = 0, totalQuestions: Int = 12, correctCount: Int = 0, bestStreak: Int = 0, durationMs: Long = 30000, avgResponseMs: Long = 2000, grade: String = "B", livesRemaining: Int = 3, completedNormally: Boolean = true, playedAt: Long = System.currentTimeMillis(), )</ID>
+    <ID>LongParameterList:WordServiceTest.kt$WordServiceTest$( id: Long? = null, originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tagIds: List&lt;Long&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:WordServiceTest.kt$WordServiceTest$( id: Long? = null, user: User? = null, originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tags: MutableSet&lt;Tag&gt; = mutableSetOf(), )</ID>
+    <ID>LongParameterList:WordServiceTest.kt$WordServiceTest$( originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tagIds: List&lt;Long&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:WordUpsertPreparerTest.kt$WordUpsertPreparerTest$( id: Long? = null, originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tagIds: List&lt;Long&gt; = emptyList(), )</ID>
+    <ID>LongParameterList:WordUpsertPreparerTest.kt$WordUpsertPreparerTest$( id: Long? = null, user: User? = null, originalWord: String = "hello", translation: String = "hallo", description: String = "", sourceLanguage: String = "en", targetLanguage: String = "de", level: Int = 0, easeFactor: Float = 2.5f, interval: Int = 0, repetitions: Int = 0, lastReviewDate: Long = 0L, nextReviewDate: Long = 0L, tags: MutableSet&lt;Tag&gt; = mutableSetOf(), )</ID>
+    <ID>MatchingDeclarationName:EventDto.kt$TrackEventRequest</ID>
+    <ID>MatchingDeclarationName:FeatureAccessDto.kt$FeatureAccessResponse</ID>
+    <ID>MaxLineLength:AiController.kt$AiController$logger.info { "userId=${user.id} requesting suggested vocabulary: target=${request.targetLanguage}, level=${request.currentLevel}, native=${request.nativeLanguage}" }</ID>
+    <ID>MaxLineLength:AnalyticsService.kt$AnalyticsService$fun endOfDayMs(date: LocalDate): Long</ID>
+    <ID>MaxLineLength:AnalyticsService.kt$AnalyticsService$val completionRate = if (totalSessions &gt; 0) ((totalSessions - abandoned).toDouble() / totalSessions * 100) else null</ID>
+    <ID>MaxLineLength:AnalyticsSessionPersister.kt$AnalyticsSessionPersister$logger.warn(e) { "Skipping session ${sessionReq.clientSessionId} for user ${user.id} due to error: ${e.message}" }</ID>
+    <ID>MaxLineLength:DailyInsightService.kt$DailyInsightService$logger.info { "Generated ${if (hasActivityToday) "celebration" else "motivational"} insight for user ${user.id}" }</ID>
+    <ID>MaxLineLength:DailyInsightService.kt$DailyInsightService$private</ID>
+    <ID>MaxLineLength:EngagementSegmentService.kt$EngagementSegmentService$logger.debug { "Segment for user=$userId: $segment (daysSinceOpen=$daysSinceLastOpen, openedInLast3=$openedInLast3)" }</ID>
+    <ID>MaxLineLength:FirebaseConfig.kt$FirebaseConfig$logger.info { "✅ Firebase initialized for authentication (token verification enabled, push notifications disabled)" }</ID>
+    <ID>MaxLineLength:FirebaseConfig.kt$FirebaseConfig$logger.warn { "Firebase service account file not found: ${appProperties.firebase.serviceAccountPath}" }</ID>
+    <ID>MaxLineLength:GlobalExceptionHandler.kt$GlobalExceptionHandler$fun</ID>
+    <ID>MaxLineLength:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }</ID>
+    <ID>MaxLineLength:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$log.debug { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }</ID>
+    <ID>MaxLineLength:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$log.warn { "❌ JWT Filter [AUTH_FAILED]: User not found or inactive for userId=$userId, active=$isActive, testAccount=$isTestAccount - returning 403 for $path" }</ID>
+    <ID>MaxLineLength:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$log.warn { "❌ JWT Filter [NO_USER_ID]: Unable to extract user ID from token - returning 401 for $path" }</ID>
+    <ID>MaxLineLength:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$response.writer.write("""{"success":false,"message":"User account has been deleted or deactivated"}""")</ID>
+    <ID>MaxLineLength:NotificationAiAdvisor.kt$NotificationAiAdvisor$logger.warn { "AI returned unknown contentHint='${aiResponse.contentHint}' for user=$userId — using curiosity" }</ID>
+    <ID>MaxLineLength:NotificationControllerHandler.kt$NotificationControllerHandler$fun</ID>
+    <ID>MaxLineLength:NotificationScheduleRepository.kt$NotificationScheduleRepository$@Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil &gt;= CURRENT_DATE AND ns.consecutiveIgnores &gt;= 15")</ID>
+    <ID>MaxLineLength:NotificationScheduleRepository.kt$NotificationScheduleRepository$@Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil &gt;= CURRENT_DATE AND ns.consecutiveIgnores BETWEEN 10 AND 14")</ID>
+    <ID>MaxLineLength:NotificationScheduleRepository.kt$NotificationScheduleRepository$@Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil &gt;= CURRENT_DATE AND ns.consecutiveIgnores BETWEEN 3 AND 5")</ID>
+    <ID>MaxLineLength:NotificationScheduleRepository.kt$NotificationScheduleRepository$@Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil &gt;= CURRENT_DATE AND ns.consecutiveIgnores BETWEEN 6 AND 9")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("- optionalShortDescription = brief context or example (optional; can be empty after the second comma)")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("1. Choose words and short phrases that are appropriate for level \"$currentLevel\" (e.g. beginner = A1, elementary; intermediate = B1-B2; advanced = C1-C2).")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("2. Each item must be useful for real-world use: everyday vocabulary, common verbs, nouns, adjectives, and essential phrases.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("3. Cover a balanced mix: greetings, numbers, time, family, food, travel, work, emotions, actions, places, and common expressions.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("4. Keep the set balanced for an onboarding experience, covering everyday situations a new learner is likely to face.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("4. Prioritize vocabulary that is especially relevant to these interests: ${interests.joinToString()}.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("5. Still include some general everyday vocabulary so the set feels balanced for an onboarding experience.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("7. Remove any special characters that might break parsing (keep only letters, numbers, spaces, commas, semicolons)")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("Generate ONE brief, personalized message to motivate the user to log in and maintain their streak.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("Generate ONE brief, personalized push notification message to remind the user to complete their review today to maintain their streak.")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("If the image does NOT contain any vocabulary, text, or words, respond with exactly: ERROR: No vocabulary found")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("Task: Generate exactly $requestedCount vocabulary items for a learner with the following profile:")</ID>
+    <ID>MaxLineLength:OpenRouterService.kt$OpenRouterService$appendLine("Write a 1-sentence celebration acknowledging their consistency. Max 2 emojis. Be specific and warm, not generic.")</ID>
+    <ID>MaxLineLength:RS256JwtTokenProvider.kt$RS256JwtTokenProvider$logger.error(e) { "Failed to load existing keys, generating new pair (THIS WILL INVALIDATE ALL TOKENS)" }</ID>
+    <ID>MaxLineLength:RevenueCatClient.kt$willRenew = subscription != null &amp;&amp; subscription.unsubscribeDetectedAt == null &amp;&amp; subscription.refundedAt == null</ID>
+    <ID>MaxLineLength:SettingsDto.kt$SettingsDto$@field:Pattern(regexp = "^(DAILY|EVERY_OTHER_DAY|WEEKLY|OFF)$", message = "Must be one of: DAILY, EVERY_OTHER_DAY, WEEKLY, OFF")</ID>
+    <ID>MaxLineLength:StreakController.kt$StreakController$ApiResponse(success = true, data = StreakResponse(currentStreak = updatedUser.currentStreak), message = "Activity recorded successfully")</ID>
+    <ID>MaxLineLength:StreakController.kt$StreakController$return ResponseEntity.ok(ApiResponse(success = true, data = StreakResponse(currentStreak = streakInfo.currentStreak)))</ID>
+    <ID>MaxLineLength:StreakNotificationService.kt$StreakNotificationService$logger.info { "Sent streak reset warning to user=${user.id} (streak=$currentStreak, ${responses.count { it.success }}/${responses.size} tokens)" }</ID>
+    <ID>MaxLineLength:StreakNotificationService.kt$StreakNotificationService$logger.warn { "Failed to send streak reset warning to user=${user.id} — all ${responses.size} token(s) failed" }</ID>
+    <ID>MaxLineLength:StreakNotificationService.kt$StreakNotificationService$logger.warn { "No notification responses received for user=${user.id} — tokens may have been deactivated" }</ID>
+    <ID>MaxLineLength:SubscriptionService.kt$SubscriptionService$"RevenueCat sync updated userId=$userId: ${user.subscriptionStatus} -&gt; ${target.first}, expiresAt=${target.second}"</ID>
+    <ID>MaxLineLength:SubscriptionService.kt$SubscriptionService.Companion$val</ID>
+    <ID>MaxLineLength:UserController.kt$UserController$return ResponseEntity.ok(ApiResponse(success = true, data = featureAccessService.getFeatureAccess(user.requireId())))</ID>
+    <ID>MaxLineLength:UserRepository.kt$UserRepository$fun</ID>
+    <ID>NestedBlockDepth:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain )</ID>
+    <ID>NewLineAtEndOfFile:AppleNotificationService.kt$com.alirezaiyan.vokab.server.service.AppleNotificationService.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationCategory.kt$com.alirezaiyan.vokab.server.domain.entity.NotificationCategory.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationMessageBuilder.kt$com.alirezaiyan.vokab.server.service.push.NotificationMessageBuilder.kt</ID>
+    <ID>NewLineAtEndOfFile:NotificationSender.kt$com.alirezaiyan.vokab.server.service.push.NotificationSender.kt</ID>
+    <ID>NewLineAtEndOfFile:Projections.kt$com.alirezaiyan.vokab.server.domain.repository.Projections.kt</ID>
+    <ID>NewLineAtEndOfFile:UserRepository.kt$com.alirezaiyan.vokab.server.domain.repository.UserRepository.kt</ID>
+    <ID>ReturnCount:ApplePublicKeyService.kt$ApplePublicKeyService$private fun JsonNode.toRsaKeyOrNull(): Pair&lt;String, PublicKey&gt;?</ID>
+    <ID>ReturnCount:DailyInsightService.kt$DailyInsightService$fun generateDailyInsightForUser(user: User): DailyInsight?</ID>
+    <ID>ReturnCount:EmailService.kt$EmailService$@Transactional fun sendTemplated( userId: Long, recipientEmail: String, templateId: String, variables: Map&lt;String, String&gt; = emptyMap(), dedupHours: Long = 24 ): Boolean</ID>
+    <ID>ReturnCount:FirebaseConfig.kt$FirebaseConfig$@Bean fun initializeFirebase(): FirebaseApp?</ID>
+    <ID>ReturnCount:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$override fun doFilterInternal( request: HttpServletRequest, response: HttpServletResponse, filterChain: FilterChain )</ID>
+    <ID>ReturnCount:MilestoneDetector.kt$MilestoneDetector$@Transactional(readOnly = true) fun getPendingMilestone(user: User): MilestoneEvent?</ID>
+    <ID>ReturnCount:NotificationTypeSelector.kt$NotificationTypeSelector$@Transactional(readOnly = true) fun selectType(user: User, schedule: NotificationSchedule): NotificationType</ID>
+    <ID>ReturnCount:RevenueCatWebhookAuthenticator.kt$RevenueCatWebhookAuthenticator$private fun verifySignature(header: String?, body: ByteArray, secret: String, toleranceSeconds: Long): String?</ID>
+    <ID>ReturnCount:SubscriptionService.kt$SubscriptionService$fun syncFromRevenueCat(userId: Long): SyncOutcome</ID>
+    <ID>SwallowedException:ApplePublicKeyService.kt$ApplePublicKeyService$e: GeneralSecurityException</ID>
+    <ID>SwallowedException:ApplePublicKeyService.kt$ApplePublicKeyService$e: IllegalArgumentException</ID>
+    <ID>SwallowedException:DailyInsightService.kt$DailyInsightService$e: DataIntegrityViolationException</ID>
+    <ID>SwallowedException:GeoLocationService.kt$GeoLocationService$e: AddressNotFoundException</ID>
+    <ID>ThrowsCount:OpenRouterService.kt$OpenRouterService$fun extractVocabularyFromImage( imageBase64: String, targetLanguage: String, extractWords: Boolean = true, extractSentences: Boolean = false ): String</ID>
+    <ID>ThrowsCount:OpenRouterService.kt$OpenRouterService$private fun requestChat(content: List&lt;Content&gt;, operation: String): String?</ID>
+    <ID>TooGenericExceptionCaught:AdminNotificationListener.kt$AdminNotificationListener$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AnalyticsSessionPersister.kt$AnalyticsSessionPersister$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppleNotificationService.kt$AppleNotificationService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AppleWebhookController.kt$AppleWebhookController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:AuditLogService.kt$AuditLogService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:DailyInsightService.kt$DailyInsightService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EmailService.kt$EmailService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EventController.kt$EventController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:EventService.kt$EventService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:FirebaseConfig.kt$FirebaseConfig$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:GeoLocationService.kt$GeoLocationService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:JwtAuthenticationFilter.kt$JwtAuthenticationFilter$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:NotificationSender.kt$FirebaseNotificationSender$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:RS256JwtTokenProvider.kt$RS256JwtTokenProvider$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:ScheduledTasks.kt$ScheduledTasks$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:StreakNotificationService.kt$StreakNotificationService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:StreakReminderService.kt$StreakReminderService$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:StreakReminderService.kt$StreakReminderService$fallbackError: Exception</ID>
+    <ID>TooGenericExceptionCaught:WebhookController.kt$WebhookController$e: Exception</ID>
+    <ID>TooGenericExceptionCaught:WordRushGamePersister.kt$WordRushGamePersister$e: Exception</ID>
+    <ID>TooManyFunctions:AnalyticsController.kt$AnalyticsController</ID>
+    <ID>TooManyFunctions:AnalyticsService.kt$AnalyticsService</ID>
+    <ID>TooManyFunctions:AuthService.kt$AuthService</ID>
+    <ID>TooManyFunctions:GlobalExceptionHandler.kt$GlobalExceptionHandler</ID>
+    <ID>TooManyFunctions:NotificationLogRepository.kt$NotificationLogRepository : JpaRepository</ID>
+    <ID>TooManyFunctions:NotificationScheduleRepository.kt$NotificationScheduleRepository : JpaRepository</ID>
+    <ID>TooManyFunctions:OpenRouterService.kt$OpenRouterService</ID>
+    <ID>TooManyFunctions:ReviewEventRepository.kt$ReviewEventRepository : JpaRepository</ID>
+    <ID>TooManyFunctions:SubscriptionService.kt$SubscriptionService</ID>
+    <ID>TooManyFunctions:UserRepository.kt$UserRepository : JpaRepository</ID>
+    <ID>TooManyFunctions:WordRepository.kt$WordRepository : JpaRepository</ID>
+    <ID>UnusedImports:AppleNotificationServiceTest.kt$import org.junit.jupiter.api.Assertions.assertEquals</ID>
+    <ID>UnusedImports:AuthDto.kt$import jakarta.validation.constraints.Email</ID>
+    <ID>UnusedImports:AuthServiceTest.kt$import com.alirezaiyan.vokab.server.domain.event.UserSignedUpEvent</ID>
+    <ID>UnusedImports:AuthServiceTest.kt$import io.mockk.Runs</ID>
+    <ID>UnusedImports:AuthServiceTest.kt$import io.mockk.just</ID>
+    <ID>UnusedImports:DailyInsightRepository.kt$import org.springframework.data.repository.query.Param</ID>
+    <ID>UnusedImports:DailyInsightServiceTest.kt$import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule</ID>
+    <ID>UnusedImports:DailyInsightServiceTest.kt$import io.mockk.justRun</ID>
+    <ID>UnusedImports:EngagementSegmentScheduler.kt$import java.time.LocalDate</ID>
+    <ID>UnusedImports:EngagementSegmentSchedulerTest.kt$import io.mockk.justRun</ID>
+    <ID>UnusedImports:EventServiceTest.kt$import io.mockk.just</ID>
+    <ID>UnusedImports:EventServiceTest.kt$import io.mockk.runs</ID>
+    <ID>UnusedImports:GlobalExceptionHandler.kt$import com.alirezaiyan.vokab.server.presentation.dto.ErrorResponse</ID>
+    <ID>UnusedImports:NotificationTimingServiceTest.kt$import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus</ID>
+    <ID>UnusedImports:NotificationTimingServiceTest.kt$import io.mockk.Runs</ID>
+    <ID>UnusedImports:NotificationTimingServiceTest.kt$import io.mockk.just</ID>
+    <ID>UnusedImports:PushNotificationService.kt$import com.alirezaiyan.vokab.server.domain.entity.PushToken</ID>
+    <ID>UnusedImports:RS256JwtTokenProvider.kt$import io.jsonwebtoken.security.Keys</ID>
+    <ID>UnusedImports:SecurityConfig.kt$import org.springframework.http.HttpMethod</ID>
+    <ID>UnusedImports:StreakNotificationService.kt$import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto</ID>
+    <ID>UnusedImports:StreakNotificationService.kt$import java.time.Instant</ID>
+    <ID>UnusedImports:SubscriptionServiceTest.kt$import org.junit.jupiter.api.assertThrows</ID>
+    <ID>UnusedImports:UserSettingsServiceTest.kt$import org.junit.jupiter.api.Assertions.assertNotNull</ID>
+    <ID>UnusedImports:WebConfig.kt$import org.springframework.context.annotation.Bean</ID>
+    <ID>UnusedImports:WordUpsertPreparerTest.kt$import org.junit.jupiter.api.Assertions.assertNotNull</ID>
+    <ID>UnusedParameter:AiController.kt$AiController$@AuthenticationPrincipal user: User</ID>
+    <ID>UnusedParameter:NotificationControllerHandler.kt$NotificationControllerHandler$user: User</ID>
+    <ID>UnusedPrivateProperty:AnalyticsService.kt$AnalyticsService$private val userRepository: UserRepository</ID>
+    <ID>UnusedPrivateProperty:AuthControllerTest.kt$AuthControllerTest$@Autowired private lateinit var objectMapper: ObjectMapper</ID>
+    <ID>UnusedPrivateProperty:NotificationEngagementServiceTest.kt$NotificationEngagementServiceTest$val since = TEST_NOW.minusSeconds(60 * 60 * 24 * 30)</ID>
+    <ID>UnusedPrivateProperty:SecurityConfig.kt$SecurityConfig$val origins = appProperties.cors.allowedOrigins.split(",").toMutableList()</ID>
+    <ID>WildcardImport:AiController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AiController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:AnalyticsController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AnalyticsController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:AnalyticsDto.kt$import jakarta.validation.constraints.*</ID>
+    <ID>WildcardImport:AnalyticsIntegrationTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AnalyticsIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:AnalyticsService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AppConfig.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:AppConfigAdminController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:AppEvent.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:AppleNotificationService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AppleWebhookController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:AuditLog.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:AuthController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:AuthController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:BackwardCompatibilityTest.kt$import com.alirezaiyan.vokab.server.domain.entity.*</ID>
+    <ID>WildcardImport:BackwardCompatibilityTest.kt$import com.alirezaiyan.vokab.server.domain.repository.*</ID>
+    <ID>WildcardImport:DailyActivity.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:DailyInsight.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:EmailController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:EmailLog.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:EmailSubscription.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:EmailTemplate.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:EventController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:NotificationContentBuilder.kt$import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType.*</ID>
+    <ID>WildcardImport:NotificationLog.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:NotificationSchedule.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:PushNotificationConfig.kt$import com.alirezaiyan.vokab.server.service.push.*</ID>
+    <ID>WildcardImport:PushNotificationController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:PushNotificationController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:PushToken.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:RefreshToken.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:ReviewEvent.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:SettingsController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:StreakController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:StreakReminderServiceTest.kt$import io.mockk.*</ID>
+    <ID>WildcardImport:StudySession.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:Subscription.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:SubscriptionController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:Tag.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:TagController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:User.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:UserController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:UserPlatform.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:UserSettings.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:WebhookController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:Word.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:WordController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:WordRushController.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:WordRushController.kt$import org.springframework.web.bind.annotation.*</ID>
+    <ID>WildcardImport:WordRushControllerTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:WordRushDto.kt$import jakarta.validation.constraints.*</ID>
+    <ID>WildcardImport:WordRushGame.kt$import jakarta.persistence.*</ID>
+    <ID>WildcardImport:WordRushGamePersisterTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:WordRushIntegrationTest.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:WordRushIntegrationTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+    <ID>WildcardImport:WordRushService.kt$import com.alirezaiyan.vokab.server.presentation.dto.*</ID>
+    <ID>WildcardImport:WordRushServiceTest.kt$import org.junit.jupiter.api.Assertions.*</ID>
+  </CurrentIssues>
+</SmellBaseline>

@@ -4,6 +4,7 @@ plugins {
 	alias(libs.plugins.kotlin.jpa)
 	alias(libs.plugins.spring.boot)
 	alias(libs.plugins.spring.dependency.management)
+	alias(libs.plugins.detekt)
 	jacoco
 }
 
@@ -70,6 +71,8 @@ dependencies {
 	testImplementation(libs.spring.security.test)
 	testImplementation(libs.kotlin.test.junit5)
 	testImplementation(libs.mockk)
+	// Architecture rules as tests (src/test/.../architecture)
+	testImplementation(libs.konsist)
 	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
 	testImplementation(libs.testcontainers.postgresql)
 	testRuntimeOnly(libs.junit.platform.launcher)
@@ -97,6 +100,30 @@ kotlin {
 // META-INF/build-info.properties: lets /api/v1/health report the real version instead of "development"
 springBoot {
 	buildInfo()
+}
+
+// Same ruleset as the client (Lexicon/detekt.yml), minus the Compose/Android rules. Runs in `check`,
+// so CI fails on new findings; existing ones are recorded in detekt-baseline.xml.
+detekt {
+	buildUponDefaultConfig = true
+	config.setFrom(files("$rootDir/detekt.yml"))
+	baseline = file("$rootDir/detekt-baseline.xml")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+	jvmTarget = "21"
+	reports {
+		sarif.required = true
+	}
+}
+
+// detekt 1.23 embeds the Kotlin 1.9 compiler; keep the Spring BOM from lifting its classpath to ours
+configurations.matching { it.name == "detekt" }.configureEach {
+	resolutionStrategy.eachDependency {
+		if (requested.group == "org.jetbrains.kotlin") {
+			useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+		}
+	}
 }
 
 // One stable artifact name for the Dockerfile and scripts; the plain (non-boot) jar isn't used

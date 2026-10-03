@@ -246,7 +246,7 @@ class AuthServiceTest {
         // Assert — platform row ensured, then touched with the resolved version
         verifyOrder {
             userPlatformRepository.insertPlatformIfAbsent(existingUser.id!!, "IOS", "2.5.0")
-            userPlatformRepository.touchPlatform(existingUser.id!!, "IOS", "2.5.0")
+            userPlatformRepository.touchPlatform(existingUser.id, "IOS", "2.5.0")
         }
     }
 

@@ -81,12 +81,12 @@ object SensitiveDataMasker {
         return when {
             node.isObject -> {
                 val maskedObject = objectMapper.createObjectNode()
-                node.fields().forEach { (fieldName, fieldValue) ->
+                node.properties().forEach { (fieldName, fieldValue) ->
                     val lowerFieldName = fieldName.lowercase(Locale.getDefault())
                     if (sensitiveJsonFields.any { lowerFieldName.contains(it, ignoreCase = true) }) {
                         maskedObject.put(fieldName, MASKED_VALUE)
                     } else if (fieldValue.isObject || fieldValue.isArray) {
-                        maskedObject.set(fieldName, maskJsonNode(fieldValue))
+                        maskedObject.set<JsonNode>(fieldName, maskJsonNode(fieldValue))
                     } else {
                         maskedObject.set(fieldName, fieldValue)
                     }

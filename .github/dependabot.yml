@@ -1,0 +1,32 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      # Every 2 months: 1st of Jan, Mar, May, Jul, Sep, Nov at 09:00 UTC (same cadence as the client)
+      interval: cron
+      cronjob: "0 9 1 */2 *"
+    open-pull-requests-limit: 5
+    groups:
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*"]
+      spring-boot:
+        patterns: ["org.springframework.boot*", "io.spring.dependency-management*"]
+      jjwt:
+        patterns: ["io.jsonwebtoken*"]
+      flyway:
+        patterns: ["org.flywaydb*"]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 9 1 */2 *"
+    open-pull-requests-limit: 2
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: cron
+      cronjob: "0 9 1 */2 *"
+    open-pull-requests-limit: 3

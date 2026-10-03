@@ -2,7 +2,6 @@ package com.alirezaiyan.vokab.server.config
 
 import io.github.bucket4j.Bandwidth
 import io.github.bucket4j.Bucket
-import io.github.bucket4j.Refill
 import org.springframework.context.annotation.Configuration
 import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
@@ -18,7 +17,7 @@ class RateLimitConfig {
      */
     fun getAiBucket(userId: String): Bucket {
         return cache.computeIfAbsent(userId) {
-            val limit = Bandwidth.classic(10, Refill.intervally(10, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
@@ -32,7 +31,7 @@ class RateLimitConfig {
     fun getImageProcessingBucket(userId: String): Bucket {
         val key = "image_$userId"
         return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
@@ -46,7 +45,7 @@ class RateLimitConfig {
     fun getSubscriptionSyncBucket(userId: String): Bucket {
         val key = "subscription_sync_$userId"
         return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.classic(2, Refill.intervally(2, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(2).refillIntervally(2, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
@@ -60,7 +59,7 @@ class RateLimitConfig {
     fun getAuthBucket(ipAddress: String): Bucket {
         val key = "auth_$ipAddress"
         return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
@@ -74,7 +73,7 @@ class RateLimitConfig {
     fun getRefreshBucket(ipAddress: String): Bucket {
         val key = "refresh_$ipAddress"
         return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.classic(10, Refill.intervally(10, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
@@ -88,7 +87,7 @@ class RateLimitConfig {
     fun getOnboardingBucket(ipAddress: String): Bucket {
         val key = "onboarding_$ipAddress"
         return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.classic(5, Refill.intervally(5, Duration.ofMinutes(1)))
+            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()

@@ -1,0 +1,54 @@
+[versions]
+kotlin = "2.3.10"
+spring-boot = "3.5.6"
+spring-dependency-management = "1.1.7"
+flyway = "11.8.0"
+jjwt = "0.12.3"
+firebase-admin = "9.2.0"
+google-api-client = "2.2.0"
+bucket4j = "8.10.1"
+bouncycastle = "1.78.1"
+geoip2 = "4.2.0"
+kotlin-logging = "5.1.0"
+mockk = "1.13.8"
+
+[libraries]
+# Versions managed by the Spring Boot BOM
+spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
+spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
+spring-boot-starter-oauth2-client = { module = "org.springframework.boot:spring-boot-starter-oauth2-client" }
+spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
+spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
+spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
+spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
+spring-security-test = { module = "org.springframework.security:spring-security-test" }
+kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
+kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
+jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+postgresql = { module = "org.postgresql:postgresql" }
+h2 = { module = "com.h2database:h2" }
+testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+
+# Pinned here
+flyway-core = { module = "org.flywaydb:flyway-core", version.ref = "flyway" }
+flyway-postgresql = { module = "org.flywaydb:flyway-database-postgresql", version.ref = "flyway" }
+jjwt-api = { module = "io.jsonwebtoken:jjwt-api", version.ref = "jjwt" }
+jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
+jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
+firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
+google-api-client = { module = "com.google.api-client:google-api-client", version.ref = "google-api-client" }
+bucket4j-core = { module = "com.bucket4j:bucket4j-core", version.ref = "bucket4j" }
+bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk18on", version.ref = "bouncycastle" }
+geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
+kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
+mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-spring = { id = "org.jetbrains.kotlin.plugin.spring", version.ref = "kotlin" }
+kotlin-jpa = { id = "org.jetbrains.kotlin.plugin.jpa", version.ref = "kotlin" }
+spring-boot = { id = "org.springframework.boot", version.ref = "spring-boot" }
+spring-dependency-management = { id = "io.spring.dependency-management", version.ref = "spring-dependency-management" }

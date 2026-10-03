@@ -1,9 +1,9 @@
 plugins {
-	kotlin("jvm") version "1.9.25"
-	kotlin("plugin.spring") version "1.9.25"
-	kotlin("plugin.jpa") version "1.9.25"
-	id("org.springframework.boot") version "3.5.6"
-	id("io.spring.dependency-management") version "1.1.7"
+	alias(libs.plugins.kotlin.jvm)
+	alias(libs.plugins.kotlin.spring)
+	alias(libs.plugins.kotlin.jpa)
+	alias(libs.plugins.spring.boot)
+	alias(libs.plugins.spring.dependency.management)
 	jacoco
 }
 
@@ -11,11 +11,8 @@ group = "com.alirezaiyan"
 version = project.property("projectVersion") as String
 description = "Lexicon Server Application"
 
-java {
-	toolchain {
-		languageVersion = JavaLanguageVersion.of(21)
-	}
-}
+// The Spring Boot BOM pins Kotlin libraries to its own baseline; keep them on the compiler's version
+extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
 
 repositories {
 	mavenCentral()
@@ -23,69 +20,74 @@ repositories {
 
 dependencies {
 	// Spring Boot Starters
-	implementation("org.springframework.boot:spring-boot-starter-web")
-	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.springframework.boot:spring-boot-starter-security")
-	implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
-	implementation("org.springframework.boot:spring-boot-starter-validation")
-	implementation("org.springframework.boot:spring-boot-starter-actuator")
-	implementation("org.springframework.boot:spring-boot-starter-mail")
-	
+	implementation(libs.spring.boot.starter.web)
+	implementation(libs.spring.boot.starter.data.jpa)
+	implementation(libs.spring.boot.starter.security)
+	implementation(libs.spring.boot.starter.oauth2.client)
+	implementation(libs.spring.boot.starter.validation)
+	implementation(libs.spring.boot.starter.actuator)
+	implementation(libs.spring.boot.starter.mail)
+
 	// Kotlin
-	implementation("org.jetbrains.kotlin:kotlin-reflect")
-	implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
-	implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
-	
+	implementation(libs.kotlin.reflect)
+	implementation(libs.jackson.module.kotlin)
+
 	// Database
-	implementation("org.postgresql:postgresql")
+	implementation(libs.postgresql)
 	// H2 only for the local h2 profile (bootRun); not shipped in the production jar
-	developmentOnly("com.h2database:h2")
-	implementation("org.flywaydb:flyway-core:11.8.0")
-	implementation("org.flywaydb:flyway-database-postgresql:11.8.0")
-	
+	developmentOnly(libs.h2)
+	implementation(libs.flyway.core)
+	implementation(libs.flyway.postgresql)
+
 	// JWT
-	implementation("io.jsonwebtoken:jjwt-api:0.12.3")
-	runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")
-	runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
-	
+	implementation(libs.jjwt.api)
+	runtimeOnly(libs.jjwt.impl)
+	runtimeOnly(libs.jjwt.jackson)
+
 	// Firebase Admin SDK for push notifications
-	implementation("com.google.firebase:firebase-admin:9.2.0")
-	
+	implementation(libs.firebase.admin)
+
 	// Google API Client for OAuth
-	implementation("com.google.api-client:google-api-client:2.2.0")
-	
+	implementation(libs.google.api.client)
+
 	// Rate Limiting
-	implementation("com.bucket4j:bucket4j-core:8.10.1")
-	
+	implementation(libs.bucket4j.core)
+
 	// Password Hashing (for refresh tokens)
-	implementation("org.springframework.security:spring-security-crypto")
-	
+	implementation(libs.spring.security.crypto)
+
 	// Argon2 for refresh token hashing
-	implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
-	
+	implementation(libs.bouncycastle.bcprov)
+
 	// GeoIP
-	implementation("com.maxmind.geoip2:geoip2:4.2.0")
+	implementation(libs.geoip2)
 
 	// Logging
-	implementation("io.github.oshai:kotlin-logging-jvm:5.1.0")
-	
+	implementation(libs.kotlin.logging)
+
 	// Testing
-	testImplementation("org.springframework.boot:spring-boot-starter-test")
-	testImplementation("org.springframework.security:spring-security-test")
-	testImplementation("org.jetbrains.kotlin:kotlin-test-junit5")
-	testImplementation("io.mockk:mockk:1.13.8")
+	testImplementation(libs.spring.boot.starter.test)
+	testImplementation(libs.spring.security.test)
+	testImplementation(libs.kotlin.test.junit5)
+	testImplementation(libs.mockk)
 	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
-	testImplementation("org.testcontainers:postgresql")
-	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+	testImplementation(libs.testcontainers.postgresql)
+	testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 kotlin {
+	jvmToolchain(21)
 	compilerOptions {
-		freeCompilerArgs.addAll("-Xjsr305=strict")
+		freeCompilerArgs.addAll(
+			"-Xjsr305=strict",
+			// Annotations on constructor properties (@JsonProperty, @NotBlank, ...) also land on the
+			// property/field — the Kotlin 2.x future default; opting in now silences the migration warning
+			"-Xannotation-default-target=param-property",
+		)
 	}
 }
 
-tasks.withType<Test> {
+tasks.test {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)
 }
@@ -116,7 +118,7 @@ tasks.jacocoTestReport {
 
 	// Print coverage after report is generated
 	doLast {
-		val report = file("$buildDir/reports/jacoco/test/jacocoTestReport.xml")
+		val report = layout.buildDirectory.file("reports/jacoco/test/jacocoTestReport.xml").get().asFile
 		
 		if (report.exists()) {
 			val content = report.readText()
@@ -182,9 +184,4 @@ tasks.jacocoTestReport {
 			}
 		}
 	}
-}
-
-// Run report after tests
-tasks.test {
-	finalizedBy(tasks.jacocoTestReport)
 }

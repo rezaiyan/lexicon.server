@@ -1,7 +1,7 @@
 # Multi-stage build for optimized Docker image
 
 # Stage 1: Build
-FROM gradle:8.5-jdk21 AS builder
+FROM eclipse-temurin:21-jdk AS builder
 
 WORKDIR /app
 
@@ -9,19 +9,20 @@ WORKDIR /app
 ENV GRADLE_USER_HOME=/app/.gradle
 
 # Copy Gradle files
-COPY build.gradle.kts settings.gradle.kts gradle.properties ./
+# The wrapper pins the same Gradle version as local and CI builds
+COPY gradlew build.gradle.kts settings.gradle.kts gradle.properties ./
 # Strip Mac-local JDK path — not valid inside the container
 RUN sed -i '/org.gradle.java.home/d' gradle.properties
 COPY gradle gradle
 
 # Download dependencies (cached layer) — ignore failure due to missing sources
-RUN gradle build --no-daemon || true
+RUN ./gradlew build --no-daemon || true
 
 # Copy source code
 COPY src src
 
 # Build application
-RUN gradle clean build --no-daemon -x test
+RUN ./gradlew clean build --no-daemon -x test
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine

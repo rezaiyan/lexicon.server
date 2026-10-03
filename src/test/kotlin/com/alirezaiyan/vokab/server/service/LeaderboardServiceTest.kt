@@ -82,8 +82,8 @@ class LeaderboardServiceTest {
 
         assertNotNull(result.userEntry)
         assertEquals(42, result.userEntry!!.rank)
-        assertEquals(5, result.userEntry!!.masteredWords)
-        assertTrue(result.userEntry!!.isCurrentUser)
+        assertEquals(5, result.userEntry.masteredWords)
+        assertTrue(result.userEntry.isCurrentUser)
     }
 
     @Test

@@ -60,7 +60,7 @@ class BackwardCompatibilityTest {
         )
         assertNotNull(settings.id)
 
-        val retrieved = userRepository.findById(user.id!!).orElse(null)
+        val retrieved = userRepository.findById(user.id).orElse(null)
         assertNotNull(retrieved)
         assertTrue(retrieved.email == "legacy@example.com")
     }
@@ -83,7 +83,7 @@ class BackwardCompatibilityTest {
         )
 
         assertNotNull(refreshToken.id)
-        val loaded = refreshTokenRepository.findById(refreshToken.id!!).orElse(null)
+        val loaded = refreshTokenRepository.findById(refreshToken.id).orElse(null)
         assertNotNull(loaded)
         assertTrue(loaded.tokenHash == "test_hash")
     }

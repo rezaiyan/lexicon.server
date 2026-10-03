@@ -26,6 +26,9 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lexicon-server
+    # The JVM sizes its heap from this (-XX:MaxRAMPercentage=75 in the Dockerfile); without a limit
+    # it would size against the whole VPS, which Postgres and Metabase share.
+    mem_limit: ${APP_MEM_LIMIT:-1536m}
     depends_on:
       postgres:
         condition: service_healthy

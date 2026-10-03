@@ -21,8 +21,10 @@ RUN ./gradlew build --no-daemon || true
 # Copy source code
 COPY src src
 
-# Build application
-RUN ./gradlew clean build --no-daemon -x test
+# Build the boot jar, then split it into layers ordered from least to most frequently changed,
+# so a code-only deploy rebuilds and ships just the small application layer
+RUN ./gradlew bootJar --no-daemon \
+ && java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
@@ -32,19 +34,16 @@ WORKDIR /app
 # Create non-root user
 RUN addgroup -S spring && adduser -S spring -G spring
 
-# Copy built JAR from builder stage
-COPY --from=builder /app/build/libs/*.jar app.jar
+# Create mount points for JWT RSA keys and avatar uploads (mounted as volumes)
+RUN mkdir -p /app/keys /var/www/uploads/avatars \
+ && chown -R spring:spring /app /var/www/uploads
 
-# Create keys directory for JWT RSA keys (will be mounted as volume)
-RUN mkdir -p /app/keys && chown -R spring:spring /app/keys
-
-# Create avatar uploads directory (will be mounted as volume)
-RUN mkdir -p /var/www/uploads/avatars && chown -R spring:spring /var/www/uploads
+COPY --from=builder --chown=spring:spring /app/extracted/dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/spring-boot-loader/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/snapshot-dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/application/ ./
 
 # Firebase service account is provided via a secure path or secret at runtime
-
-# Change ownership
-RUN chown -R spring:spring /app
 
 # Switch to non-root user
 USER spring:spring
@@ -56,6 +55,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD sh -c 'PORT=${PORT:-8080}; wget --no-verbose --tries=1 --spider "http://localhost:${PORT}/api/v1/health" || exit 1'
 
-# Run application
-ENTRYPOINT ["java", "-jar", "app.jar"]
-
+# Heap is sized from the container memory limit (mem_limit in docker-compose.yml). On OOM the JVM
+# exits instead of limping on half-broken, and the restart policy brings up a fresh one.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", \
+            "org.springframework.boot.loader.launch.JarLauncher"]

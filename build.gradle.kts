@@ -84,6 +84,20 @@ kotlin {
 	}
 }
 
+// META-INF/build-info.properties: lets /api/v1/health report the real version instead of "development"
+springBoot {
+	buildInfo()
+}
+
+// One stable artifact name for the Dockerfile and scripts; the plain (non-boot) jar isn't used
+tasks.bootJar {
+	archiveFileName = "app.jar"
+}
+
+tasks.jar {
+	enabled = false
+}
+
 tasks.test {
 	useJUnitPlatform()
 	finalizedBy(tasks.jacocoTestReport)

@@ -47,7 +47,7 @@ fi
 
 # Start the server
 echo "🚀 Starting production server..."
-java -jar build/libs/lexicon.server-0.0.1-SNAPSHOT.jar
+java -XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError -jar build/libs/app.jar
 
 echo ""
 echo "✅ Server started successfully!"

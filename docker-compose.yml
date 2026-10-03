@@ -33,6 +33,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      # One JSON object per log line (Elastic Common Schema) incl. MDC requestId and access-log fields;
+      # set LOG_FORMAT= (empty) in .env for plain text while debugging on the box
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT-ecs}
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lexicondb}
       DATABASE_USERNAME: ${POSTGRES_USER:-lexicon_user}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}

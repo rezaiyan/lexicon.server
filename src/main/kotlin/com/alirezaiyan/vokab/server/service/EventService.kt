@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.domain.entity.AppEvent
 import com.alirezaiyan.vokab.server.domain.repository.AppEventRepository
 import com.alirezaiyan.vokab.server.presentation.dto.TrackEventRequest
@@ -19,6 +20,7 @@ class EventService(
     private val objectMapper: ObjectMapper,
     private val notificationEngagementService: NotificationEngagementService,
     private val clock: Clock,
+    private val meterRegistry: MeterRegistry,
 ) {
     @Transactional
     fun track(userId: Long, request: TrackEventRequest) {
@@ -47,6 +49,7 @@ class EventService(
 
             logger.debug { "Tracked event '${request.eventName}' for user $userId" }
         } catch (e: Exception) {
+            meterRegistry.counter("app_events.insert_failures").increment()
             logger.warn(e) { "Failed to track event '${request.eventName}' for user $userId" }
         }
     }

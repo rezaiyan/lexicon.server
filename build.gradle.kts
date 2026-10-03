@@ -27,6 +27,9 @@ dependencies {
 	implementation(libs.spring.boot.starter.actuator)
 	implementation(libs.spring.boot.starter.mail)
 
+	// Metrics, scraped from the internal management port
+	implementation(libs.micrometer.registry.prometheus)
+
 	// Kotlin
 	implementation(libs.kotlin.reflect)
 	implementation(libs.jackson.module.kotlin)

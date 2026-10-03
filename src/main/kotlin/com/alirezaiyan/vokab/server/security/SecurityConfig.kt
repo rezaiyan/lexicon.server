@@ -41,7 +41,8 @@ class SecurityConfig(
                         "/api/v1/users/feature-flags",
                         "/api/v1/onboarding/**",
                         "/h2-console/**",
-                        "/actuator/health",
+                        // Only served on the internal management port (management.server.port)
+                        "/actuator/**",
                         "/error"
                     ).permitAll()
                     // Admin endpoints require ADMIN role

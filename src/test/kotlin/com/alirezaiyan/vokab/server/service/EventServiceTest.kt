@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.AppEvent
@@ -21,13 +23,14 @@ class EventServiceTest {
     private lateinit var objectMapper: ObjectMapper
     private lateinit var notificationEngagementService: NotificationEngagementService
     private lateinit var eventService: EventService
+    private val meterRegistry = SimpleMeterRegistry()
 
     @BeforeEach
     fun setUp() {
         appEventRepository = mockk()
         objectMapper = ObjectMapper()
         notificationEngagementService = mockk()
-        eventService = EventService(appEventRepository, objectMapper, notificationEngagementService, clock = fixedClock())
+        eventService = EventService(appEventRepository, objectMapper, notificationEngagementService, clock = fixedClock(), meterRegistry = meterRegistry)
     }
 
     @Test
@@ -122,6 +125,7 @@ class EventServiceTest {
         assertDoesNotThrow {
             eventService.track(userId = 1L, request = request)
         }
+        assertEquals(1.0, meterRegistry.counter("app_events.insert_failures").count())
     }
 
     @Test

@@ -77,9 +77,8 @@ data class SecurityConfig(
 
 data class LoggingConfig(
     var enabled: Boolean = true,
-    var maxBodySize: Int = 50000,
-    var excludePatterns: String = "/actuator/health,/h2-console/**",
-    var logLevel: String = "INFO"
+    // The Docker healthcheck hits /api/v1/health every 30s
+    var excludePatterns: String = "/api/v1/health,/actuator/**,/h2-console/**",
 )
 
 /**

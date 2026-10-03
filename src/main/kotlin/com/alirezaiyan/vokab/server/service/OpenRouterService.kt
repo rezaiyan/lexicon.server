@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.config.AiRestClient
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.describe
@@ -33,6 +34,7 @@ private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
 class OpenRouterService(
     @AiRestClient restClientBuilder: RestClient.Builder,
     private val appProperties: AppProperties,
+    private val meterRegistry: MeterRegistry,
 ) {
     private val restClient: RestClient = restClientBuilder
         .baseUrl(appProperties.openrouter.baseUrl)
@@ -369,6 +371,17 @@ class OpenRouterService(
      * text. Response bodies are logged, never put into exception messages.
      */
     private fun chat(content: List<Content>, operation: String): String? {
+        val result = runCatching { requestChat(content, operation) }
+        val outcome = when {
+            result.isFailure -> "error"
+            result.getOrNull() == null -> "empty"
+            else -> "success"
+        }
+        meterRegistry.counter("ai.requests", "operation", operation, "outcome", outcome).increment()
+        return result.getOrThrow()
+    }
+
+    private fun requestChat(content: List<Content>, operation: String): String? {
         val request = OpenRouterRequest(model = model, messages = listOf(Message(role = "user", content = content)))
         val response = try {
             restClient.post()

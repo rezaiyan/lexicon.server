@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -32,6 +33,7 @@ class SmartNotificationDispatcherTest {
     private val userProgressService: UserProgressService = mockk()
     private val notificationEngagementService: NotificationEngagementService = mockk()
     private val objectMapper: ObjectMapper = ObjectMapper()
+    private val meterRegistry = SimpleMeterRegistry()
 
     private lateinit var dispatcher: SmartNotificationDispatcher
 
@@ -46,7 +48,8 @@ class SmartNotificationDispatcherTest {
             userProgressService,
             notificationEngagementService,
             objectMapper,
-            clock = fixedClock()
+            clock = fixedClock(),
+            meterRegistry = meterRegistry,
         )
     }
 
@@ -71,6 +74,7 @@ class SmartNotificationDispatcherTest {
 
         verify(exactly = 1) { pushNotificationService.sendNotificationToUser(userId = 1L, title = any(), body = any(), data = any()) }
         verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.DUE_CARDS.name, any()) }
+        assertEquals(1.0, meterRegistry.counter("notifications.sent", "type", "DUE_CARDS").count())
     }
 
     @Test
@@ -103,6 +107,7 @@ class SmartNotificationDispatcherTest {
         dispatcher.dispatchForCurrentHour()
 
         verify(exactly = 0) { notificationEngagementService.recordSend(any(), any(), any()) }
+        assertEquals(1.0, meterRegistry.counter("notifications.failed", "type", "DUE_CARDS").count())
     }
 
     @Test

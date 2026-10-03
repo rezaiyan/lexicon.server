@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleRepository
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType
@@ -11,13 +12,15 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 private val logger = KotlinLogging.logger {}
+private val REVIEW_REMINDER = NotificationType.REVIEW_REMINDER.name
 
 @Service
 class ReviewReminderDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val notificationContentBuilder: NotificationContentBuilder,
     private val pushNotificationService: PushNotificationService,
-    private val clock: Clock
+    private val clock: Clock,
+    private val meterRegistry: MeterRegistry,
 ) {
     fun dispatchForCurrentHour() {
         val hour = LocalTime.now(clock).hour
@@ -43,8 +46,10 @@ class ReviewReminderDispatcher(
         if (sent) {
             schedule.lastSentDate = LocalDate.now(clock)
             notificationScheduleRepository.save(schedule)
+            meterRegistry.counter("notifications.sent", "type", REVIEW_REMINDER).increment()
             logger.info { "Sent REVIEW_REMINDER to user=${user.id}" }
         } else {
+            meterRegistry.counter("notifications.failed", "type", REVIEW_REMINDER).increment()
             logger.warn { "Push delivery failed for user=${user.id}, type=REVIEW_REMINDER" }
         }
     }

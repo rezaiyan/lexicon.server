@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.domain.entity.NotificationLog
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.repository.NotificationLogRepository
@@ -25,7 +26,8 @@ class NotificationEngagementService(
     private val notificationLogRepository: NotificationLogRepository,
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val userSettingsRepository: UserSettingsRepository,
-    private val clock: Clock
+    private val clock: Clock,
+    private val meterRegistry: MeterRegistry,
 ) {
     /**
      * Called when a user taps a notification.
@@ -43,6 +45,7 @@ class NotificationEngagementService(
 
         log.openedAt = Instant.now(clock)
         notificationLogRepository.save(log)
+        meterRegistry.counter("notifications.opened").increment()
 
         notificationScheduleRepository.findByUserId(userId)?.let { schedule ->
             schedule.consecutiveIgnores = 0

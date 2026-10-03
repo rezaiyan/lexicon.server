@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import org.junit.jupiter.api.Assertions.assertEquals
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -24,6 +26,7 @@ class ReviewReminderDispatcherTest {
     private lateinit var pushNotificationService: PushNotificationService
 
     private lateinit var dispatcher: ReviewReminderDispatcher
+    private val meterRegistry = SimpleMeterRegistry()
 
     @BeforeEach
     fun setUp() {
@@ -35,7 +38,8 @@ class ReviewReminderDispatcherTest {
             notificationScheduleRepository,
             notificationContentBuilder,
             pushNotificationService,
-            clock = fixedClock()
+            clock = fixedClock(),
+            meterRegistry = meterRegistry,
         )
     }
 
@@ -70,6 +74,7 @@ class ReviewReminderDispatcherTest {
                 data = payload.data
             )
         }
+        assertEquals(1.0, meterRegistry.counter("notifications.sent", "type", "REVIEW_REMINDER").count())
     }
 
     @Test
@@ -80,7 +85,8 @@ class ReviewReminderDispatcherTest {
             notificationScheduleRepository,
             notificationContentBuilder,
             pushNotificationService,
-            clock = fixedClock(Instant.parse("2026-06-17T18:05:00Z"))
+            clock = fixedClock(Instant.parse("2026-06-17T18:05:00Z")),
+            meterRegistry = meterRegistry,
         )
         // Strict mock: only hour 18 is stubbed, any other hour throws
         every { notificationScheduleRepository.findUsersForReviewReminders(18) } returns listOf(schedule)

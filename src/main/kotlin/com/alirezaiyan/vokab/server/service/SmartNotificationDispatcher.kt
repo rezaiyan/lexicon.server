@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleRepository
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType
@@ -27,7 +28,8 @@ class SmartNotificationDispatcher(
     private val userProgressService: UserProgressService,
     private val notificationEngagementService: NotificationEngagementService,
     private val objectMapper: ObjectMapper,
-    private val clock: Clock
+    private val clock: Clock,
+    private val meterRegistry: MeterRegistry,
 ) {
     fun dispatchForCurrentHour() {
         val hour = LocalTime.now(clock).hour
@@ -116,6 +118,7 @@ class SmartNotificationDispatcher(
         val sent = results.any { it.success }
         if (sent) {
             notificationEngagementService.recordSend(schedule, type.name, currentLogId = logId)
+            meterRegistry.counter("notifications.sent", "type", type.name).increment()
 
             if (type == NotificationType.PROGRESS_MILESTONE) {
                 val stats = userProgressService.calculateProgressStats(user)
@@ -125,6 +128,7 @@ class SmartNotificationDispatcher(
             logger.info { "Sent $type (segment=${ schedule.engagementSegment}) to user=$userId" }
         } else {
             discardLog(logId)
+            meterRegistry.counter("notifications.failed", "type", type.name).increment()
             logger.warn { "Push delivery failed for user=$userId, type=$type" }
         }
     }

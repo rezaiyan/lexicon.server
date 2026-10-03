@@ -133,11 +133,9 @@ app:
     testEmails: ${TEST_EMAILS:}
 
   logging:
-    # Request/Response logging configuration
+    # One access-log line per request (AccessLogFilter)
     enabled: ${REQUEST_LOGGING_ENABLED:true}
-    max-body-size: ${REQUEST_LOGGING_MAX_BODY_SIZE:50000}
-    exclude-patterns: ${REQUEST_LOGGING_EXCLUDE_PATTERNS:/actuator/health,/h2-console/**}
-    log-level: ${REQUEST_LOGGING_LEVEL:INFO}
+    exclude-patterns: ${REQUEST_LOGGING_EXCLUDE_PATTERNS:/api/v1/health,/actuator/**,/h2-console/**}
 
   email:
     enabled: ${EMAIL_ENABLED:false}
@@ -182,15 +180,18 @@ logging:
     org.hibernate: ERROR
 
 management:
+  server:
+    # Actuator lives on its own port: not published by docker-compose and not routed by Caddy
+    # (which only forwards /api/* to 8080), so metrics and health details stay internal.
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
-        include: "health"
-        exclude: "env,beans,conditions,configprops,flyway,heapdump,info,loggers,mappings,metrics,scheduledtasks,shutdown,threaddump"
+        include: "health,info,prometheus"
   endpoint:
     health:
       show-details: never
-  trace:
-    http:
-      enabled: false
+  metrics:
+    tags:
+      application: ${spring.application.name}
 

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.OpenRouterConfig
 import com.alirezaiyan.vokab.server.config.VocabularyConfig
@@ -35,10 +36,11 @@ class OpenRouterServiceTest {
 
     private val chatUrl = "https://openrouter.ai/api/v1/chat/completions"
     private val mapper = jacksonObjectMapper()
+    private val meterRegistry = SimpleMeterRegistry()
 
     private val builder = RestClient.builder()
     private val server = MockRestServiceServer.bindTo(builder).build()
-    private val service = OpenRouterService(builder, appProperties())
+    private val service = OpenRouterService(builder, appProperties(), meterRegistry)
 
     // ── transport ─────────────────────────────────────────────────────────────
 
@@ -46,7 +48,7 @@ class OpenRouterServiceTest {
     fun `requests post the configured model with auth and attribution headers`() {
         val custom = RestClient.builder()
         val customServer = MockRestServiceServer.bindTo(custom).build()
-        val customService = OpenRouterService(custom, appProperties(model = "anthropic/custom-model"))
+        val customService = OpenRouterService(custom, meterRegistry = meterRegistry, appProperties = appProperties(model = "anthropic/custom-model"))
         customServer.expect(requestTo(chatUrl))
             .andExpect(method(HttpMethod.POST))
             .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-api-key"))
@@ -64,6 +66,7 @@ class OpenRouterServiceTest {
         expectChat().andRespond(answer("  {\"action\":\"send\"}  \n"))
 
         assertEquals("{\"action\":\"send\"}", service.complete("prompt", "test"))
+        assertEquals(1.0, meterRegistry.counter("ai.requests", "operation", "test", "outcome", "success").count())
     }
 
     @Test
@@ -80,6 +83,7 @@ class OpenRouterServiceTest {
         expectChat().andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
 
         assertThrows<UpstreamServiceException> { service.complete("prompt", "test") }
+        assertEquals(1.0, meterRegistry.counter("ai.requests", "operation", "test", "outcome", "error").count())
     }
 
     @Test

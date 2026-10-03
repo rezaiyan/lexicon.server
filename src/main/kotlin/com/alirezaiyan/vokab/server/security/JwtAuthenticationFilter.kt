@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.security
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.service.AppConfigService
+import com.alirezaiyan.vokab.server.logging.AccessLogFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -37,7 +38,7 @@ class JwtAuthenticationFilter(
         "/api/v1/users/feature-flags",
         "/api/v1/onboarding/",
         "/h2-console/",
-        "/actuator/health",
+        "/actuator/",
         "/error"
     )
     
@@ -52,7 +53,7 @@ class JwtAuthenticationFilter(
         filterChain: FilterChain
     ) {
         val path = request.requestURI
-        log.info { "🔐 JWT Filter [START]: Processing ${request.method} $path" }
+        log.debug { "🔐 JWT Filter [START]: Processing ${request.method} $path" }
 
         // Admin key — grants ROLE_ADMIN for /admin/** without requiring a user JWT
         val adminKey = request.getHeader("X-Admin-Key")
@@ -62,6 +63,7 @@ class JwtAuthenticationFilter(
                 "ali-cli", null, listOf(SimpleGrantedAuthority("ROLE_ADMIN"))
             )
             SecurityContextHolder.getContext().authentication = auth
+            request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, "admin")
             filterChain.doFilter(request, response)
             return
         }
@@ -76,14 +78,14 @@ class JwtAuthenticationFilter(
                 response.contentType = "application/json"
                 return
             } else {
-                log.info { "🔑 JWT Filter [TOKEN_FOUND]: Token length ${jwt.length} for $path" }
+                log.debug { "🔑 JWT Filter [TOKEN_FOUND]: Token length ${jwt.length} for $path" }
                 
                 val isValid = jwtTokenProvider.validateToken(jwt)
-                log.info { "🔍 JWT Filter [VALIDATE]: Token valid=$isValid for $path" }
+                log.debug { "🔍 JWT Filter [VALIDATE]: Token valid=$isValid for $path" }
                 
                 if (isValid) {
                     val userId = jwtTokenProvider.getUserIdFromToken(jwt)
-                    log.info { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
+                    log.debug { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
                     
                     if (userId != null) {
                         val testEmails = appConfigService.getTestEmails()
@@ -92,7 +94,7 @@ class JwtAuthenticationFilter(
                         val userEmail = if (isPresent) userOptional.get().email else null
                         val isTestAccount = userEmail in testEmails
                         val isActive = if (isPresent) userOptional.get().active else false
-                        log.info { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }
+                        log.debug { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }
 
                         if (isPresent && (isActive || isTestAccount)) {
                             val authentication = UsernamePasswordAuthenticationToken(
@@ -103,8 +105,9 @@ class JwtAuthenticationFilter(
                             authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
 
                             SecurityContextHolder.getContext().authentication = authentication
-                            log.info { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }
-                            log.info { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
+                            request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, userId)
+                            log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }
+                            log.debug { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
                         } else {
                             log.warn { "❌ JWT Filter [AUTH_FAILED]: User not found or inactive for userId=$userId, active=$isActive, testAccount=$isTestAccount - returning 403 for $path" }
                             response.status = HttpServletResponse.SC_FORBIDDEN
@@ -136,9 +139,9 @@ class JwtAuthenticationFilter(
             return
         }
         
-        log.info { "🔄 JWT Filter [CONTINUE]: Calling filter chain for $path" }
+        log.debug { "🔄 JWT Filter [CONTINUE]: Calling filter chain for $path" }
         filterChain.doFilter(request, response)
-        log.info { "✅ JWT Filter [END]: Filter chain completed for $path, response status: ${response.status}" }
+        log.debug { "✅ JWT Filter [END]: Filter chain completed for $path, response status: ${response.status}" }
     }
     
     private fun getJwtFromRequest(request: HttpServletRequest): String? {

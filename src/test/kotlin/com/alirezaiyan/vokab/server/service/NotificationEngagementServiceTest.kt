@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -32,6 +33,7 @@ class NotificationEngagementServiceTest {
     private lateinit var userSettingsRepository: UserSettingsRepository
 
     private lateinit var notificationEngagementService: NotificationEngagementService
+    private val meterRegistry = SimpleMeterRegistry()
 
     @BeforeEach
     fun setUp() {
@@ -42,7 +44,8 @@ class NotificationEngagementServiceTest {
             notificationLogRepository,
             notificationScheduleRepository,
             userSettingsRepository,
-            clock = fixedClock()
+            clock = fixedClock(),
+            meterRegistry = meterRegistry,
         )
     }
 
@@ -66,6 +69,7 @@ class NotificationEngagementServiceTest {
         // Assert
         assertNotNull(log.openedAt)
         verify(exactly = 1) { notificationLogRepository.save(log) }
+        assertEquals(1.0, meterRegistry.counter("notifications.opened").count())
     }
 
     @Test
@@ -125,6 +129,7 @@ class NotificationEngagementServiceTest {
 
         assertTrue(found)
         verify(exactly = 0) { notificationScheduleRepository.save(any()) }
+        assertEquals(0.0, meterRegistry.counter("notifications.opened").count())
     }
 
     @Test

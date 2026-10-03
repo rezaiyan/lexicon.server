@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
@@ -19,11 +20,13 @@ class ProfileStatsService(
     private val dailyActivityRepository: DailyActivityRepository,
     private val wordRepository: WordRepository,
     private val streakService: StreakService,
-    private val clock: Clock
+    private val userRepository: UserRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional(readOnly = true)
-    fun getProfileStats(user: User): ProfileStatsResponse {
+    fun getProfileStats(userId: Long): ProfileStatsResponse {
+        val user = userRepository.getReferenceById(userId)
         val streakInfo = streakService.getUserStreak(user.requireId())
         val longestStreak = calculateLongestStreak(user)
 

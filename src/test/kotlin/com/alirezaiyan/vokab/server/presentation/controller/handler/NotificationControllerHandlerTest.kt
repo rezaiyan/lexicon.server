@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller.handler
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.service.NotificationEngagementService
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
@@ -26,7 +27,7 @@ class NotificationControllerHandlerTest {
     fun `markOpened returns 200 when the log belongs to the caller`() {
         every { engagementService.recordOpen(7L, 42L) } returns true
 
-        val response = handler.markOpened(user, 42L)
+        val response = handler.markOpened(user.requireId(), 42L)
 
         assertEquals(HttpStatus.OK, response.statusCode)
         assertTrue(response.body!!.success)
@@ -36,6 +37,6 @@ class NotificationControllerHandlerTest {
     fun `markOpened throws not-found when the log is unknown or someone else's`() {
         every { engagementService.recordOpen(7L, 42L) } returns false
 
-        assertThrows<NoSuchElementException> { handler.markOpened(user, 42L) }
+        assertThrows<NoSuchElementException> { handler.markOpened(user.requireId(), 42L) }
     }
 }

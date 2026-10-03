@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.config.RateLimitConfig
 import com.alirezaiyan.vokab.server.exception.RateLimitExceededException
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.service.FeatureAccessService
@@ -11,7 +11,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,9 +29,9 @@ class SubscriptionController(
      */
     @PostMapping("/sync")
     fun syncWithStore(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<FeatureAccessResponse>> {
-        val userId = user.requireId()
+        val userId = user.id
         if (!rateLimitConfig.getSubscriptionSyncBucket(userId.toString()).tryConsume(1)) {
             throw RateLimitExceededException("Too many sync requests. Try again shortly.")
         }

@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.CreateTagRequest
 import com.alirezaiyan.vokab.server.presentation.dto.RenameTagRequest
@@ -53,7 +55,7 @@ class TagControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── GET /api/v1/tags ──────────────────────────────────────────────────────
 
@@ -63,7 +65,7 @@ class TagControllerTest {
             createTagDto(id = 1L, name = "verbs"),
             createTagDto(id = 2L, name = "nouns"),
         )
-        `when`(tagService.list(mockUser)).thenReturn(tags)
+        `when`(tagService.list(mockUser.requireId())).thenReturn(tags)
 
         mockMvc.perform(
             get("/api/v1/tags")
@@ -92,7 +94,7 @@ class TagControllerTest {
     fun `POST tags should return 201 when tag created`() {
         val request = CreateTagRequest(name = "phrases")
         val createdTag = createTagDto(id = 10L, name = "phrases")
-        `when`(tagService.create(mockUser, "phrases")).thenReturn(createdTag)
+        `when`(tagService.create(mockUser.requireId(), "phrases")).thenReturn(createdTag)
 
         mockMvc.perform(
             post("/api/v1/tags")
@@ -123,7 +125,7 @@ class TagControllerTest {
     @Test
     fun `POST tags should return 400 when duplicate tag`() {
         val request = CreateTagRequest(name = "verbs")
-        `when`(tagService.create(mockUser, "verbs"))
+        `when`(tagService.create(mockUser.requireId(), "verbs"))
             .thenThrow(IllegalArgumentException("A tag named 'verbs' already exists"))
 
         mockMvc.perform(
@@ -142,7 +144,7 @@ class TagControllerTest {
     fun `PUT tag rename should return 200 when renamed`() {
         val request = RenameTagRequest(name = "adjectives")
         val renamedTag = createTagDto(id = 1L, name = "adjectives")
-        `when`(tagService.rename(mockUser, 1L, "adjectives")).thenReturn(renamedTag)
+        `when`(tagService.rename(mockUser.requireId(), 1L, "adjectives")).thenReturn(renamedTag)
 
         mockMvc.perform(
             put("/api/v1/tags/1")
@@ -158,7 +160,7 @@ class TagControllerTest {
     @Test
     fun `PUT tag rename should return 404 when tag not found`() {
         val request = RenameTagRequest(name = "adjectives")
-        `when`(tagService.rename(mockUser, 99L, "adjectives"))
+        `when`(tagService.rename(mockUser.requireId(), 99L, "adjectives"))
             .thenThrow(NoSuchElementException("Tag not found"))
 
         mockMvc.perform(
@@ -175,7 +177,7 @@ class TagControllerTest {
 
     @Test
     fun `DELETE tag should return 204 when deleted`() {
-        `when`(tagService.delete(mockUser, 1L)).then { }
+        `when`(tagService.delete(mockUser.requireId(), 1L)).then { }
 
         mockMvc.perform(
             delete("/api/v1/tags/1")
@@ -188,7 +190,7 @@ class TagControllerTest {
     @Test
     fun `DELETE tag should return 404 when tag not found`() {
         doThrow(NoSuchElementException("Tag not found"))
-            .`when`(tagService).delete(mockUser, 99L)
+            .`when`(tagService).delete(mockUser.requireId(), 99L)
 
         mockMvc.perform(
             delete("/api/v1/tags/99")

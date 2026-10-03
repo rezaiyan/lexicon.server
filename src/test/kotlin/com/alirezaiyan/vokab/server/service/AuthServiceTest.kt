@@ -933,6 +933,7 @@ class AuthServiceTest {
             domainEventPublisher = domainEventPublisher,
             geoLocationService = geoLocationService,
             appConfigService = appConfigService,
+            userAccessCache = mockk(relaxed = true),
             clock = fixedClock()
         )
     }

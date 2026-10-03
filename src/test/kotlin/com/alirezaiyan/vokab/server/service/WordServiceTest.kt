@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.Tag
@@ -28,6 +30,7 @@ class WordServiceTest {
     private lateinit var tagRepository: TagRepository
     private lateinit var wordUpsertPreparer: WordUpsertPreparer
     private lateinit var userRepository: UserRepository
+    private val knownUsers = mutableListOf<User>()
     private lateinit var wordService: WordService
 
     @BeforeEach
@@ -35,7 +38,7 @@ class WordServiceTest {
         wordRepository = mockk()
         tagRepository = mockk()
         wordUpsertPreparer = mockk()
-        userRepository = mockk()
+        userRepository = mockk<UserRepository>().answerReferences(knownUsers)
         wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock = fixedClock())
     }
 
@@ -46,7 +49,7 @@ class WordServiceTest {
         val user = createUser()
         every { wordRepository.findAllByUserWithTags(user) } returns emptyList()
 
-        val result = wordService.list(user)
+        val result = wordService.list(user.requireId())
 
         assertEquals(emptyList<WordDto>(), result)
         verify(exactly = 1) { wordRepository.findAllByUserWithTags(user) }
@@ -58,7 +61,7 @@ class WordServiceTest {
         val word = createWord(id = 10L, user = user, originalWord = "apple", translation = "Apfel")
         every { wordRepository.findAllByUserWithTags(user) } returns listOf(word)
 
-        val result = wordService.list(user)
+        val result = wordService.list(user.requireId())
 
         assertEquals(1, result.size)
         assertEquals(10L, result[0].id)
@@ -72,7 +75,7 @@ class WordServiceTest {
     fun `upsert should do nothing when words list is empty`() {
         val user = createUser()
 
-        wordService.upsert(user, emptyList())
+        wordService.upsert(user.requireId(), emptyList())
 
         verify(exactly = 0) { wordUpsertPreparer.prepareUpsertEntities(any(), any()) }
         verify(exactly = 0) { wordRepository.saveAll(any<Collection<Word>>()) }
@@ -86,7 +89,7 @@ class WordServiceTest {
         every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(entity)
         every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(entity)
 
-        wordService.upsert(user, listOf(dto))
+        wordService.upsert(user.requireId(), listOf(dto))
 
         verify(exactly = 1) { wordRepository.saveAll(any<Collection<Word>>()) }
     }
@@ -100,7 +103,7 @@ class WordServiceTest {
         every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(newEntity)
         every { userRepository.save(any()) } answers { firstArg() }
 
-        wordService.upsert(user, listOf(dto))
+        wordService.upsert(user.requireId(), listOf(dto))
 
         verify(exactly = 1) { userRepository.save(match { it.firstWordAddedAt != null }) }
     }
@@ -114,7 +117,7 @@ class WordServiceTest {
         every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(newEntity)
         every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(newEntity)
 
-        wordService.upsert(user, listOf(dto))
+        wordService.upsert(user.requireId(), listOf(dto))
 
         verify(exactly = 0) { userRepository.save(any()) }
     }
@@ -127,7 +130,7 @@ class WordServiceTest {
         every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(existingEntity)
         every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(existingEntity)
 
-        wordService.upsert(user, listOf(dto))
+        wordService.upsert(user.requireId(), listOf(dto))
 
         verify(exactly = 0) { userRepository.save(any()) }
     }
@@ -140,7 +143,7 @@ class WordServiceTest {
         every { wordRepository.findById(99L) } returns Optional.empty()
 
         assertThrows<NoSuchElementException> {
-            wordService.update(user, 99L, createUpdateWordRequest())
+            wordService.update(user.requireId(), 99L, createUpdateWordRequest())
         }
     }
 
@@ -152,7 +155,7 @@ class WordServiceTest {
         every { wordRepository.findById(10L) } returns Optional.of(word)
 
         assertThrows<IllegalArgumentException> {
-            wordService.update(user, 10L, createUpdateWordRequest())
+            wordService.update(user.requireId(), 10L, createUpdateWordRequest())
         }
     }
 
@@ -169,7 +172,7 @@ class WordServiceTest {
         every { wordRepository.findById(10L) } returns Optional.of(word)
         every { wordRepository.save(any()) } returns word
 
-        wordService.update(user, 10L, request)
+        wordService.update(user.requireId(), 10L, request)
 
         assertEquals("new", word.originalWord)
         assertEquals("neu", word.translation)
@@ -187,7 +190,7 @@ class WordServiceTest {
         every { wordRepository.findById(10L) } returns Optional.of(word)
         every { wordRepository.save(any()) } returns word
 
-        wordService.update(user, 10L, request)
+        wordService.update(user.requireId(), 10L, request)
 
         verify(exactly = 0) { tagRepository.findAllByUserAndIdIn(any(), any()) }
     }
@@ -202,7 +205,7 @@ class WordServiceTest {
         every { tagRepository.findAllByUserAndIdIn(user, listOf(5L)) } returns listOf(tag)
         every { wordRepository.save(any()) } returns word
 
-        wordService.update(user, 10L, request)
+        wordService.update(user.requireId(), 10L, request)
 
         assertEquals(setOf(tag), word.tags)
         verify(exactly = 1) { tagRepository.findAllByUserAndIdIn(user, listOf(5L)) }
@@ -216,7 +219,7 @@ class WordServiceTest {
         every { wordRepository.deleteByIdAndUserId(99L, 1L) } returns 0
 
         assertThrows<IllegalArgumentException> {
-            wordService.delete(user, 99L)
+            wordService.delete(user.requireId(), 99L)
         }
     }
 
@@ -225,7 +228,7 @@ class WordServiceTest {
         val user = createUser(id = 1L)
         every { wordRepository.deleteByIdAndUserId(10L, 1L) } returns 1
 
-        wordService.delete(user, 10L)
+        wordService.delete(user.requireId(), 10L)
 
         verify(exactly = 1) { wordRepository.deleteByIdAndUserId(10L, 1L) }
     }
@@ -236,7 +239,7 @@ class WordServiceTest {
     fun `batchDelete should return 0 when ids is empty`() {
         val user = createUser()
 
-        val result = wordService.batchDelete(user, emptyList())
+        val result = wordService.batchDelete(user.requireId(), emptyList())
 
         assertEquals(0, result)
         verify(exactly = 0) { wordRepository.deleteAllByIdInAndUserId(any(), any()) }
@@ -248,7 +251,7 @@ class WordServiceTest {
         val ids = listOf(10L, 11L, 12L)
         every { wordRepository.deleteAllByIdInAndUserId(ids, 1L) } returns 3
 
-        val result = wordService.batchDelete(user, ids)
+        val result = wordService.batchDelete(user.requireId(), ids)
 
         assertEquals(3, result)
         verify(exactly = 1) { wordRepository.deleteAllByIdInAndUserId(ids, 1L) }
@@ -260,7 +263,7 @@ class WordServiceTest {
     fun `batchUpdateLanguages should return 0 when ids is empty`() {
         val user = createUser()
 
-        val result = wordService.batchUpdateLanguages(user, emptyList(), "en", "de")
+        val result = wordService.batchUpdateLanguages(user.requireId(), emptyList(), "en", "de")
 
         assertEquals(0, result)
         verify(exactly = 0) { wordRepository.updateLanguagesByIdInAndUserId(any(), any(), any(), any(), any()) }
@@ -271,7 +274,7 @@ class WordServiceTest {
         val user = createUser()
         val ids = listOf(1L, 2L)
 
-        val result = wordService.batchUpdateLanguages(user, ids, null, null)
+        val result = wordService.batchUpdateLanguages(user.requireId(), ids, null, null)
 
         assertEquals(0, result)
         verify(exactly = 0) { wordRepository.updateLanguagesByIdInAndUserId(any(), any(), any(), any(), any()) }
@@ -287,7 +290,7 @@ class WordServiceTest {
             wordRepository.updateLanguagesByIdInAndUserId(ids, 1L, "en", "de", any())
         } returns 2
 
-        val result = wordService.batchUpdateLanguages(user, ids, "en", "de")
+        val result = wordService.batchUpdateLanguages(user.requireId(), ids, "en", "de")
 
         assertEquals(2, result)
         verify(exactly = 1) { wordRepository.updateLanguagesByIdInAndUserId(ids, 1L, "en", "de", any()) }
@@ -301,7 +304,7 @@ class WordServiceTest {
             wordRepository.updateSourceLanguageByIdInAndUserId(ids, 1L, "en", any())
         } returns 1
 
-        val result = wordService.batchUpdateLanguages(user, ids, "en", null)
+        val result = wordService.batchUpdateLanguages(user.requireId(), ids, "en", null)
 
         assertEquals(1, result)
         verify(exactly = 1) { wordRepository.updateSourceLanguageByIdInAndUserId(ids, 1L, "en", any()) }
@@ -316,7 +319,7 @@ class WordServiceTest {
             wordRepository.updateTargetLanguageByIdInAndUserId(ids, 1L, "de", any())
         } returns 1
 
-        val result = wordService.batchUpdateLanguages(user, ids, null, "de")
+        val result = wordService.batchUpdateLanguages(user.requireId(), ids, null, "de")
 
         assertEquals(1, result)
         verify(exactly = 1) { wordRepository.updateTargetLanguageByIdInAndUserId(ids, 1L, "de", any()) }
@@ -329,7 +332,7 @@ class WordServiceTest {
     fun `batchAssignTags should return 0 when wordIds is empty`() {
         val user = createUser()
 
-        val result = wordService.batchAssignTags(user, emptyList(), listOf(1L))
+        val result = wordService.batchAssignTags(user.requireId(), emptyList(), listOf(1L))
 
         assertEquals(0, result)
         verify(exactly = 0) { wordRepository.deleteWordTagsByWordIdsAndUserId(any(), any()) }
@@ -343,7 +346,7 @@ class WordServiceTest {
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
         justRun { wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, 1L) }
 
-        val result = wordService.batchAssignTags(user, wordIds, tagIds)
+        val result = wordService.batchAssignTags(user.requireId(), wordIds, tagIds)
 
         assertEquals(2, result)
         verify(exactly = 1) { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
@@ -356,7 +359,7 @@ class WordServiceTest {
         val wordIds = listOf(10L, 11L)
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
 
-        val result = wordService.batchAssignTags(user, wordIds, emptyList())
+        val result = wordService.batchAssignTags(user.requireId(), wordIds, emptyList())
 
         assertEquals(2, result)
         verify(exactly = 1) { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
@@ -372,7 +375,7 @@ class WordServiceTest {
         every { wordRepository.findById(99L) } returns Optional.empty()
 
         assertThrows<NoSuchElementException> {
-            wordService.updateWordTags(user, 99L, listOf(1L))
+            wordService.updateWordTags(user.requireId(), 99L, listOf(1L))
         }
     }
 
@@ -384,7 +387,7 @@ class WordServiceTest {
         every { wordRepository.findById(10L) } returns Optional.of(word)
 
         assertThrows<IllegalArgumentException> {
-            wordService.updateWordTags(user, 10L, listOf(1L))
+            wordService.updateWordTags(user.requireId(), 10L, listOf(1L))
         }
     }
 
@@ -396,7 +399,7 @@ class WordServiceTest {
         every { wordRepository.findById(10L) } returns Optional.of(word)
         every { wordRepository.save(any()) } returns word
 
-        wordService.updateWordTags(user, 10L, emptyList())
+        wordService.updateWordTags(user.requireId(), 10L, emptyList())
 
         assertEquals(emptySet<Tag>(), word.tags)
         verify(exactly = 1) { wordRepository.save(word) }
@@ -412,7 +415,7 @@ class WordServiceTest {
         every { tagRepository.findAllByUserAndIdIn(user, listOf(5L)) } returns listOf(tag)
         every { wordRepository.save(any()) } returns word
 
-        wordService.updateWordTags(user, 10L, listOf(5L))
+        wordService.updateWordTags(user.requireId(), 10L, listOf(5L))
 
         assertEquals(setOf(tag), word.tags)
         verify(exactly = 1) { tagRepository.findAllByUserAndIdIn(user, listOf(5L)) }
@@ -435,7 +438,7 @@ class WordServiceTest {
         active = true,
         createdAt = TEST_NOW,
         updatedAt = TEST_NOW,
-    )
+    ).also { knownUsers += it }
 
     private fun createWord(
         id: Long? = null,

@@ -1,7 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
-import com.alirezaiyan.vokab.server.domain.entity.requireId
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.AvatarResponse
 import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
@@ -32,43 +31,43 @@ class UserController(
     
     @GetMapping("/me")
     fun getCurrentUser(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<UserDto>> {
-        val userDto = userService.getUserById(user.requireId())
+        val userDto = userService.getUserById(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = userDto))
     }
     
     @PatchMapping("/me")
     fun updateCurrentUser(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: UpdateProfileRequest
     ): ResponseEntity<ApiResponse<UserDto>> {
-        val updated = userService.updateUser(user.requireId(), request.name, request.displayAlias)
+        val updated = userService.updateUser(user.id, request.name, request.displayAlias)
         return ResponseEntity.ok(ApiResponse(success = true, data = updated))
     }
 
     @PostMapping("/me/avatar")
     fun uploadAvatar(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestParam("file") file: MultipartFile
     ): ResponseEntity<ApiResponse<AvatarResponse>> {
-        val url = avatarService.uploadAvatar(user.requireId(), file)
+        val url = avatarService.uploadAvatar(user.id, file)
         return ResponseEntity.ok(ApiResponse(success = true, data = AvatarResponse(profileImageUrl = url)))
     }
 
     @DeleteMapping("/me/avatar")
     fun deleteAvatar(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
-        avatarService.deleteAvatar(user.requireId())
+        avatarService.deleteAvatar(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Avatar deleted successfully"))
     }
     
     @DeleteMapping("/me")
     fun deleteCurrentUser(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.deleteAccount(user.requireId())
+        authService.deleteAccount(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
     }
     
@@ -78,9 +77,9 @@ class UserController(
      */
     @GetMapping("/feature-access")
     fun getFeatureAccess(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<FeatureAccessResponse>> {
-        return ResponseEntity.ok(ApiResponse(success = true, data = featureAccessService.getFeatureAccess(user.requireId())))
+        return ResponseEntity.ok(ApiResponse(success = true, data = featureAccessService.getFeatureAccess(user.id)))
     }
     
     /**
@@ -94,9 +93,9 @@ class UserController(
 
     @GetMapping("/profile-stats")
     fun getProfileStats(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<ProfileStatsResponse>> {
-        val stats = profileStatsService.getProfileStats(user)
+        val stats = profileStatsService.getProfileStats(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = stats))
     }
 }

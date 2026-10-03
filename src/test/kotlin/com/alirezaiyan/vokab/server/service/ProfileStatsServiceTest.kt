@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -22,13 +25,14 @@ class ProfileStatsServiceTest {
     private lateinit var streakService: StreakService
 
     private lateinit var profileStatsService: ProfileStatsService
+    private val knownUsers = mutableListOf<User>()
 
     @BeforeEach
     fun setUp() {
         dailyActivityRepository = mockk()
         wordRepository = mockk()
         streakService = mockk()
-        profileStatsService = ProfileStatsService(dailyActivityRepository, wordRepository, streakService, clock = fixedClock())
+        profileStatsService = ProfileStatsService(dailyActivityRepository, wordRepository, streakService, clock = fixedClock(), userRepository = mockk<UserRepository>().answerReferences(knownUsers))
     }
 
     @Test
@@ -41,7 +45,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns emptyList()
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         assertEquals(7, result.currentStreak)
@@ -65,7 +69,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns emptyList()
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         assertEquals(5, result.longestStreak)
@@ -86,7 +90,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns emptyList()
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         assertEquals(7, result.weeklyActivity.size)
@@ -104,7 +108,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns emptyList()
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         assertEquals(7, result.weeklyActivity.size)
@@ -127,7 +131,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns languagePairRows
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         assertEquals(2, result.languages.size)
@@ -155,7 +159,7 @@ class ProfileStatsServiceTest {
         every { wordRepository.findLanguagePairsWithCount(user) } returns emptyList()
 
         // Act
-        val result = profileStatsService.getProfileStats(user)
+        val result = profileStatsService.getProfileStats(user.requireId())
 
         // Assert
         // max(4 calculated, 3 currentStreak, 10 stored) == 10
@@ -179,7 +183,7 @@ class ProfileStatsServiceTest {
         active = true,
         createdAt = TEST_NOW,
         updatedAt = TEST_NOW
-    )
+    ).also { knownUsers += it }
 
     private fun createDailyActivity(
         user: User,

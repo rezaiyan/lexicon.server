@@ -24,7 +24,7 @@ class LeaderboardService(
     private val excludedEmails = listOf(ciTestEmail)
 
     @Transactional(readOnly = true)
-    fun getLeaderboard(requestingUser: User, limit: Int = 20): LeaderboardResponse {
+    fun getLeaderboard(requestingUserId: Long, limit: Int = 20): LeaderboardResponse {
         val topUsers = userRepository.findTopUsersByScore(PageRequest.of(0, limit), excludedEmails)
         val userIds = topUsers.mapNotNull { it.id }
 
@@ -35,7 +35,6 @@ class LeaderboardService(
             emptyMap()
         }
 
-        val requestingUserId = requestingUser.id
         val entries = topUsers.mapIndexed { index, user ->
             toEntryDto(
                 user = user,
@@ -47,7 +46,8 @@ class LeaderboardService(
 
         val userInTop = entries.any { it.isCurrentUser }
         val userEntry = if (!userInTop) {
-            val userMastered = wordRepository.countMasteredWordsByUserId(requestingUser.requireId())
+            val requestingUser = userRepository.getReferenceById(requestingUserId)
+            val userMastered = wordRepository.countMasteredWordsByUserId(requestingUserId)
             val userScore = computeScore(userMastered, requestingUser.currentStreak, requestingUser.longestStreak)
             val userRank = userRepository.findUserRankByScore(userScore, excludedEmails).toInt()
             toEntryDto(

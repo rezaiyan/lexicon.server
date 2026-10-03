@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
 import com.alirezaiyan.vokab.server.presentation.dto.SyncWordRushGameRequest
@@ -22,18 +25,18 @@ class WordRushServiceTest {
     fun setup() {
         wordRushGameRepository = mockk()
         wordRushGamePersister = mockk()
-        wordRushService = WordRushService(wordRushGameRepository, wordRushGamePersister)
+        wordRushService = WordRushService(wordRushGameRepository, wordRushGamePersister, mockk<UserRepository>().answerReferences())
         user = User(id = 1L, email = "test@example.com", name = "Test User")
     }
 
     @Test
     fun `syncGames includes only successfully saved game ids in response`() {
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-1" }) } returns true
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-2" }) } returns false
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-3" }) } returns true
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-1" }) } returns true
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-2" }) } returns false
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-3" }) } returns true
 
         val response = wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(
                     makeGameReq("game-1"),
@@ -48,12 +51,12 @@ class WordRushServiceTest {
 
     @Test
     fun `syncGames attempts all games even when one fails`() {
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-1" }) } returns true
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-2" }) } returns false
-        every { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-3" }) } returns true
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-1" }) } returns true
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-2" }) } returns false
+        every { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-3" }) } returns true
 
         wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(
                     makeGameReq("game-1"),
@@ -63,9 +66,9 @@ class WordRushServiceTest {
             )
         )
 
-        verify(exactly = 1) { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-1" }) }
-        verify(exactly = 1) { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-2" }) }
-        verify(exactly = 1) { wordRushGamePersister.saveGame(user, match { it.clientGameId == "game-3" }) }
+        verify(exactly = 1) { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-1" }) }
+        verify(exactly = 1) { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-2" }) }
+        verify(exactly = 1) { wordRushGamePersister.saveGame(user.requireId(), match { it.clientGameId == "game-3" }) }
     }
 
     @Test
@@ -73,7 +76,7 @@ class WordRushServiceTest {
         every { wordRushGamePersister.saveGame(any(), any()) } returns false
 
         val response = wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(games = listOf(makeGameReq("g1"), makeGameReq("g2")))
         )
 
@@ -82,7 +85,7 @@ class WordRushServiceTest {
 
     @Test
     fun `syncGames returns empty list for empty request`() {
-        val response = wordRushService.syncGames(user, SyncWordRushRequest(games = emptyList()))
+        val response = wordRushService.syncGames(user.requireId(), SyncWordRushRequest(games = emptyList()))
 
         assertTrue(response.syncedGameIds.isEmpty())
     }

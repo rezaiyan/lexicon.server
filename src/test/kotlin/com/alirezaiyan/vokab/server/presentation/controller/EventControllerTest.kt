@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.TrackEventRequest
 import com.alirezaiyan.vokab.server.service.EventService
@@ -48,7 +50,7 @@ class EventControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── POST /api/v1/events ────────────────────────────────────────────────────
 

@@ -121,7 +121,7 @@ class SmartNotificationDispatcher(
             meterRegistry.counter("notifications.sent", "type", type.name).increment()
 
             if (type == NotificationType.PROGRESS_MILESTONE) {
-                val stats = userProgressService.calculateProgressStats(user)
+                val stats = userProgressService.calculateProgressStats(user.requireId())
                 milestoneDetector.recordMilestoneSnapshot(user, stats)
             }
 

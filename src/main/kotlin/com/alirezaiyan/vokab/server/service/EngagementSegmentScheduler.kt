@@ -90,7 +90,8 @@ class EngagementSegmentScheduler(
         val stats7d  = notificationEngagementService.getEngagementStats(userId, windowDays = 7)
         val stats30d = notificationEngagementService.getEngagementStats(userId, windowDays = 30)
         val daysSinceOpen = notificationEngagementService.getDaysSinceLastOpen(userId)
-        val dueCards = runCatching { userProgressService.calculateProgressStats(user).dueCards }.getOrElse { 0 }
+        val dueCards = runCatching { userProgressService.calculateProgressStats(user.requireId()).dueCards }
+            .getOrElse { 0 }
         val accountAgeDays = ChronoUnit.DAYS.between(user.createdAt, Instant.now(clock))
 
         return NotificationAiAdvisor.UserNotificationContext(

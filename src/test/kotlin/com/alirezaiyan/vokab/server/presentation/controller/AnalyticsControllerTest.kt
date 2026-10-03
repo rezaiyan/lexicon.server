@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.AccuracyByLevelResponse
 import com.alirezaiyan.vokab.server.presentation.dto.ComebackWordResponse
@@ -67,14 +69,14 @@ class AnalyticsControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── POST /api/v1/analytics/sync ────────────────────────────────────────────
 
     @Test
     fun `POST sync should return 200 with synced session ids when successful`() {
         val request = createSyncRequest()
-        `when`(analyticsService.syncSessions(mockUser, request))
+        `when`(analyticsService.syncSessions(mockUser.requireId(), request))
             .thenReturn(SyncAnalyticsResponse(syncedSessionIds = listOf("s1")))
 
         mockMvc.perform(
@@ -91,7 +93,7 @@ class AnalyticsControllerTest {
     @Test
     fun `POST sync should return 500 when service throws exception`() {
         val request = createSyncRequest()
-        `when`(analyticsService.syncSessions(mockUser, request))
+        `when`(analyticsService.syncSessions(mockUser.requireId(), request))
             .thenThrow(RuntimeException("sync failed"))
 
         mockMvc.perform(
@@ -134,7 +136,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET insights should return 200 with study insights`() {
-        `when`(analyticsService.getStudyInsights(mockUser)).thenReturn(createStudyInsightsResponse())
+        `when`(analyticsService.getStudyInsights(mockUser.requireId())).thenReturn(createStudyInsightsResponse())
 
         mockMvc.perform(
             get("/api/v1/analytics/insights")
@@ -150,7 +152,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET insights should return 500 when service throws exception`() {
-        `when`(analyticsService.getStudyInsights(mockUser))
+        `when`(analyticsService.getStudyInsights(mockUser.requireId()))
             .thenThrow(RuntimeException("database error"))
 
         mockMvc.perform(
@@ -178,7 +180,7 @@ class AnalyticsControllerTest {
                 wordsLeveledDown = 1,
             )
         )
-        `when`(analyticsService.getDailyStats(mockUser, LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-07"))).thenReturn(stats)
+        `when`(analyticsService.getDailyStats(mockUser.requireId(), LocalDate.parse("2024-01-01"), LocalDate.parse("2024-01-07"))).thenReturn(stats)
 
         mockMvc.perform(
             get("/api/v1/analytics/daily-stats")
@@ -221,7 +223,7 @@ class AnalyticsControllerTest {
                 errorRate = 0.8,
             )
         )
-        `when`(analyticsService.getDifficultWords(mockUser, 3, 20)).thenReturn(words)
+        `when`(analyticsService.getDifficultWords(mockUser.requireId(), 3, 20)).thenReturn(words)
 
         mockMvc.perform(
             get("/api/v1/analytics/difficult-words")
@@ -238,7 +240,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET difficult-words should use default params when none provided`() {
-        `when`(analyticsService.getDifficultWords(mockUser, 3, 20)).thenReturn(emptyList())
+        `when`(analyticsService.getDifficultWords(mockUser.requireId(), 3, 20)).thenReturn(emptyList())
 
         mockMvc.perform(
             get("/api/v1/analytics/difficult-words")
@@ -251,7 +253,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET difficult-words should return 500 when service throws exception`() {
-        `when`(analyticsService.getDifficultWords(mockUser, 3, 20))
+        `when`(analyticsService.getDifficultWords(mockUser.requireId(), 3, 20))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -276,7 +278,7 @@ class AnalyticsControllerTest {
                 totalReviews = 42,
             )
         )
-        `when`(analyticsService.getMostReviewedWords(mockUser, 10)).thenReturn(words)
+        `when`(analyticsService.getMostReviewedWords(mockUser.requireId(), 10)).thenReturn(words)
 
         mockMvc.perform(
             get("/api/v1/analytics/most-reviewed")
@@ -291,7 +293,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET most-reviewed should return 500 when service throws exception`() {
-        `when`(analyticsService.getMostReviewedWords(mockUser, 10))
+        `when`(analyticsService.getMostReviewedWords(mockUser.requireId(), 10))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -315,7 +317,7 @@ class AnalyticsControllerTest {
                 accuracyPercent = 80.0,
             )
         )
-        `when`(analyticsService.getAccuracyByLevel(mockUser)).thenReturn(data)
+        `when`(analyticsService.getAccuracyByLevel(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/accuracy-by-level")
@@ -330,7 +332,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET accuracy-by-level should return 500 when service throws exception`() {
-        `when`(analyticsService.getAccuracyByLevel(mockUser))
+        `when`(analyticsService.getAccuracyByLevel(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -348,7 +350,7 @@ class AnalyticsControllerTest {
         val data = listOf(
             HourlyAccuracyResponse(hour = 9, totalReviews = 50L, correctCount = 40L, accuracyPercent = 80.0)
         )
-        `when`(analyticsService.getAccuracyByHour(mockUser)).thenReturn(data)
+        `when`(analyticsService.getAccuracyByHour(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/accuracy-by-hour")
@@ -361,7 +363,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET accuracy-by-hour should return 500 when service throws exception`() {
-        `when`(analyticsService.getAccuracyByHour(mockUser))
+        `when`(analyticsService.getAccuracyByHour(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -379,7 +381,7 @@ class AnalyticsControllerTest {
         val data = listOf(
             DayOfWeekAccuracyResponse(dayOfWeek = 1, totalReviews = 30L, correctCount = 25L, accuracyPercent = 83.3)
         )
-        `when`(analyticsService.getAccuracyByDayOfWeek(mockUser)).thenReturn(data)
+        `when`(analyticsService.getAccuracyByDayOfWeek(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/accuracy-by-day-of-week")
@@ -392,7 +394,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET accuracy-by-day-of-week should return 500 when service throws exception`() {
-        `when`(analyticsService.getAccuracyByDayOfWeek(mockUser))
+        `when`(analyticsService.getAccuracyByDayOfWeek(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -420,7 +422,7 @@ class AnalyticsControllerTest {
                 completedNormally = true,
             )
         )
-        `when`(analyticsService.getRecentSessions(mockUser, 10)).thenReturn(sessions)
+        `when`(analyticsService.getRecentSessions(mockUser.requireId(), 10)).thenReturn(sessions)
 
         mockMvc.perform(
             get("/api/v1/analytics/sessions")
@@ -435,7 +437,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET sessions should return 500 when service throws exception`() {
-        `when`(analyticsService.getRecentSessions(mockUser, 10))
+        `when`(analyticsService.getRecentSessions(mockUser.requireId(), 10))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -452,7 +454,7 @@ class AnalyticsControllerTest {
     @Test
     fun `GET heatmap should return 200 with heatmap data`() {
         val data = listOf(HeatmapDayResponse(date = "2024-01-01", count = 5))
-        `when`(analyticsService.getHeatmap(mockUser, 1704067200000L, 1704672000000L)).thenReturn(data)
+        `when`(analyticsService.getHeatmap(mockUser.requireId(), 1704067200000L, 1704672000000L)).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/heatmap")
@@ -468,7 +470,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET heatmap should return 500 when service throws exception`() {
-        `when`(analyticsService.getHeatmap(mockUser, 1704067200000L, 1704672000000L))
+        `when`(analyticsService.getHeatmap(mockUser.requireId(), 1704067200000L, 1704672000000L))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -486,7 +488,7 @@ class AnalyticsControllerTest {
     @Test
     fun `GET level-transitions should return 200 with transition data`() {
         val data = listOf(LevelTransitionResponse(fromLevel = 1, toLevel = 2, count = 10L))
-        `when`(analyticsService.getLevelTransitions(mockUser)).thenReturn(data)
+        `when`(analyticsService.getLevelTransitions(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/level-transitions")
@@ -500,7 +502,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET level-transitions should return 500 when service throws exception`() {
-        `when`(analyticsService.getLevelTransitions(mockUser))
+        `when`(analyticsService.getLevelTransitions(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -523,7 +525,7 @@ class AnalyticsControllerTest {
                 masteredAt = 1704067200000L,
             )
         )
-        `when`(analyticsService.getWordsMastered(mockUser, 20)).thenReturn(data)
+        `when`(analyticsService.getWordsMastered(mockUser.requireId(), 20)).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/words-mastered")
@@ -538,7 +540,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET words-mastered should return 500 when service throws exception`() {
-        `when`(analyticsService.getWordsMastered(mockUser, 20))
+        `when`(analyticsService.getWordsMastered(mockUser.requireId(), 20))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -564,7 +566,7 @@ class AnalyticsControllerTest {
                 accuracyPercent = 80.0,
             )
         )
-        `when`(analyticsService.getStatsByLanguagePair(mockUser)).thenReturn(data)
+        `when`(analyticsService.getStatsByLanguagePair(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/language-stats")
@@ -578,7 +580,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET language-stats should return 500 when service throws exception`() {
-        `when`(analyticsService.getStatsByLanguagePair(mockUser))
+        `when`(analyticsService.getStatsByLanguagePair(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -602,7 +604,7 @@ class AnalyticsControllerTest {
                 accuracyPercent = 80.0,
             )
         )
-        `when`(analyticsService.getMonthlyStats(mockUser)).thenReturn(data)
+        `when`(analyticsService.getMonthlyStats(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/monthly-stats")
@@ -616,7 +618,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET monthly-stats should return 500 when service throws exception`() {
-        `when`(analyticsService.getMonthlyStats(mockUser))
+        `when`(analyticsService.getMonthlyStats(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -634,7 +636,7 @@ class AnalyticsControllerTest {
         val data = listOf(
             ResponseTimeTrendResponse(year = 2024, week = 1, avgResponseTimeMs = 1200.5)
         )
-        `when`(analyticsService.getResponseTimeTrend(mockUser)).thenReturn(data)
+        `when`(analyticsService.getResponseTimeTrend(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/response-time-trend")
@@ -648,7 +650,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET response-time-trend should return 500 when service throws exception`() {
-        `when`(analyticsService.getResponseTimeTrend(mockUser))
+        `when`(analyticsService.getResponseTimeTrend(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -664,7 +666,7 @@ class AnalyticsControllerTest {
     @Test
     fun `GET comeback-words should return 200 with comeback words`() {
         val data = listOf(ComebackWordResponse(wordId = 3L, wordText = "apple", wordTranslation = "Apfel"))
-        `when`(analyticsService.getComebackWords(mockUser)).thenReturn(data)
+        `when`(analyticsService.getComebackWords(mockUser.requireId())).thenReturn(data)
 
         mockMvc.perform(
             get("/api/v1/analytics/comeback-words")
@@ -678,7 +680,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET comeback-words should return 500 when service throws exception`() {
-        `when`(analyticsService.getComebackWords(mockUser))
+        `when`(analyticsService.getComebackWords(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(
@@ -693,7 +695,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET weekly-report should return 200 with weekly report`() {
-        `when`(analyticsService.getWeeklyReport(mockUser)).thenReturn(createWeeklyReportResponse())
+        `when`(analyticsService.getWeeklyReport(mockUser.requireId())).thenReturn(createWeeklyReportResponse())
 
         mockMvc.perform(
             get("/api/v1/analytics/weekly-report")
@@ -708,7 +710,7 @@ class AnalyticsControllerTest {
 
     @Test
     fun `GET weekly-report should return 500 when service throws exception`() {
-        `when`(analyticsService.getWeeklyReport(mockUser))
+        `when`(analyticsService.getWeeklyReport(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(

@@ -27,6 +27,10 @@ class FeatureAccessService(
 
     fun hasActivePremiumAccess(user: User): Boolean = premiumSource(user, Instant.now(clock)) != PremiumSource.NONE
 
+    /** For callers holding only the authenticated id; an unknown user has no access. */
+    fun hasActivePremiumAccess(userId: Long): Boolean =
+        userRepository.findById(userId).map(::hasActivePremiumAccess).orElse(false)
+
     /**
      * Store subscription is active: ACTIVE/TRIAL until their expiry (if any); CANCELLED means
      * auto-renew is off — the period is already paid, so access continues until the expiry date.

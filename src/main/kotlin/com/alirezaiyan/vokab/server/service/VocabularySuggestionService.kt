@@ -1,7 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
 import com.alirezaiyan.vokab.server.config.AppProperties
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyItemResponse
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -38,7 +37,7 @@ class VocabularySuggestionService(
 
     /** Signed-in user: also drops words the user already has in [targetLanguage]. */
     fun suggestForUser(
-        user: User,
+        userId: Long,
         targetLanguage: String,
         currentLevel: String,
         nativeLanguage: String,
@@ -49,7 +48,7 @@ class VocabularySuggestionService(
             currentLevel = currentLevel.trim(),
             nativeLanguage = nativeLanguage.trim(),
             interests = emptyList(),
-            existingKeys = wordService.getExistingTranslationKeys(user, target),
+            existingKeys = wordService.getExistingTranslationKeys(userId, target),
         )
     }
 

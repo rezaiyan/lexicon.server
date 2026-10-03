@@ -1,19 +1,18 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.config.RateLimitConfig
-import com.alirezaiyan.vokab.server.domain.entity.DailyInsight
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.alirezaiyan.vokab.server.presentation.dto.ExtractVocabularyRequest
-import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyItemResponse
 import com.alirezaiyan.vokab.server.presentation.dto.SuggestVocabularyRequest
 import com.alirezaiyan.vokab.server.presentation.dto.TranslateTextRequest
 import com.alirezaiyan.vokab.server.service.DailyInsightService
 import com.alirezaiyan.vokab.server.service.FeatureAccessService
 import com.alirezaiyan.vokab.server.service.OpenRouterService
-import com.alirezaiyan.vokab.server.service.UserProgressService
 import com.alirezaiyan.vokab.server.service.WordService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
@@ -56,8 +55,6 @@ class AiControllerTest {
     @MockitoBean
     private lateinit var featureAccessService: FeatureAccessService
 
-    @MockitoBean
-    private lateinit var userProgressService: UserProgressService
 
     @MockitoBean
     private lateinit var dailyInsightService: DailyInsightService
@@ -66,13 +63,13 @@ class AiControllerTest {
     private lateinit var wordService: WordService
 
     private val mockUser = createUser()
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── POST /api/v1/ai/extract-vocabulary ────────────────────────────────────
 
     @Test
     fun `POST extract-vocabulary should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(false)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
 
         val request = createExtractVocabularyRequest()
 
@@ -89,7 +86,7 @@ class AiControllerTest {
 
     @Test
     fun `POST extract-vocabulary should return 429 when rate limit exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createRateLimitedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
 
@@ -108,7 +105,7 @@ class AiControllerTest {
 
     @Test
     fun `POST extract-vocabulary should return 200 with extracted text when premium user and rate not exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(openRouterService.extractVocabularyFromImage(
@@ -134,7 +131,7 @@ class AiControllerTest {
 
     @Test
     fun `POST extract-vocabulary should return 500 when extraction throws exception`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(openRouterService.extractVocabularyFromImage(
@@ -158,7 +155,7 @@ class AiControllerTest {
 
     @Test
     fun `POST extract-vocabulary should return 502 UPSTREAM_UNAVAILABLE when OpenRouter fails`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(openRouterService.extractVocabularyFromImage(
@@ -183,7 +180,7 @@ class AiControllerTest {
 
     @Test
     fun `GET generate-insight should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(false)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
 
         mockMvc.perform(
             get("/api/v1/ai/generate-insight")
@@ -196,7 +193,7 @@ class AiControllerTest {
 
     @Test
     fun `GET generate-insight should return 429 when rate limit exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createRateLimitedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
@@ -210,16 +207,14 @@ class AiControllerTest {
     }
 
     @Test
-    fun `GET generate-insight should return 200 with existing insight when already generated today`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+    fun `GET generate-insight should return 200 with today's insight`() {
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
-        val existingInsight = createDailyInsight(
-            insightText = "You've mastered 10 words today!",
-            generatedAt = Instant.now()
+        `when`(dailyInsightService.getOrGenerateTodaysInsight(mockUser.requireId())).thenReturn(
+            DailyInsightService.TodaysInsight("You've mastered 10 words today!", Instant.now())
         )
-        `when`(dailyInsightService.getTodaysInsightForUser(mockUser)).thenReturn(existingInsight)
 
         mockMvc.perform(
             get("/api/v1/ai/generate-insight")
@@ -231,37 +226,12 @@ class AiControllerTest {
     }
 
     @Test
-    fun `GET generate-insight should return 200 with new insight when none exists today`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
-        val bucket = createAllowedBucket()
-        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(dailyInsightService.getTodaysInsightForUser(mockUser)).thenReturn(null)
-
-        val progressStats = createProgressStatsDto()
-        `when`(userProgressService.calculateProgressStats(mockUser)).thenReturn(progressStats)
-        `when`(openRouterService.generateDailyInsight(anyNonNull())).thenReturn(
-            "Keep up the great work, you have 5 words to review!"
-        )
-
-        mockMvc.perform(
-            get("/api/v1/ai/generate-insight")
-                .with(authentication(auth))
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.insight").value("Keep up the great work, you have 5 words to review!"))
-    }
-
-    @Test
     fun `GET generate-insight should return 500 when insight generation fails`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser)).thenReturn(true)
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(dailyInsightService.getTodaysInsightForUser(mockUser)).thenReturn(null)
-
-        val progressStats = createProgressStatsDto()
-        `when`(userProgressService.calculateProgressStats(mockUser)).thenReturn(progressStats)
-        `when`(openRouterService.generateDailyInsight(anyNonNull())).thenThrow(RuntimeException("AI insight generation failed"))
+        `when`(dailyInsightService.getOrGenerateTodaysInsight(mockUser.requireId()))
+            .thenThrow(RuntimeException("AI insight generation failed"))
 
         mockMvc.perform(
             get("/api/v1/ai/generate-insight")
@@ -399,7 +369,7 @@ class AiControllerTest {
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
         val existingKeys = setOf("hallo")
-        `when`(wordService.getExistingTranslationKeys(mockUser, "German")).thenReturn(existingKeys)
+        `when`(wordService.getExistingTranslationKeys(mockUser.requireId(), "German")).thenReturn(existingKeys)
 
         val rawItems = listOf(
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello"),
@@ -433,7 +403,7 @@ class AiControllerTest {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
-        `when`(wordService.getExistingTranslationKeys(mockUser, "German")).thenReturn(emptySet())
+        `when`(wordService.getExistingTranslationKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
         `when`(openRouterService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
@@ -508,33 +478,6 @@ class AiControllerTest {
         nativeLanguage = nativeLanguage,
     )
 
-    private fun createProgressStatsDto(
-        totalWords: Int = 20,
-        dueCards: Int = 5,
-    ): ProgressStatsDto = ProgressStatsDto(
-        totalWords = totalWords,
-        dueCards = dueCards,
-        level0Count = 5,
-        level1Count = 4,
-        level2Count = 3,
-        level3Count = 3,
-        level4Count = 2,
-        level5Count = 2,
-        level6Count = 1,
-    )
-
-    private fun createDailyInsight(
-        insightText: String = "Great work today!",
-        generatedAt: Instant = Instant.now(),
-    ): DailyInsight = DailyInsight(
-        id = 1L,
-        user = mockUser,
-        insightText = insightText,
-        generatedAt = generatedAt,
-        date = java.time.LocalDate.now().toString(),
-        sentViaPush = false,
-    )
-
     private fun createAllowedBucket(): Bucket {
         val bucket = org.mockito.Mockito.mock(Bucket::class.java)
         `when`(bucket.tryConsume(1)).thenReturn(true)
@@ -546,8 +489,4 @@ class AiControllerTest {
         `when`(bucket.tryConsume(1)).thenReturn(false)
         return bucket
     }
-
-    /** Workaround for Mockito `any()` returning null for non-nullable Kotlin parameters. */
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> anyNonNull(): T = org.mockito.ArgumentMatchers.any<T>() as T
 }

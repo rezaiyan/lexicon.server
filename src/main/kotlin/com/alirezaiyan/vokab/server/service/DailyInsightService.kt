@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
 import com.alirezaiyan.vokab.server.domain.repository.DailyInsightRepository
 import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleRepository
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
 import com.alirezaiyan.vokab.server.service.push.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -30,8 +31,38 @@ class DailyInsightService(
     private val featureAccessService: FeatureAccessService,
     private val analyticsService: AnalyticsService,
     private val notificationScheduleRepository: NotificationScheduleRepository,
+    private val userRepository: UserRepository,
     private val clock: Clock
 ) {
+
+    data class TodaysInsight(val text: String, val generatedAt: Instant)
+
+    /**
+     * The on-demand path (GET /ai/generate-insight, the fallback when the push was missed): today's
+     * insight, generated and stored now if there is none. Not transactional, so the AI call holds
+     * no connection.
+     */
+    fun getOrGenerateTodaysInsight(userId: Long): TodaysInsight {
+        val user = userRepository.findById(userId).orElseThrow { NoSuchElementException("User not found") }
+        val today = LocalDate.now(clock).toString()
+        dailyInsightRepository.findByUserAndDate(user, today)
+            ?.let { return TodaysInsight(it.insightText, it.generatedAt) }
+
+        logger.info { "Generating new daily insight for userId=$userId" }
+        val ctx = OpenRouterService.DailyInsightContext(
+            stats = userProgressService.calculateProgressStats(userId),
+            userName = user.name,
+            optimalStudyHour = null,
+            accuracyTrend = null,
+            topDifficultWord = null,
+            primaryLanguage = null,
+            sessionCompletionRate = null,
+            currentStreak = user.currentStreak
+        )
+        val insightText = openRouterService.generateDailyInsight(ctx)
+        val saved = saveDailyInsight(user, insightText)
+        return TodaysInsight(saved?.insightText ?: insightText, saved?.generatedAt ?: Instant.now(clock))
+    }
 
     /**
      * Generate daily insight for a specific user.
@@ -74,7 +105,7 @@ class DailyInsightService(
         }
 
         return try {
-            val stats = userProgressService.calculateProgressStats(user)
+            val stats = userProgressService.calculateProgressStats(user.requireId())
             val insightText = if (hasActivityToday) {
                 openRouterService.generateCelebrationInsight(stats, user.name)
             } else {
@@ -109,19 +140,19 @@ class DailyInsightService(
             notificationScheduleRepository.findByUser(user)?.optimalSendHour
         }.getOrNull()
 
-        val weeklyReport = runCatching { analyticsService.getWeeklyReport(user) }.getOrNull()
+        val weeklyReport = runCatching { analyticsService.getWeeklyReport(user.requireId()) }.getOrNull()
         val accuracyTrend = weeklyReport?.changePercent?.toFloat()
 
         val topDifficultWord = runCatching {
-            analyticsService.getDifficultWords(user, minReviews = 3, limit = 1).firstOrNull()?.wordText
+            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1).firstOrNull()?.wordText
         }.getOrNull()
 
         val primaryLanguage = runCatching {
-            analyticsService.getStatsByLanguagePair(user).firstOrNull()?.targetLanguage
+            analyticsService.getStatsByLanguagePair(user.requireId()).firstOrNull()?.targetLanguage
         }.getOrNull()
 
         val sessionCompletionRate = runCatching {
-            analyticsService.getStudyInsights(user).sessionCompletionRate?.toFloat()
+            analyticsService.getStudyInsights(user.requireId()).sessionCompletionRate?.toFloat()
         }.getOrNull()
 
         return OpenRouterService.DailyInsightContext(
@@ -202,15 +233,6 @@ class DailyInsightService(
             logger.debug { "Concurrent insight write for user ${user.id} on $today, returning existing row" }
             dailyInsightRepository.findByUserAndDate(user, today)
         }
-    }
-
-    /**
-     * Get today's insight for a user (for fallback when push notification is missed).
-     */
-    @Transactional(readOnly = true)
-    fun getTodaysInsightForUser(user: User): DailyInsight? {
-        val today = LocalDate.now(clock).toString()
-        return dailyInsightRepository.findByUserAndDate(user, today)
     }
 
     /**

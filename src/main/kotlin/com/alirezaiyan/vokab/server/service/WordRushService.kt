@@ -1,12 +1,11 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -14,24 +13,25 @@ private val logger = KotlinLogging.logger {}
 class WordRushService(
     private val wordRushGameRepository: WordRushGameRepository,
     private val wordRushGamePersister: WordRushGamePersister,
+    private val userRepository: UserRepository,
 ) {
 
-    fun syncGames(user: User, request: SyncWordRushRequest): SyncWordRushResponse {
+    fun syncGames(userId: Long, request: SyncWordRushRequest): SyncWordRushResponse {
         val syncedIds = mutableListOf<String>()
 
         for (gameReq in request.games) {
-            if (wordRushGamePersister.saveGame(user, gameReq)) {
+            if (wordRushGamePersister.saveGame(userId, gameReq)) {
                 syncedIds.add(gameReq.clientGameId)
             }
         }
 
-        logger.info { "Synced ${syncedIds.size}/${request.games.size} Word Rush games for user ${user.id}" }
+        logger.info { "Synced ${syncedIds.size}/${request.games.size} Word Rush games for user $userId" }
         return SyncWordRushResponse(syncedGameIds = syncedIds)
     }
 
     @Transactional(readOnly = true)
-    fun getInsights(user: User): WordRushInsightsResponse {
-        val p = wordRushGameRepository.findInsightsByUserId(user.requireId())
+    fun getInsights(userId: Long): WordRushInsightsResponse {
+        val p = wordRushGameRepository.findInsightsByUserId(userId)
         val completionRatePercent = if (p.totalGames > 0) p.totalCompleted.toDouble() / p.totalGames * 100 else 0.0
         val avgDurationMs = if (p.totalGames > 0) p.totalTimePlayedMs.toDouble() / p.totalGames else 0.0
 
@@ -49,7 +49,8 @@ class WordRushService(
     }
 
     @Transactional(readOnly = true)
-    fun getHistory(user: User): List<WordRushGameResponse> {
+    fun getHistory(userId: Long): List<WordRushGameResponse> {
+        val user = userRepository.getReferenceById(userId)
         return wordRushGameRepository.findTop20ByUserOrderByPlayedAtDesc(user).map { game ->
             WordRushGameResponse(
                 clientGameId = game.clientGameId,

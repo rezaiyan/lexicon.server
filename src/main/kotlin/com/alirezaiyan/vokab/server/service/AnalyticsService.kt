@@ -1,6 +1,5 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
@@ -33,21 +32,22 @@ class AnalyticsService(
     // Not @Transactional at the batch level — each session is saved in its own
     // REQUIRES_NEW transaction via sessionPersister so one bad session in the
     // client's retry queue cannot roll back the entire batch forever.
-    fun syncSessions(user: User, request: SyncAnalyticsRequest): SyncAnalyticsResponse {
+    fun syncSessions(userId: Long, request: SyncAnalyticsRequest): SyncAnalyticsResponse {
         val syncedIds = mutableListOf<String>()
 
         for (sessionReq in request.sessions) {
-            if (sessionPersister.saveSession(user, sessionReq)) {
+            if (sessionPersister.saveSession(userId, sessionReq)) {
                 syncedIds.add(sessionReq.clientSessionId)
             }
         }
 
-        logger.info { "Synced ${syncedIds.size}/${request.sessions.size} sessions for user ${user.id}" }
+        logger.info { "Synced ${syncedIds.size}/${request.sessions.size} sessions for user $userId" }
         return SyncAnalyticsResponse(syncedSessionIds = syncedIds)
     }
 
     @Transactional(readOnly = true)
-    fun getStudyInsights(user: User): StudyInsightsResponse {
+    fun getStudyInsights(userId: Long): StudyInsightsResponse {
+        val user = userRepository.getReferenceById(userId)
         val totalCards = reviewEventRepository.countByUser(user)
         val totalCorrect = reviewEventRepository.countCorrectByUser(user)
         val totalStudyTime = studySessionRepository.totalStudyTimeByUser(user)
@@ -78,7 +78,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getDailyStats(user: User, startDate: LocalDate, endDate: LocalDate): List<DailyStatsResponse> {
+    fun getDailyStats(userId: Long, startDate: LocalDate, endDate: LocalDate): List<DailyStatsResponse> {
+        val user = userRepository.getReferenceById(userId)
         val start = startDate.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()
         val end = endDate.plusDays(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli() - 1
         val sessions = studySessionRepository.findByUserAndDateRange(user, start, end)
@@ -104,7 +105,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getDifficultWords(user: User, minReviews: Int, limit: Int): List<DifficultWordResponse> {
+    fun getDifficultWords(userId: Long, minReviews: Int, limit: Int): List<DifficultWordResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.findDifficultWords(user, minReviews, PageRequest.of(0, limit))
             .map { p ->
                 DifficultWordResponse(
@@ -121,7 +123,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getMostReviewedWords(user: User, limit: Int): List<MostReviewedWordResponse> {
+    fun getMostReviewedWords(userId: Long, limit: Int): List<MostReviewedWordResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.findMostReviewedWords(user, PageRequest.of(0, limit))
             .map { p ->
                 MostReviewedWordResponse(
@@ -134,7 +137,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getAccuracyByLevel(user: User): List<AccuracyByLevelResponse> {
+    fun getAccuracyByLevel(userId: Long): List<AccuracyByLevelResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.getAccuracyByLevel(user).map { p ->
             AccuracyByLevelResponse(
                 level = p.level,
@@ -146,8 +150,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getAccuracyByHour(user: User): List<HourlyAccuracyResponse> {
-        return reviewEventRepository.getAccuracyByHour(user.requireId()).map { p ->
+    fun getAccuracyByHour(userId: Long): List<HourlyAccuracyResponse> {
+        return reviewEventRepository.getAccuracyByHour(userId).map { p ->
             HourlyAccuracyResponse(
                 hour = p.hour,
                 totalReviews = p.total,
@@ -158,8 +162,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getAccuracyByDayOfWeek(user: User): List<DayOfWeekAccuracyResponse> {
-        return reviewEventRepository.getAccuracyByDayOfWeek(user.requireId()).map { p ->
+    fun getAccuracyByDayOfWeek(userId: Long): List<DayOfWeekAccuracyResponse> {
+        return reviewEventRepository.getAccuracyByDayOfWeek(userId).map { p ->
             DayOfWeekAccuracyResponse(
                 dayOfWeek = p.dayOfWeek,
                 totalReviews = p.total,
@@ -170,7 +174,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getRecentSessions(user: User, limit: Int): List<StudySessionResponse> {
+    fun getRecentSessions(userId: Long, limit: Int): List<StudySessionResponse> {
+        val user = userRepository.getReferenceById(userId)
         return studySessionRepository.findByUserOrderByStartedAtDesc(user, PageRequest.of(0, limit))
             .map { session ->
                 StudySessionResponse(
@@ -188,8 +193,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getHeatmap(user: User, startMs: Long, endMs: Long): List<HeatmapDayResponse> {
-        return reviewEventRepository.getHeatmapData(user.requireId(), startMs, endMs).map { p ->
+    fun getHeatmap(userId: Long, startMs: Long, endMs: Long): List<HeatmapDayResponse> {
+        return reviewEventRepository.getHeatmapData(userId, startMs, endMs).map { p ->
             HeatmapDayResponse(
                 date = p.day,
                 count = p.count.toInt()
@@ -198,7 +203,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getLevelTransitions(user: User): List<LevelTransitionResponse> {
+    fun getLevelTransitions(userId: Long): List<LevelTransitionResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.getLevelTransitions(user).map { p ->
             LevelTransitionResponse(
                 fromLevel = p.fromLevel,
@@ -209,7 +215,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getWordsMastered(user: User, limit: Int): List<MasteredWordResponse> {
+    fun getWordsMastered(userId: Long, limit: Int): List<MasteredWordResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.findWordsMastered(user, PageRequest.of(0, limit)).map { p ->
             MasteredWordResponse(
                 wordId = p.wordId,
@@ -221,7 +228,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getStatsByLanguagePair(user: User): List<LanguagePairStatsResponse> {
+    fun getStatsByLanguagePair(userId: Long): List<LanguagePairStatsResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.getStatsByLanguagePair(user).map { p ->
             LanguagePairStatsResponse(
                 sourceLanguage = p.sourceLanguage,
@@ -235,8 +243,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getMonthlyStats(user: User): List<MonthlyStatsResponse> {
-        return reviewEventRepository.getMonthlyStats(user.requireId()).map { p ->
+    fun getMonthlyStats(userId: Long): List<MonthlyStatsResponse> {
+        return reviewEventRepository.getMonthlyStats(userId).map { p ->
             MonthlyStatsResponse(
                 year = p.yr,
                 month = p.mo,
@@ -248,8 +256,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getResponseTimeTrend(user: User): List<ResponseTimeTrendResponse> {
-        return reviewEventRepository.getResponseTimeTrend(user.requireId()).map { p ->
+    fun getResponseTimeTrend(userId: Long): List<ResponseTimeTrendResponse> {
+        return reviewEventRepository.getResponseTimeTrend(userId).map { p ->
             ResponseTimeTrendResponse(
                 year = p.yr,
                 week = p.wk,
@@ -259,7 +267,8 @@ class AnalyticsService(
     }
 
     @Transactional(readOnly = true)
-    fun getComebackWords(user: User): List<ComebackWordResponse> {
+    fun getComebackWords(userId: Long): List<ComebackWordResponse> {
+        val user = userRepository.getReferenceById(userId)
         return reviewEventRepository.findComebackWords(user).map { p ->
             ComebackWordResponse(
                 wordId = p.wordId,
@@ -283,7 +292,8 @@ class AnalyticsService(
      * - "Last week" = the 7 calendar days before this week's Monday
      */
     @Transactional(readOnly = true)
-    fun getWeeklyReport(user: User): WeeklyReportResponse {
+    fun getWeeklyReport(userId: Long): WeeklyReportResponse {
+        val user = userRepository.getReferenceById(userId)
         val today = LocalDate.now(clock)
 
         fun dateToMs(date: LocalDate): Long = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli()

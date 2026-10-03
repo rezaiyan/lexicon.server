@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
 import com.alirezaiyan.vokab.server.presentation.dto.*
@@ -56,7 +57,7 @@ class WordRushIntegrationTest {
             )
         )
 
-        val response = wordRushService.syncGames(user, request)
+        val response = wordRushService.syncGames(user.requireId(), request)
 
         assertEquals(listOf("game-1", "game-2", "game-3"), response.syncedGameIds)
         assertEquals(3, wordRushGameRepository.countByUser(user))
@@ -70,8 +71,8 @@ class WordRushIntegrationTest {
             )
         )
 
-        wordRushService.syncGames(user, request)
-        val response2 = wordRushService.syncGames(user, request)
+        wordRushService.syncGames(user.requireId(), request)
+        val response2 = wordRushService.syncGames(user.requireId(), request)
 
         assertEquals(listOf("idempotent-1"), response2.syncedGameIds)
         assertEquals(1, wordRushGameRepository.countByUser(user))
@@ -82,7 +83,7 @@ class WordRushIntegrationTest {
         val firstRequest = SyncWordRushRequest(
             games = listOf(createGameRequest("existing-1", score = 100))
         )
-        wordRushService.syncGames(user, firstRequest)
+        wordRushService.syncGames(user.requireId(), firstRequest)
 
         val secondRequest = SyncWordRushRequest(
             games = listOf(
@@ -90,7 +91,7 @@ class WordRushIntegrationTest {
                 createGameRequest("new-1", score = 200),
             )
         )
-        val response = wordRushService.syncGames(user, secondRequest)
+        val response = wordRushService.syncGames(user.requireId(), secondRequest)
 
         assertEquals(listOf("existing-1", "new-1"), response.syncedGameIds)
         assertEquals(2, wordRushGameRepository.countByUser(user))
@@ -100,7 +101,7 @@ class WordRushIntegrationTest {
 
     @Test
     fun `insights returns zeros for user with no data`() {
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.requireId())
 
         assertEquals(0L, insights.totalGames)
         assertEquals(0L, insights.totalCompleted)
@@ -122,9 +123,9 @@ class WordRushIntegrationTest {
                 createGameRequest("g3", score = 50, correctCount = 5, totalQuestions = 12, bestStreak = 2, durationMs = 25000, avgResponseMs = 3000, completedNormally = false),
             )
         )
-        wordRushService.syncGames(user, request)
+        wordRushService.syncGames(user.requireId(), request)
 
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.requireId())
 
         assertEquals(3L, insights.totalGames)
         assertEquals(2L, insights.totalCompleted)  // g3 is not completed normally
@@ -152,9 +153,9 @@ class WordRushIntegrationTest {
                 createGameRequest("new-game", score = 100, playedAt = 1700100000000),
             )
         )
-        wordRushService.syncGames(user, request)
+        wordRushService.syncGames(user.requireId(), request)
 
-        val history = wordRushService.getHistory(user)
+        val history = wordRushService.getHistory(user.requireId())
 
         assertEquals(2, history.size)
         assertEquals("new-game", history[0].clientGameId)
@@ -166,9 +167,9 @@ class WordRushIntegrationTest {
         val games = (1..25).map { i ->
             createGameRequest("game-$i", score = i * 10, playedAt = 1700000000000 + i * 1000)
         }
-        wordRushService.syncGames(user, SyncWordRushRequest(games = games))
+        wordRushService.syncGames(user.requireId(), SyncWordRushRequest(games = games))
 
-        val history = wordRushService.getHistory(user)
+        val history = wordRushService.getHistory(user.requireId())
 
         assertEquals(20, history.size)
         // Most recent should be first
@@ -177,7 +178,7 @@ class WordRushIntegrationTest {
 
     @Test
     fun `history returns empty list for user with no games`() {
-        val history = wordRushService.getHistory(user)
+        val history = wordRushService.getHistory(user.requireId())
 
         assertTrue(history.isEmpty())
     }
@@ -185,13 +186,13 @@ class WordRushIntegrationTest {
     @Test
     fun `insights with single game - all aggregate fields computed correctly`() {
         wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(createGameRequest("solo", score = 80, correctCount = 8, totalQuestions = 10, bestStreak = 4, durationMs = 20000, avgResponseMs = 1000))
             )
         )
 
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.requireId())
 
         assertEquals(1L, insights.totalGames)
         assertEquals(1L, insights.totalCompleted)
@@ -207,7 +208,7 @@ class WordRushIntegrationTest {
     @Test
     fun `insights with all games incomplete - completion rate is 0`() {
         wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(
                     createGameRequest("inc-1", score = 30, completedNormally = false),
@@ -216,7 +217,7 @@ class WordRushIntegrationTest {
             )
         )
 
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.requireId())
 
         assertEquals(2L, insights.totalGames)
         assertEquals(0L, insights.totalCompleted)
@@ -227,7 +228,7 @@ class WordRushIntegrationTest {
     fun `insights accuracy excludes games with zero total questions via NULLIF`() {
         // game with 0 totalQuestions would cause divide-by-zero without NULLIF guard
         wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(
                     createGameRequest("zero-q", score = 50, correctCount = 0, totalQuestions = 0),
@@ -236,7 +237,7 @@ class WordRushIntegrationTest {
             )
         )
 
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.requireId())
 
         assertEquals(2L, insights.totalGames)
         // accuracy for zero-totalQuestions game is excluded from AVG (NULLIF → null → ignored)
@@ -246,7 +247,7 @@ class WordRushIntegrationTest {
     @Test
     fun `insights best streak is the maximum across all games`() {
         wordRushService.syncGames(
-            user,
+            user.requireId(),
             SyncWordRushRequest(
                 games = listOf(
                     createGameRequest("s1", bestStreak = 3),
@@ -256,7 +257,7 @@ class WordRushIntegrationTest {
             )
         )
 
-        assertEquals(15, wordRushService.getInsights(user).bestStreakEver)
+        assertEquals(15, wordRushService.getInsights(user.requireId()).bestStreakEver)
     }
 
     // -- Data Isolation -------------------------------------------------------
@@ -267,16 +268,16 @@ class WordRushIntegrationTest {
 
         try {
             wordRushService.syncGames(
-                user,
+                user.requireId(),
                 SyncWordRushRequest(games = listOf(createGameRequest("my-game", score = 100)))
             )
             wordRushService.syncGames(
-                otherUser,
+                otherUser.requireId(),
                 SyncWordRushRequest(games = listOf(createGameRequest("other-game", score = 200)))
             )
 
-            val myInsights = wordRushService.getInsights(user)
-            val otherInsights = wordRushService.getInsights(otherUser)
+            val myInsights = wordRushService.getInsights(user.requireId())
+            val otherInsights = wordRushService.getInsights(otherUser.requireId())
 
             assertEquals(1L, myInsights.totalGames)
             assertEquals(1L, otherInsights.totalGames)
@@ -292,7 +293,7 @@ class WordRushIntegrationTest {
     @Test
     fun `each game in a batch is saved in its own committed transaction`() {
         // Pre-save "dup-game" in its own REQUIRES_NEW transaction (committed to DB)
-        wordRushGamePersister.saveGame(user, createGameRequest("dup-game", score = 10))
+        wordRushGamePersister.saveGame(user.requireId(), createGameRequest("dup-game", score = 10))
 
         // Batch contains: new game, already-committed duplicate, another new game
         val request = SyncWordRushRequest(
@@ -303,7 +304,7 @@ class WordRushIntegrationTest {
             )
         )
 
-        val response = wordRushService.syncGames(user, request)
+        val response = wordRushService.syncGames(user.requireId(), request)
 
         // All 3 games reported as synced: "dup-game" via idempotency, others as new saves
         assertEquals(3, response.syncedGameIds.size)

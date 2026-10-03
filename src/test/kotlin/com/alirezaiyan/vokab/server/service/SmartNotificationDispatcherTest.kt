@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
@@ -141,7 +142,7 @@ class SmartNotificationDispatcherTest {
         )
         justRun { notificationEngagementService.recordSend(any(), any(), any()) }
         every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         justRun { milestoneDetector.recordMilestoneSnapshot(user, stats) }
 
         dispatcher.dispatchForCurrentHour()

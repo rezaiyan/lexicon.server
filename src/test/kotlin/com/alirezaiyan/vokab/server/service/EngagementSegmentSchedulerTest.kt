@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
@@ -142,7 +143,7 @@ class EngagementSegmentSchedulerTest {
         every { notificationEngagementService.getEngagementStats(1L, windowDays = 7) } returns engagementStats()
         every { notificationEngagementService.getEngagementStats(1L, windowDays = 30) } returns engagementStats()
         every { notificationEngagementService.getDaysSinceLastOpen(1L) } returns 10L
-        every { userProgressService.calculateProgressStats(user) } returns mockk(relaxed = true)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns mockk(relaxed = true)
         every { notificationAiAdvisor.advise(any()) } returns advice
 
         scheduler.refreshAll(listOf(user))

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleRepository
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
@@ -32,7 +33,7 @@ class MilestoneDetector(
 
     @Transactional(readOnly = true)
     fun getPendingMilestone(user: User): MilestoneEvent? {
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         val schedule = notificationScheduleRepository.findByUser(user) ?: return null
         val lastSnapshot = schedule.lastMilestoneSnapshot?.let { parseSnapshot(it) } ?: emptyMap()
 

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.ReviewEvent
 import com.alirezaiyan.vokab.server.domain.entity.StudySession
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -148,7 +149,7 @@ class AnalyticsIntegrationTest {
             )
         )
 
-        val response = analyticsService.syncSessions(user, request)
+        val response = analyticsService.syncSessions(user.requireId(), request)
 
         assertEquals(listOf("sync-1"), response.syncedSessionIds)
         assertEquals(1, studySessionRepository.countByUser(user))
@@ -181,8 +182,8 @@ class AnalyticsIntegrationTest {
             )
         )
 
-        analyticsService.syncSessions(user, request)
-        val response2 = analyticsService.syncSessions(user, request)
+        analyticsService.syncSessions(user.requireId(), request)
+        val response2 = analyticsService.syncSessions(user.requireId(), request)
 
         assertEquals(listOf("idempotent-1"), response2.syncedSessionIds)
         assertEquals(1, studySessionRepository.countByUser(user))
@@ -208,7 +209,7 @@ class AnalyticsIntegrationTest {
             )
         )
 
-        val response = analyticsService.syncSessions(user, request)
+        val response = analyticsService.syncSessions(user.requireId(), request)
 
         assertEquals(2, response.syncedSessionIds.size)
         assertEquals(2, studySessionRepository.countByUser(user))
@@ -218,7 +219,7 @@ class AnalyticsIntegrationTest {
 
     @Test
     fun `insights returns zeros for user with no data`() {
-        val insights = analyticsService.getStudyInsights(user)
+        val insights = analyticsService.getStudyInsights(user.requireId())
 
         assertEquals(0L, insights.totalCardsReviewed)
         assertEquals(0L, insights.totalCorrect)
@@ -246,7 +247,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val insights = analyticsService.getStudyInsights(user)
+        val insights = analyticsService.getStudyInsights(user.requireId())
 
         assertEquals(4L, insights.totalCardsReviewed)
         assertEquals(2L, insights.totalCorrect)
@@ -270,7 +271,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val insights = analyticsService.getStudyInsights(user)
+        val insights = analyticsService.getStudyInsights(user.requireId())
 
         assertEquals(2L, insights.wordsMasteredCount)
     }
@@ -280,7 +281,7 @@ class AnalyticsIntegrationTest {
         createSession(clientSessionId = "completed", completedNormally = true)
         createSession(clientSessionId = "abandoned", completedNormally = false)
 
-        val insights = analyticsService.getStudyInsights(user)
+        val insights = analyticsService.getStudyInsights(user.requireId())
 
         assertEquals(50.0, insights.sessionCompletionRate!!, 0.01)
     }
@@ -303,7 +304,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getDifficultWords(user, minReviews = 3, limit = 10)
+        val result = analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 10)
 
         assertEquals(2, result.size)
         assertEquals("hard", result[0].wordText)
@@ -321,7 +322,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getDifficultWords(user, minReviews = 3, limit = 10)
+        val result = analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 10)
 
         assertTrue(result.isEmpty())
     }
@@ -340,7 +341,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getMostReviewedWords(user, limit = 10)
+        val result = analyticsService.getMostReviewedWords(user.requireId(), limit = 10)
 
         assertEquals(2, result.size)
         assertEquals(1L, result[0].wordId)
@@ -362,7 +363,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getAccuracyByLevel(user)
+        val result = analyticsService.getAccuracyByLevel(user.requireId())
 
         val level0 = result.find { it.level == 0 }!!
         assertEquals(2L, level0.totalReviews)
@@ -389,7 +390,7 @@ class AnalyticsIntegrationTest {
             durationMs = 45_000,
         )
 
-        val result = analyticsService.getDailyStats(user, LocalDate.parse("2023-11-15"), LocalDate.parse("2023-11-15"))
+        val result = analyticsService.getDailyStats(user.requireId(), LocalDate.parse("2023-11-15"), LocalDate.parse("2023-11-15"))
 
         assertEquals(1, result.size)
         assertEquals("2023-11-15", result[0].date)
@@ -402,7 +403,7 @@ class AnalyticsIntegrationTest {
 
     @Test
     fun `daily stats returns empty for date range with no sessions`() {
-        val result = analyticsService.getDailyStats(user, LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-31"))
+        val result = analyticsService.getDailyStats(user.requireId(), LocalDate.parse("2020-01-01"), LocalDate.parse("2020-01-31"))
         assertTrue(result.isEmpty())
     }
 
@@ -413,7 +414,7 @@ class AnalyticsIntegrationTest {
         createSession(clientSessionId = "old", startedAt = EPOCH_NOV_14)
         createSession(clientSessionId = "new", startedAt = EPOCH_NOV_15)
 
-        val result = analyticsService.getRecentSessions(user, limit = 10)
+        val result = analyticsService.getRecentSessions(user.requireId(), limit = 10)
 
         assertEquals(2, result.size)
         assertEquals("new", result[0].clientSessionId)
@@ -426,7 +427,7 @@ class AnalyticsIntegrationTest {
         createSession(clientSessionId = "s2", startedAt = EPOCH_NOV_15)
         createSession(clientSessionId = "s3", startedAt = EPOCH_NOV_15 + 86_400_000)
 
-        val result = analyticsService.getRecentSessions(user, limit = 2)
+        val result = analyticsService.getRecentSessions(user.requireId(), limit = 2)
 
         assertEquals(2, result.size)
     }
@@ -444,7 +445,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getLevelTransitions(user)
+        val result = analyticsService.getLevelTransitions(user.requireId())
 
         val up = result.find { it.fromLevel == 0 && it.toLevel == 1 }!!
         assertEquals(2L, up.count)
@@ -472,7 +473,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getWordsMastered(user, limit = 10)
+        val result = analyticsService.getWordsMastered(user.requireId(), limit = 10)
 
         assertEquals(1, result.size)
         assertEquals("mastered", result[0].wordText)
@@ -491,7 +492,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getStatsByLanguagePair(user)
+        val result = analyticsService.getStatsByLanguagePair(user.requireId())
 
         assertEquals(2, result.size)
         val enEs = result.find { it.targetLanguage == "es" }!!
@@ -524,7 +525,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getComebackWords(user)
+        val result = analyticsService.getComebackWords(user.requireId())
 
         assertEquals(1, result.size)
         assertEquals("comeback", result[0].wordText)
@@ -544,7 +545,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getAccuracyByHour(user)
+        val result = analyticsService.getAccuracyByHour(user.requireId())
 
         assertTrue(result.size >= 2, "Expected at least 2 hour groups, got ${result.size}: ${result.map { "${it.hour}→${it.totalReviews}" }}")
         // Find the group with 2 reviews (hour 1 events)
@@ -565,7 +566,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getAccuracyByDayOfWeek(user)
+        val result = analyticsService.getAccuracyByDayOfWeek(user.requireId())
 
         assertTrue(result.isNotEmpty())
         assertEquals(2L, result[0].totalReviews)
@@ -584,7 +585,7 @@ class AnalyticsIntegrationTest {
         )
 
         val result = analyticsService.getHeatmap(
-            user,
+            user.requireId(),
             startMs = EPOCH_NOV_14,
             endMs = EPOCH_NOV_15 + 86_400_000,
         )
@@ -606,7 +607,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getMonthlyStats(user)
+        val result = analyticsService.getMonthlyStats(user.requireId())
 
         assertEquals(1, result.size)
         assertEquals(2023, result[0].year)
@@ -626,7 +627,7 @@ class AnalyticsIntegrationTest {
             ),
         )
 
-        val result = analyticsService.getResponseTimeTrend(user)
+        val result = analyticsService.getResponseTimeTrend(user.requireId())
 
         assertTrue(result.isNotEmpty())
         assertEquals(2000.0, result[0].avgResponseTimeMs, 0.01)
@@ -661,8 +662,8 @@ class AnalyticsIntegrationTest {
             )
         )
 
-        val myInsights = analyticsService.getStudyInsights(user)
-        val otherInsights = analyticsService.getStudyInsights(otherUser)
+        val myInsights = analyticsService.getStudyInsights(user.requireId())
+        val otherInsights = analyticsService.getStudyInsights(otherUser.requireId())
 
         assertEquals(1L, myInsights.totalCardsReviewed)
         assertEquals(1L, otherInsights.totalCardsReviewed)

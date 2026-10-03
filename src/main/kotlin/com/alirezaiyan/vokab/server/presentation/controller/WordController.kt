@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.BatchDeleteRequest
 import com.alirezaiyan.vokab.server.presentation.dto.BatchDeleteResponse
@@ -25,48 +25,48 @@ class WordController(
 ) {
     @GetMapping
     fun list(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestParam(required = false) updatedAfter: Long?,
     ): ResponseEntity<ApiResponse<List<WordDto>>> {
         val since = updatedAfter?.let { Instant.ofEpochMilli(it) }
-        val words = wordService.list(user, since)
+        val words = wordService.list(user.id, since)
         return ResponseEntity.ok(ApiResponse(success = true, data = words))
     }
 
     @PostMapping
     fun upsert(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody req: UpsertWordsRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.upsert(user, req.words)
+        wordService.upsert(user.id, req.words)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Upserted"))
     }
 
     @PatchMapping("/{id}")
     fun update(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @PathVariable id: Long,
         @Valid @RequestBody request: UpdateWordRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.update(user, id, request)
+        wordService.update(user.id, id, request)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Updated"))
     }
 
     @DeleteMapping("/{id}")
     fun delete(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @PathVariable id: Long,
     ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.delete(user, id)
+        wordService.delete(user.id, id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Deleted"))
     }
 
     @PostMapping("/batch-delete")
     fun batchDelete(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: BatchDeleteRequest,
     ): ResponseEntity<ApiResponse<BatchDeleteResponse>> {
-        val deletedCount = wordService.batchDelete(user, request.ids)
+        val deletedCount = wordService.batchDelete(user.id, request.ids)
         return ResponseEntity.ok(
             ApiResponse(
                 success = true,
@@ -78,30 +78,30 @@ class WordController(
 
     @PutMapping("/{id}/tags")
     fun updateTags(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @PathVariable id: Long,
         @Valid @RequestBody request: UpdateWordTagsRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.updateWordTags(user, id, request.tagIds)
+        wordService.updateWordTags(user.id, id, request.tagIds)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Tags updated"))
     }
 
     @PostMapping("/batch-assign-tags")
     fun batchAssignTags(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: BatchAssignTagsRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.batchAssignTags(user, request.wordIds, request.tagIds)
+        wordService.batchAssignTags(user.id, request.wordIds, request.tagIds)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Tags assigned"))
     }
 
     @PostMapping("/batch-update")
     fun batchUpdate(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: BatchUpdateLanguagesRequest,
     ): ResponseEntity<ApiResponse<BatchUpdateLanguagesResponse>> {
         val updatedCount = wordService.batchUpdateLanguages(
-            user, request.ids, request.sourceLanguage, request.targetLanguage,
+            user.id, request.ids, request.sourceLanguage, request.targetLanguage,
         )
         return ResponseEntity.ok(
             ApiResponse(

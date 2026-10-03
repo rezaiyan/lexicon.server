@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.Tag
@@ -22,7 +25,7 @@ class TagServiceTest {
     @BeforeEach
     fun setUp() {
         tagRepository = mockk()
-        tagService = TagService(tagRepository, clock = fixedClock())
+        tagService = TagService(tagRepository, clock = fixedClock(), userRepository = mockk<UserRepository>().answerReferences())
     }
 
     // --- list ---
@@ -37,7 +40,7 @@ class TagServiceTest {
         )
 
         // Act
-        val result = tagService.list(user)
+        val result = tagService.list(user.requireId())
 
         // Assert
         assertEquals(1, result.size)
@@ -54,7 +57,7 @@ class TagServiceTest {
         every { tagRepository.findAllWithWordCountByUser(user) } returns emptyList()
 
         // Act
-        val result = tagService.list(user)
+        val result = tagService.list(user.requireId())
 
         // Assert
         assertEquals(0, result.size)
@@ -71,7 +74,7 @@ class TagServiceTest {
         )
 
         // Act
-        val result = tagService.list(user)
+        val result = tagService.list(user.requireId())
 
         // Assert
         assertEquals(3L, result[0].wordCount)
@@ -88,7 +91,7 @@ class TagServiceTest {
         every { tagRepository.save(any()) } returns savedTag
 
         // Act
-        val result = tagService.create(user, "Travel")
+        val result = tagService.create(user.requireId(), "Travel")
 
         // Assert
         assertEquals(10L, result.id)
@@ -105,7 +108,7 @@ class TagServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException::class.java) {
-            tagService.create(user, "Travel")
+            tagService.create(user.requireId(), "Travel")
         }
         verify(exactly = 0) { tagRepository.save(any()) }
     }
@@ -119,7 +122,7 @@ class TagServiceTest {
         every { tagRepository.save(any()) } returns savedTag
 
         // Act
-        val result = tagService.create(user, "  Science  ")
+        val result = tagService.create(user.requireId(), "  Science  ")
 
         // Assert
         assertEquals("Science", result.name)
@@ -134,7 +137,7 @@ class TagServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException::class.java) {
-            tagService.create(user, "  Science  ")
+            tagService.create(user.requireId(), "  Science  ")
         }
     }
 
@@ -148,7 +151,7 @@ class TagServiceTest {
 
         // Act & Assert
         assertThrows(NoSuchElementException::class.java) {
-            tagService.rename(user, 99L, "New Name")
+            tagService.rename(user.requireId(), 99L, "New Name")
         }
     }
 
@@ -161,7 +164,7 @@ class TagServiceTest {
         every { tagRepository.countWordsByTagId(5L) } returns 3L
 
         // Act
-        val result = tagService.rename(user, 5L, "History")
+        val result = tagService.rename(user.requireId(), 5L, "History")
 
         // Assert
         assertEquals("History", result.name)
@@ -179,7 +182,7 @@ class TagServiceTest {
         every { tagRepository.countWordsByTagId(5L) } returns 2L
 
         // Act
-        val result = tagService.rename(user, 5L, "  History  ")
+        val result = tagService.rename(user.requireId(), 5L, "  History  ")
 
         // Assert
         assertEquals("History", result.name)
@@ -196,7 +199,7 @@ class TagServiceTest {
 
         // Act & Assert
         assertThrows(IllegalArgumentException::class.java) {
-            tagService.rename(user, 5L, "Science")
+            tagService.rename(user.requireId(), 5L, "Science")
         }
         verify(exactly = 0) { tagRepository.save(any()) }
     }
@@ -212,7 +215,7 @@ class TagServiceTest {
         every { tagRepository.countWordsByTagId(5L) } returns 7L
 
         // Act
-        val result = tagService.rename(user, 5L, "Modern History")
+        val result = tagService.rename(user.requireId(), 5L, "Modern History")
 
         // Assert
         assertEquals("Modern History", result.name)
@@ -230,7 +233,7 @@ class TagServiceTest {
 
         // Act & Assert
         assertThrows(NoSuchElementException::class.java) {
-            tagService.delete(user, 99L)
+            tagService.delete(user.requireId(), 99L)
         }
         verify(exactly = 0) { tagRepository.delete(any()) }
     }
@@ -244,7 +247,7 @@ class TagServiceTest {
         justRun { tagRepository.delete(tag) }
 
         // Act
-        tagService.delete(user, 3L)
+        tagService.delete(user.requireId(), 3L)
 
         // Assert
         verify(exactly = 1) { tagRepository.delete(tag) }

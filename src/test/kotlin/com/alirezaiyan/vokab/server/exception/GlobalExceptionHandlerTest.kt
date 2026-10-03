@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.exception
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.controller.ControllerTestSecurityConfig
 import com.alirezaiyan.vokab.server.service.WordService
@@ -52,7 +54,7 @@ class GlobalExceptionHandlerTest {
         updatedAt = Instant.now()
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── IllegalArgumentException → 400 ───────────────────────────────────────
 
@@ -60,7 +62,7 @@ class GlobalExceptionHandlerTest {
     fun `should return 400 with success=false when IllegalArgumentException is thrown`() {
         // Arrange
         doThrow(IllegalArgumentException("Word does not belong to user"))
-            .`when`(wordService).delete(mockUser, 1L)
+            .`when`(wordService).delete(mockUser.requireId(), 1L)
 
         // Act + Assert
         mockMvc.perform(
@@ -75,7 +77,7 @@ class GlobalExceptionHandlerTest {
     fun `should include the exception message in response body for IllegalArgumentException`() {
         // Arrange
         doThrow(IllegalArgumentException("Forbidden: word belongs to another user"))
-            .`when`(wordService).delete(mockUser, 2L)
+            .`when`(wordService).delete(mockUser.requireId(), 2L)
 
         // Act + Assert
         mockMvc.perform(
@@ -93,7 +95,7 @@ class GlobalExceptionHandlerTest {
     fun `should return 404 with success=false when NoSuchElementException is thrown`() {
         // Arrange
         doThrow(NoSuchElementException("Word not found"))
-            .`when`(wordService).delete(mockUser, 99L)
+            .`when`(wordService).delete(mockUser.requireId(), 99L)
 
         // Act + Assert
         mockMvc.perform(
@@ -108,7 +110,7 @@ class GlobalExceptionHandlerTest {
     fun `should include resource not found prefix in response for NoSuchElementException`() {
         // Arrange
         doThrow(NoSuchElementException("Word not found"))
-            .`when`(wordService).delete(mockUser, 99L)
+            .`when`(wordService).delete(mockUser.requireId(), 99L)
 
         // Act + Assert
         mockMvc.perform(
@@ -124,7 +126,7 @@ class GlobalExceptionHandlerTest {
     fun `should return 409 with success=false when DataIntegrityViolationException is thrown`() {
         // Arrange
         doThrow(DataIntegrityViolationException("Duplicate key"))
-            .`when`(wordService).list(mockUser, null)
+            .`when`(wordService).list(mockUser.requireId(), null)
 
         // Act + Assert
         mockMvc.perform(
@@ -220,7 +222,7 @@ class GlobalExceptionHandlerTest {
     fun `should return 500 with success=false for unexpected RuntimeException`() {
         // Arrange
         doThrow(RuntimeException("Unexpected internal error"))
-            .`when`(wordService).list(mockUser, null)
+            .`when`(wordService).list(mockUser.requireId(), null)
 
         // Act + Assert
         mockMvc.perform(

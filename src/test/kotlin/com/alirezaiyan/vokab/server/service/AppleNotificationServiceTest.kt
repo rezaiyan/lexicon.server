@@ -49,6 +49,7 @@ class AppleNotificationServiceTest {
             objectMapper,
             pushNotificationService,
             authService,
+            userAccessCache = mockk(relaxed = true),
             clock = fixedClock()
         )
     }

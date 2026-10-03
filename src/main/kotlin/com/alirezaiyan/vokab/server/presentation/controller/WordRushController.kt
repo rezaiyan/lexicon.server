@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.WordRushService
 import jakarta.validation.Valid
@@ -16,26 +16,26 @@ class WordRushController(
 
     @PostMapping("/sync")
     fun syncGames(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: SyncWordRushRequest,
     ): ResponseEntity<ApiResponse<SyncWordRushResponse>> {
-        val response = wordRushService.syncGames(user, request)
+        val response = wordRushService.syncGames(user.id, request)
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 
     @GetMapping("/insights")
     fun getInsights(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
     ): ResponseEntity<ApiResponse<WordRushInsightsResponse>> {
-        val insights = wordRushService.getInsights(user)
+        val insights = wordRushService.getInsights(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = insights))
     }
 
     @GetMapping("/history")
     fun getHistory(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
     ): ResponseEntity<ApiResponse<List<WordRushGameResponse>>> {
-        val history = wordRushService.getHistory(user)
+        val history = wordRushService.getHistory(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = history))
     }
 }

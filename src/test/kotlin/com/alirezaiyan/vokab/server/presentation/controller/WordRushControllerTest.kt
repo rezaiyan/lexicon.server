@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.WordRushService
@@ -48,14 +50,14 @@ class WordRushControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // -- POST /api/v1/word-rush/sync ------------------------------------------
 
     @Test
     fun `POST sync should return 200 with synced game ids when successful`() {
         val request = createSyncRequest()
-        `when`(wordRushService.syncGames(mockUser, request))
+        `when`(wordRushService.syncGames(mockUser.requireId(), request))
             .thenReturn(SyncWordRushResponse(syncedGameIds = listOf("game-1")))
 
         mockMvc.perform(
@@ -72,7 +74,7 @@ class WordRushControllerTest {
     @Test
     fun `POST sync should return 500 when service throws exception`() {
         val request = createSyncRequest()
-        `when`(wordRushService.syncGames(mockUser, request))
+        `when`(wordRushService.syncGames(mockUser.requireId(), request))
             .thenThrow(RuntimeException("sync failed"))
 
         mockMvc.perform(
@@ -115,7 +117,7 @@ class WordRushControllerTest {
 
     @Test
     fun `GET insights should return 200 with Word Rush insights`() {
-        `when`(wordRushService.getInsights(mockUser)).thenReturn(createInsightsResponse())
+        `when`(wordRushService.getInsights(mockUser.requireId())).thenReturn(createInsightsResponse())
 
         mockMvc.perform(
             get("/api/v1/word-rush/insights")
@@ -131,7 +133,7 @@ class WordRushControllerTest {
 
     @Test
     fun `GET insights should return 500 when service throws exception`() {
-        `when`(wordRushService.getInsights(mockUser))
+        `when`(wordRushService.getInsights(mockUser.requireId()))
             .thenThrow(RuntimeException("database error"))
 
         mockMvc.perform(
@@ -154,7 +156,7 @@ class WordRushControllerTest {
 
     @Test
     fun `GET history should return 200 with game history`() {
-        `when`(wordRushService.getHistory(mockUser)).thenReturn(
+        `when`(wordRushService.getHistory(mockUser.requireId())).thenReturn(
             listOf(
                 WordRushGameResponse(
                     clientGameId = "game-1",
@@ -186,7 +188,7 @@ class WordRushControllerTest {
 
     @Test
     fun `GET history should return 500 when service throws exception`() {
-        `when`(wordRushService.getHistory(mockUser))
+        `when`(wordRushService.getHistory(mockUser.requireId()))
             .thenThrow(RuntimeException("query failed"))
 
         mockMvc.perform(

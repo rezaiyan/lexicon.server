@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -37,7 +38,7 @@ class MilestoneDetectorTest {
     fun `getPendingMilestone should return null when no schedule found`() {
         // Arrange
         val user = createUser()
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 15)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 15)
         every { notificationScheduleRepository.findByUser(user) } returns null
 
         // Act
@@ -52,7 +53,7 @@ class MilestoneDetectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, lastMilestoneSnapshot = null)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 25)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 25)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -70,7 +71,7 @@ class MilestoneDetectorTest {
         val user = createUser()
         val snapshotJson = objectMapper.writeValueAsString(mapOf("total_words" to 99L, "mastered_words" to 0L, "longest_streak" to 0L))
         val schedule = createSchedule(user, lastMilestoneSnapshot = snapshotJson)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 100)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 100)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -90,7 +91,7 @@ class MilestoneDetectorTest {
         // but snapshot has total_words=5000 so none trigger). level6Count crosses 1 (mastered).
         val snapshotJson = objectMapper.writeValueAsString(mapOf("total_words" to 5000L, "mastered_words" to 0L, "longest_streak" to 0L))
         val schedule = createSchedule(user, lastMilestoneSnapshot = snapshotJson)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 5000, level6Count = 1)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 5000, level6Count = 1)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -109,7 +110,7 @@ class MilestoneDetectorTest {
         val user = createUser(currentStreak = 10, longestStreak = 10)
         val snapshotJson = objectMapper.writeValueAsString(mapOf("total_words" to 5000L, "mastered_words" to 500L, "longest_streak" to 9L))
         val schedule = createSchedule(user, lastMilestoneSnapshot = snapshotJson)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 5000, level6Count = 500)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 5000, level6Count = 500)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -130,7 +131,7 @@ class MilestoneDetectorTest {
             mapOf("total_words" to 5000L, "mastered_words" to 500L, "longest_streak" to 5L)
         )
         val schedule = createSchedule(user, lastMilestoneSnapshot = snapshotJson)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 5000, level6Count = 500)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 5000, level6Count = 500)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -147,7 +148,7 @@ class MilestoneDetectorTest {
         val schedule = createSchedule(user, lastMilestoneSnapshot = "not valid json {{{")
         // With unparseable snapshot, lastSnapshot becomes emptyMap, so prevTotal=0 and any totalWords>=10 triggers.
         // We use totalWords=0 to ensure nothing triggers.
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 0)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 0)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -162,7 +163,7 @@ class MilestoneDetectorTest {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, lastMilestoneSnapshot = null)
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 25)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 25)
         every { notificationScheduleRepository.findByUser(user) } returns schedule
 
         // Act
@@ -177,7 +178,7 @@ class MilestoneDetectorTest {
         // Arrange
         val user = createUser()
         every { notificationScheduleRepository.findByUser(user) } returns null
-        every { userProgressService.calculateProgressStats(user) } returns createProgressStats(totalWords = 0)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 0)
 
         // Act
         val result = milestoneDetector.hasPendingMilestone(user)

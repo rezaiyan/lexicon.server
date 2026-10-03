@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.DailyActivityRepository
@@ -58,17 +59,18 @@ class NotificationTypeSelector(
         }
 
         if (LocalDate.now(clock).dayOfWeek == DayOfWeek.MONDAY) {
-            runCatching { analyticsService.getWeeklyReport(user) }
+            runCatching { analyticsService.getWeeklyReport(user.requireId()) }
                 .getOrNull()
                 ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }
                 ?.let { return NotificationType.WEEKLY_PREVIEW }
         }
 
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWords = runCatching { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) }
-            .getOrNull()
+        val comebackWords = runCatching {
+            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
+        }.getOrNull()
         if (!comebackWords.isNullOrEmpty()) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
@@ -82,11 +84,12 @@ class NotificationTypeSelector(
     private fun selectReEngagementType(user: User): NotificationType {
         if (milestoneDetector.hasPendingMilestone(user)) return NotificationType.PROGRESS_MILESTONE
 
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWords = runCatching { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) }
-            .getOrNull()
+        val comebackWords = runCatching {
+            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
+        }.getOrNull()
         if (!comebackWords.isNullOrEmpty()) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT

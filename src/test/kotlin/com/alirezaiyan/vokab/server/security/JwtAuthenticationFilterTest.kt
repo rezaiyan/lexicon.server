@@ -7,6 +7,7 @@ import com.alirezaiyan.vokab.server.config.JwtConfig
 import com.alirezaiyan.vokab.server.config.SecurityConfig
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.UserAccessView
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.service.AppConfigService
 import io.mockk.every
@@ -26,7 +27,6 @@ import org.springframework.security.core.context.SecurityContextHolder
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.util.Base64
-import java.util.Optional
 import jakarta.servlet.http.HttpServletResponse
 
 class JwtAuthenticationFilterTest {
@@ -49,7 +49,7 @@ class JwtAuthenticationFilterTest {
         userRepository = mockk()
         appConfigService = mockk()
         every { appConfigService.getTestEmails() } returns emptySet()
-        filter = JwtAuthenticationFilter(jwtTokenProvider, userRepository, appProperties, appConfigService)
+        filter = JwtAuthenticationFilter(jwtTokenProvider, appProperties, UserAccessCache(userRepository, appConfigService, clock))
         SecurityContextHolder.clearContext()
     }
 
@@ -139,14 +139,14 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
-        every { userRepository.findById(1L) } returns Optional.of(user)
+        every { userRepository.findAccessById(1L) } returns access(user)
 
         // Act
         filter.doFilter(request, response, chain)
 
         // Assert
         assertNotNull(SecurityContextHolder.getContext().authentication)
-        assertEquals(user, SecurityContextHolder.getContext().authentication.principal)
+        assertEquals(AuthUser(1L), SecurityContextHolder.getContext().authentication.principal)
     }
 
     @Test
@@ -160,7 +160,7 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = mockk<FilterChain>(relaxed = true)
-        every { userRepository.findById(2L) } returns Optional.of(user)
+        every { userRepository.findAccessById(2L) } returns access(user)
 
         // Act
         filter.doFilter(request, response, chain)
@@ -180,13 +180,13 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
-        every { userRepository.findById(42L) } returns Optional.of(user)
+        every { userRepository.findAccessById(42L) } returns access(user)
 
         // Act
         filter.doFilter(request, response, chain)
 
         // Assert
-        verify(exactly = 1) { userRepository.findById(42L) }
+        verify(exactly = 1) { userRepository.findAccessById(42L) }
     }
 
     // ── Invalid or expired JWT ────────────────────────────────────────────────
@@ -263,7 +263,7 @@ class JwtAuthenticationFilterTest {
         filter.doFilter(request, response, chain)
 
         // Assert
-        verify(exactly = 0) { userRepository.findById(any()) }
+        verify(exactly = 0) { userRepository.findAccessById(any()) }
     }
 
     // ── Inactive user ─────────────────────────────────────────────────────────
@@ -279,7 +279,7 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
-        every { userRepository.findById(5L) } returns Optional.of(user)
+        every { userRepository.findAccessById(5L) } returns access(user)
 
         // Act
         filter.doFilter(request, response, chain)
@@ -300,7 +300,7 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = mockk<FilterChain>(relaxed = true)
-        every { userRepository.findById(6L) } returns Optional.of(user)
+        every { userRepository.findAccessById(6L) } returns access(user)
 
         // Act
         filter.doFilter(request, response, chain)
@@ -321,7 +321,7 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
-        every { userRepository.findById(99L) } returns Optional.empty()
+        every { userRepository.findAccessById(99L) } returns null
 
         // Act
         filter.doFilter(request, response, chain)
@@ -341,7 +341,9 @@ class JwtAuthenticationFilterTest {
         val providerForTest = RS256JwtTokenProvider(propsWithTestEmail, clock)
         val configServiceForTest = mockk<AppConfigService>()
         every { configServiceForTest.getTestEmails() } returns setOf(testEmail)
-        val filterForTest = JwtAuthenticationFilter(providerForTest, userRepository, propsWithTestEmail, configServiceForTest)
+        val filterForTest = JwtAuthenticationFilter(
+            providerForTest, propsWithTestEmail, UserAccessCache(userRepository, configServiceForTest, clock)
+        )
 
         val user = createUser(id = 7L, email = testEmail, active = false)
         val token = providerForTest.generateAccessToken(7L, testEmail)
@@ -351,7 +353,7 @@ class JwtAuthenticationFilterTest {
         }
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
-        every { userRepository.findById(7L) } returns Optional.of(user)
+        every { userRepository.findAccessById(7L) } returns access(user)
 
         // Act
         filterForTest.doFilter(request, response, chain)
@@ -421,6 +423,11 @@ class JwtAuthenticationFilterTest {
         currentStreak = 0,
         longestStreak = 0,
     )
+
+    private fun access(user: User): UserAccessView = object : UserAccessView {
+        override val active = user.active
+        override val email = user.email
+    }
 
     private fun generateTestKeyPair(): KeyPair =
         KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.genKeyPair()

@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.SettingsDto
 import com.alirezaiyan.vokab.server.service.UserSettingsService
@@ -14,17 +14,17 @@ class SettingsController(
     private val service: UserSettingsService
 ) {
     @GetMapping
-    fun get(@AuthenticationPrincipal user: User): ResponseEntity<ApiResponse<SettingsDto>> {
-        val dto = service.get(user)
+    fun get(@AuthenticationPrincipal user: AuthUser): ResponseEntity<ApiResponse<SettingsDto>> {
+        val dto = service.get(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = dto))
     }
 
     @PatchMapping
     fun update(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestBody dto: SettingsDto
     ): ResponseEntity<ApiResponse<SettingsDto>> {
-        val updated = service.update(user, dto)
+        val updated = service.update(user.id, dto)
         return ResponseEntity.ok(ApiResponse(success = true, data = updated))
     }
 }

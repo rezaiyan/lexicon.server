@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.LeaderboardResponse
 import com.alirezaiyan.vokab.server.service.LeaderboardService
@@ -19,10 +19,10 @@ class LeaderboardController(
 
     @GetMapping
     fun getLeaderboard(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestParam(defaultValue = "20") limit: Int
     ): ResponseEntity<ApiResponse<LeaderboardResponse>> {
-        val response = leaderboardService.getLeaderboard(user, limit.coerceIn(1, 100))
+        val response = leaderboardService.getLeaderboard(user.id, limit.coerceIn(1, 100))
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 }

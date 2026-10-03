@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.security.UserAccessCache
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
 import com.alirezaiyan.vokab.server.domain.entity.Platform
@@ -55,6 +56,7 @@ class AuthService(
     private val eventService: EventService,
     private val domainEventPublisher: DomainEventPublisher,
     private val geoLocationService: GeoLocationService,
+    private val userAccessCache: UserAccessCache,
     private val clock: Clock,
 ) {
 
@@ -256,6 +258,7 @@ class AuthService(
         // The audit log has no FK to users, so this record survives the deletion.
         auditLogService.logAccountDeletion(userId, user.email, null)
         userRepository.delete(user)
+        userAccessCache.evict(userId)
         logger.info { "✅ Account deleted successfully for userId=$userId" }
     }
 

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -138,7 +139,7 @@ class StreakNotificationServiceTest {
         val stats = createProgressStats()
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep your streak!"
         every {
             pushNotificationService.sendNotificationToUser(
@@ -174,7 +175,7 @@ class StreakNotificationServiceTest {
         val stats = createProgressStats()
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
@@ -201,7 +202,7 @@ class StreakNotificationServiceTest {
         val stats = createProgressStats()
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
@@ -228,7 +229,7 @@ class StreakNotificationServiceTest {
         val stats = createProgressStats()
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
@@ -309,7 +310,7 @@ class StreakNotificationServiceTest {
         // user1 causes exception during streakService call
         every { streakService.getUserStreak(user1.id!!) } throws RuntimeException("DB timeout")
         every { streakService.getUserStreak(user2.id!!) } returns StreakInfo(currentStreak = 5)
-        every { userProgressService.calculateProgressStats(user2) } returns stats
+        every { userProgressService.calculateProgressStats(user2.requireId()) } returns stats
         every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(

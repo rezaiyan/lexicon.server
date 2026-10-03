@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -108,8 +109,8 @@ class StreakReminderServiceTest {
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user1, user2)
         every { dailyActivityRepository.existsByUserAndActivityDate(user1, today) } returns false
         every { dailyActivityRepository.existsByUserAndActivityDate(user2, today) } returns false
-        every { userProgressService.calculateProgressStats(user1) } returns progressStats1
-        every { userProgressService.calculateProgressStats(user2) } returns progressStats2
+        every { userProgressService.calculateProgressStats(user1.requireId()) } returns progressStats1
+        every { userProgressService.calculateProgressStats(user2.requireId()) } returns progressStats2
         every {
             openRouterService.generateStreakReminderMessage(
                 currentStreak = 5,
@@ -184,7 +185,7 @@ class StreakReminderServiceTest {
 
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
-        every { userProgressService.calculateProgressStats(user) } returns progressStats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
             openRouterService.generateStreakReminderMessage(
                 currentStreak = 5,
@@ -234,7 +235,7 @@ class StreakReminderServiceTest {
 
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
-        every { userProgressService.calculateProgressStats(user) } returns progressStats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
             openRouterService.generateStreakReminderMessage(
                 currentStreak = 5,
@@ -284,7 +285,7 @@ class StreakReminderServiceTest {
 
         every { userRepository.findByCurrentStreakGreaterThanAndActiveTrue(0) } returns listOf(user)
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
-        every { userProgressService.calculateProgressStats(user) } returns progressStats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
             openRouterService.generateStreakReminderMessage(
                 currentStreak = 5,

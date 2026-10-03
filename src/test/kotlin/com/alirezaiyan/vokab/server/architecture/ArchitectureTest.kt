@@ -68,11 +68,7 @@ class ArchitectureTest {
             .flatMap { it.functions() }
             .filter { function -> function.annotations.any { it.name.endsWith("Mapping") } }
             .assertFalse { function ->
-                // The authenticated User entity is still injected as principal; item 15 replaces it
-                val parameters = function.parameters.filterNot { param ->
-                    param.annotations.any { it.name == "AuthenticationPrincipal" }
-                }
-                val signature = listOfNotNull(function.returnType?.text) + parameters.map { it.type.text }
+                val signature = listOfNotNull(function.returnType?.text) + function.parameters.map { it.type.text }
                 signature.any { entityType.containsMatchIn(it) }
             }
     }

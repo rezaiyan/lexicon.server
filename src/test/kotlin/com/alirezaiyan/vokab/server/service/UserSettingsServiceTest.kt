@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.entity.UserSettings
@@ -28,7 +31,7 @@ class UserSettingsServiceTest {
         repo = mockk()
         notificationScheduleRepository = mockk()
         notificationEngagementService = mockk()
-        userSettingsService = UserSettingsService(repo, notificationScheduleRepository, notificationEngagementService)
+        userSettingsService = UserSettingsService(repo, notificationScheduleRepository, notificationEngagementService, mockk<UserRepository>().answerReferences())
     }
 
     // --- get ---
@@ -43,7 +46,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(user.id!!) } returns createEngagementStats()
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         assertEquals("fr", result.languageCode)
@@ -62,7 +65,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(user.id!!) } returns createEngagementStats()
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         assertEquals("en", result.languageCode)
@@ -80,7 +83,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(user.id!!) } returns createEngagementStats()
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         assertEquals(9, result.optimalSendHour)
@@ -103,7 +106,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(10L) } returns engagementStats
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         val stats = requireNotNull(result.engagementStats)
@@ -121,7 +124,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(10L) } throws RuntimeException("service down")
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         assertNull(result.engagementStats)
@@ -139,7 +142,7 @@ class UserSettingsServiceTest {
         every { repo.save(existing) } returns existing
 
         // Act
-        val result = userSettingsService.update(user, dto)
+        val result = userSettingsService.update(user.requireId(), dto)
 
         // Assert
         assertEquals("de", result.languageCode)
@@ -157,7 +160,7 @@ class UserSettingsServiceTest {
         every { repo.save(any<UserSettings>()) } answers { firstArg() }
 
         // Act
-        val result = userSettingsService.update(user, dto)
+        val result = userSettingsService.update(user.requireId(), dto)
 
         // Assert
         assertEquals("es", result.languageCode)
@@ -175,7 +178,7 @@ class UserSettingsServiceTest {
         every { repo.save(existing) } returns existing
 
         // Act
-        val result = userSettingsService.update(user, dto)
+        val result = userSettingsService.update(user.requireId(), dto)
 
         // Assert
         assertEquals("09:00", result.dailyReminderTime)
@@ -192,7 +195,7 @@ class UserSettingsServiceTest {
         every { repo.save(existing) } returns existing
 
         // Act
-        val result = userSettingsService.update(user, dto)
+        val result = userSettingsService.update(user.requireId(), dto)
 
         // Assert
         assertEquals(false, result.reviewRemindersEnabled)
@@ -209,7 +212,7 @@ class UserSettingsServiceTest {
         every { notificationEngagementService.getEngagementStats(user.id!!) } returns createEngagementStats()
 
         // Act
-        val result = userSettingsService.get(user)
+        val result = userSettingsService.get(user.requireId())
 
         // Assert
         assertEquals(false, result.reviewRemindersEnabled)

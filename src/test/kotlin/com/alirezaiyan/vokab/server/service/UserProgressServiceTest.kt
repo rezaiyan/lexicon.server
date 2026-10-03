@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -27,7 +28,7 @@ class UserProgressServiceTest {
         val user = createUser()
         every { wordRepository.findProgressRowsByUserId(1L, any()) } returns emptyList()
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(0, result.totalWords)
         assertEquals(0, result.dueCards)
@@ -50,7 +51,7 @@ class UserProgressServiceTest {
             progressRow(level = 6, wordCount = 1, dueCount = 0),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(2, result.level0Count)
         assertEquals(1, result.level1Count)
@@ -68,7 +69,7 @@ class UserProgressServiceTest {
             progressRow(level = 0, wordCount = 3, dueCount = 3),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(3, result.dueCards)
     }
@@ -81,7 +82,7 @@ class UserProgressServiceTest {
             progressRow(level = 1, wordCount = 2, dueCount = 0),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(0, result.dueCards)
     }
@@ -93,7 +94,7 @@ class UserProgressServiceTest {
             progressRow(level = -1, wordCount = 2, dueCount = 0),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(2, result.level0Count)
         assertEquals(0, result.level1Count)
@@ -107,7 +108,7 @@ class UserProgressServiceTest {
             progressRow(level = 99, wordCount = 1, dueCount = 0),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(2, result.level6Count)
         assertEquals(0, result.level5Count)
@@ -122,7 +123,7 @@ class UserProgressServiceTest {
             progressRow(level = 2, wordCount = 3, dueCount = 0),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(10, result.totalWords)
     }
@@ -140,7 +141,7 @@ class UserProgressServiceTest {
             progressRow(level = 6, wordCount = 1, dueCount = 1),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(7, result.totalWords)
         assertEquals(4, result.dueCards)
@@ -161,7 +162,7 @@ class UserProgressServiceTest {
             progressRow(level = 1, wordCount = 1, dueCount = 1),
         )
 
-        val result = userProgressService.calculateProgressStats(user)
+        val result = userProgressService.calculateProgressStats(user.requireId())
 
         assertEquals(2, result.dueCards)
         assertEquals(3, result.totalWords)

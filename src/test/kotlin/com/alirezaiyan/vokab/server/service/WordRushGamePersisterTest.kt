@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.entity.WordRushGame
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
@@ -21,7 +24,7 @@ class WordRushGamePersisterTest {
     @BeforeEach
     fun setup() {
         wordRushGameRepository = mockk()
-        persister = WordRushGamePersister(wordRushGameRepository)
+        persister = WordRushGamePersister(wordRushGameRepository, mockk<UserRepository>().answerReferences())
         user = User(id = 1L, email = "test@example.com", name = "Test User")
     }
 
@@ -30,7 +33,7 @@ class WordRushGamePersisterTest {
         every { wordRushGameRepository.existsByUserAndClientGameId(user, "new-game") } returns false
         every { wordRushGameRepository.save(any()) } returns mockk()
 
-        val result = persister.saveGame(user, makeGameReq("new-game"))
+        val result = persister.saveGame(user.requireId(), makeGameReq("new-game"))
 
         assertTrue(result)
         verify(exactly = 1) { wordRushGameRepository.save(any<WordRushGame>()) }
@@ -40,7 +43,7 @@ class WordRushGamePersisterTest {
     fun `saveGame returns true when game already exists without saving again`() {
         every { wordRushGameRepository.existsByUserAndClientGameId(user, "existing") } returns true
 
-        val result = persister.saveGame(user, makeGameReq("existing"))
+        val result = persister.saveGame(user.requireId(), makeGameReq("existing"))
 
         assertTrue(result)
         verify(exactly = 0) { wordRushGameRepository.save(any<WordRushGame>()) }
@@ -51,7 +54,7 @@ class WordRushGamePersisterTest {
         every { wordRushGameRepository.existsByUserAndClientGameId(user, "race-game") } returns false
         every { wordRushGameRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
 
-        val result = persister.saveGame(user, makeGameReq("race-game"))
+        val result = persister.saveGame(user.requireId(), makeGameReq("race-game"))
 
         assertFalse(result)
     }
@@ -61,7 +64,7 @@ class WordRushGamePersisterTest {
         every { wordRushGameRepository.existsByUserAndClientGameId(user, "bad-game") } returns false
         every { wordRushGameRepository.save(any()) } throws RuntimeException("unexpected DB error")
 
-        val result = persister.saveGame(user, makeGameReq("bad-game"))
+        val result = persister.saveGame(user.requireId(), makeGameReq("bad-game"))
 
         assertFalse(result)
     }

@@ -1,5 +1,10 @@
 package com.alirezaiyan.vokab.server.service
 
+import org.junit.jupiter.api.assertThrows
+import java.util.Optional
+import io.mockk.slot
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -40,6 +45,7 @@ class DailyInsightServiceTest {
     private lateinit var featureAccessService: FeatureAccessService
     private lateinit var analyticsService: AnalyticsService
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
+    private lateinit var userRepository: UserRepository
 
     private lateinit var dailyInsightService: DailyInsightService
 
@@ -54,6 +60,7 @@ class DailyInsightServiceTest {
         featureAccessService = mockk()
         analyticsService = mockk()
         notificationScheduleRepository = mockk()
+        userRepository = mockk()
 
         dailyInsightService = DailyInsightService(
             dailyInsightRepository = dailyInsightRepository,
@@ -65,6 +72,7 @@ class DailyInsightServiceTest {
             featureAccessService = featureAccessService,
             analyticsService = analyticsService,
             notificationScheduleRepository = notificationScheduleRepository,
+            userRepository = userRepository,
             clock = fixedClock()
         )
     }
@@ -133,7 +141,7 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
@@ -157,13 +165,13 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
-        every { analyticsService.getWeeklyReport(user) } returns createWeeklyReportResponse()
-        every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns emptyList()
-        every { analyticsService.getStatsByLanguagePair(user) } returns emptyList()
-        every { analyticsService.getStudyInsights(user) } returns createStudyInsightsResponse()
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns createWeeklyReportResponse()
+        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
+        every { analyticsService.getStudyInsights(user.requireId()) } returns createStudyInsightsResponse()
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
         // Act
@@ -185,13 +193,13 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "20:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
-        every { analyticsService.getWeeklyReport(user) } returns createWeeklyReportResponse()
-        every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns emptyList()
-        every { analyticsService.getStatsByLanguagePair(user) } returns emptyList()
-        every { analyticsService.getStudyInsights(user) } returns createStudyInsightsResponse()
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns createWeeklyReportResponse()
+        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
+        every { analyticsService.getStudyInsights(user.requireId()) } returns createStudyInsightsResponse()
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
         // Act
@@ -212,7 +220,7 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateCelebrationInsight(any(), any()) } throws RuntimeException("AI service unavailable")
 
         // Act
@@ -233,7 +241,7 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
         // Second findByUserAndDate call (fallback after constraint violation)
@@ -352,7 +360,7 @@ class DailyInsightServiceTest {
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { openRouterService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } returns unsent
         every {
@@ -445,6 +453,48 @@ class DailyInsightServiceTest {
     }
 
     // --- factory functions ---
+
+    // --- getOrGenerateTodaysInsight ---
+
+    @Test
+    fun `getOrGenerateTodaysInsight when today's insight exists returns it without calling the AI`() {
+        val user = createUser()
+        val existing = createDailyInsight(user = user, date = TEST_TODAY.toString())
+        every { userRepository.findById(user.requireId()) } returns Optional.of(user)
+        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns existing
+
+        val result = dailyInsightService.getOrGenerateTodaysInsight(user.requireId())
+
+        assertEquals(existing.insightText, result.text)
+        assertEquals(existing.generatedAt, result.generatedAt)
+        verify(exactly = 0) { openRouterService.generateDailyInsight(any()) }
+    }
+
+    @Test
+    fun `getOrGenerateTodaysInsight when none exists generates from the user's name and streak and stores it`() {
+        val user = createUser(currentStreak = 4)
+        val ctx = slot<OpenRouterService.DailyInsightContext>()
+        every { userRepository.findById(user.requireId()) } returns Optional.of(user)
+        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns null
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats()
+        every { openRouterService.generateDailyInsight(capture(ctx)) } returns "Keep going!"
+        every { dailyInsightRepository.save(any()) } answers { firstArg() }
+
+        val result = dailyInsightService.getOrGenerateTodaysInsight(user.requireId())
+
+        assertEquals("Keep going!", result.text)
+        assertEquals(TEST_NOW, result.generatedAt)
+        assertEquals(user.name, ctx.captured.userName)
+        assertEquals(4, ctx.captured.currentStreak)
+        verify(exactly = 1) { dailyInsightRepository.save(match { it.insightText == "Keep going!" && it.user == user }) }
+    }
+
+    @Test
+    fun `getOrGenerateTodaysInsight for an unknown user throws not found`() {
+        every { userRepository.findById(404L) } returns Optional.empty()
+
+        assertThrows<NoSuchElementException> { dailyInsightService.getOrGenerateTodaysInsight(404L) }
+    }
 
     private fun createUser(
         id: Long = 1L,

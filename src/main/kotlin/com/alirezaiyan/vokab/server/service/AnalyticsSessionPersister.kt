@@ -2,7 +2,6 @@ package com.alirezaiyan.vokab.server.service
 
 import com.alirezaiyan.vokab.server.domain.entity.ReviewEvent
 import com.alirezaiyan.vokab.server.domain.entity.StudySession
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.ReviewEventRepository
 import com.alirezaiyan.vokab.server.domain.repository.StudySessionRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
@@ -39,7 +38,8 @@ class AnalyticsSessionPersister(
      * Returns true if the session was saved (or already existed), false if saving failed.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun saveSession(user: User, sessionReq: SyncSessionRequest): Boolean {
+    fun saveSession(userId: Long, sessionReq: SyncSessionRequest): Boolean {
+        val user = userRepository.getReferenceById(userId)
         return try {
             val existing = studySessionRepository.findByUserAndClientSessionId(user, sessionReq.clientSessionId)
             if (existing.isPresent) return true

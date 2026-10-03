@@ -1,6 +1,5 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.entity.Word
 import com.alirezaiyan.vokab.server.domain.repository.TagRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
@@ -11,7 +10,6 @@ import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @Service
 class WordService(
@@ -22,11 +20,11 @@ class WordService(
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
-    fun list(user: User): List<WordDto> =
-        wordRepository.findAllByUserWithTags(user).map { it.toDto() }
+    fun list(userId: Long): List<WordDto> = list(userId, null)
 
     @Transactional(readOnly = true)
-    fun list(user: User, updatedAfter: Instant?): List<WordDto> {
+    fun list(userId: Long, updatedAfter: Instant?): List<WordDto> {
+        val user = userRepository.getReferenceById(userId)
         val words = if (updatedAfter == null) {
             wordRepository.findAllByUserWithTags(user)
         } else {
@@ -36,14 +34,16 @@ class WordService(
     }
 
     @Transactional(readOnly = true)
-    fun getExistingTranslationKeys(user: User, targetLanguage: String): Set<String> {
+    fun getExistingTranslationKeys(userId: Long, targetLanguage: String): Set<String> {
+        val user = userRepository.getReferenceById(userId)
         return wordRepository.findTranslationsByUserAndTargetLanguage(user, targetLanguage)
             .map { it.trim().lowercase() }
             .toSet()
     }
 
     @Transactional
-    fun upsert(user: User, words: List<WordDto>) {
+    fun upsert(userId: Long, words: List<WordDto>) {
+        val user = userRepository.getReferenceById(userId)
         if (words.isEmpty()) return
 
         val entities = wordUpsertPreparer.prepareUpsertEntities(user, words)
@@ -57,7 +57,8 @@ class WordService(
     }
 
     @Transactional
-    fun update(user: User, id: Long, request: UpdateWordRequest) {
+    fun update(userId: Long, id: Long, request: UpdateWordRequest) {
+        val user = userRepository.getReferenceById(userId)
         val entity = wordRepository.findById(id).orElseThrow()
         require(entity.user?.id == user.id) { "Forbidden" }
         entity.originalWord = request.originalWord
@@ -80,20 +81,20 @@ class WordService(
     }
 
     @Transactional
-    fun delete(user: User, id: Long) {
-        val deleted = wordRepository.deleteByIdAndUserId(id, user.requireId())
+    fun delete(userId: Long, id: Long) {
+        val deleted = wordRepository.deleteByIdAndUserId(id, userId)
         require(deleted == 1) { "Word not found" }
     }
 
     @Transactional
-    fun batchDelete(user: User, ids: List<Long>): Int {
+    fun batchDelete(userId: Long, ids: List<Long>): Int {
         if (ids.isEmpty()) return 0
-        return wordRepository.deleteAllByIdInAndUserId(ids, user.requireId())
+        return wordRepository.deleteAllByIdInAndUserId(ids, userId)
     }
 
     @Transactional
     fun batchUpdateLanguages(
-        user: User,
+        userId: Long,
         ids: List<Long>,
         sourceLanguage: String?,
         targetLanguage: String?,
@@ -101,7 +102,7 @@ class WordService(
         if (ids.isEmpty()) return 0
         if (sourceLanguage == null && targetLanguage == null) return 0
 
-        val userId = user.requireId()
+        val userId = userId
         val now = Instant.now(clock)
 
         return when {
@@ -119,9 +120,9 @@ class WordService(
     }
 
     @Transactional
-    fun batchAssignTags(user: User, wordIds: List<Long>, tagIds: List<Long>): Int {
+    fun batchAssignTags(userId: Long, wordIds: List<Long>, tagIds: List<Long>): Int {
         if (wordIds.isEmpty()) return 0
-        val userId = user.requireId()
+        val userId = userId
         wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, userId)
         if (tagIds.isNotEmpty()) {
             wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, userId)
@@ -130,7 +131,8 @@ class WordService(
     }
 
     @Transactional
-    fun updateWordTags(user: User, wordId: Long, tagIds: List<Long>) {
+    fun updateWordTags(userId: Long, wordId: Long, tagIds: List<Long>) {
+        val user = userRepository.getReferenceById(userId)
         val word = wordRepository.findById(wordId).orElseThrow { NoSuchElementException("Word not found") }
         require(word.user?.id == user.id) { "Forbidden" }
         word.tags = if (tagIds.isEmpty()) mutableSetOf()

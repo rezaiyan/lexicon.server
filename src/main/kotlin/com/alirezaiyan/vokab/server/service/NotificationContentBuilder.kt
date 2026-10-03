@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.service.NotificationTypeSelector.NotificationType
@@ -39,7 +40,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildStreakRisk(user: User): NotificationPayload {
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         val body = aiCopyOr("Your ${user.currentStreak}-day streak ends at midnight. Keep it alive! 🔥") {
             openRouterService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
         }
@@ -56,9 +57,9 @@ class NotificationContentBuilder(
     }
 
     private fun buildDueCards(user: User): NotificationPayload {
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         val estimatedMinutes = maxOf(1, (stats.dueCards * 8) / 60)
-        val primaryLang = runCatching { analyticsService.getStatsByLanguagePair(user) }
+        val primaryLang = runCatching { analyticsService.getStatsByLanguagePair(user.requireId()) }
             .getOrNull()?.firstOrNull()?.targetLanguage ?: "vocabulary"
         return NotificationPayload(
             title = "📚 ${stats.dueCards} words are waiting",
@@ -73,7 +74,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildComebackAlert(user: User): NotificationPayload {
-        val difficultWords = analyticsService.getDifficultWords(user, minReviews = 3, limit = 1)
+        val difficultWords = analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
         val word = difficultWords.firstOrNull() ?: return buildFallbackInsight()
         return NotificationPayload(
             title = "\"${word.wordText}\" wants a rematch 🔄",
@@ -89,7 +90,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildWeeklyPreview(user: User): NotificationPayload {
-        val report = analyticsService.getWeeklyReport(user)
+        val report = analyticsService.getWeeklyReport(user.requireId())
         val changePercent = report.changePercent ?: 0.0
         val trend = when {
             changePercent > 5  -> "▲ ${changePercent.toInt()}% more than last week"
@@ -110,7 +111,7 @@ class NotificationContentBuilder(
     private fun buildMilestone(user: User): NotificationPayload {
         val milestone = milestoneDetector.getPendingMilestone(user)
             ?: return buildFallbackInsight()
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         val body = aiCopyOr("You hit a new milestone: ${milestone.description}! 🏆") {
             openRouterService.generateMilestoneMessage(milestone, stats, user.name)
         }
@@ -142,7 +143,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildReviewReminder(user: User): NotificationPayload {
-        val stats = userProgressService.calculateProgressStats(user)
+        val stats = userProgressService.calculateProgressStats(user.requireId())
         val dueCards = stats.dueCards
         val body = if (dueCards > 0) {
             val estimatedMinutes = maxOf(1, (dueCards * 8) / 60)
@@ -166,7 +167,7 @@ class NotificationContentBuilder(
      * contentHint selects the emotional angle; all copy is pre-written (no AI generation).
      */
     private fun buildMotivation(user: User, contentHint: String?): NotificationPayload {
-        val stats = runCatching { userProgressService.calculateProgressStats(user) }.getOrNull()
+        val stats = runCatching { userProgressService.calculateProgressStats(user.requireId()) }.getOrNull()
         val dueCards = stats?.dueCards ?: 0
 
         val (title, body) = when (contentHint) {

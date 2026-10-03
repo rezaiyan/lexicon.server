@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.entity.NotificationSchedule
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.entity.UserSettings
 import com.alirezaiyan.vokab.server.domain.repository.NotificationScheduleRepository
 import com.alirezaiyan.vokab.server.domain.repository.UserSettingsRepository
@@ -17,10 +17,12 @@ private val logger = KotlinLogging.logger {}
 class UserSettingsService(
     private val repo: UserSettingsRepository,
     private val notificationScheduleRepository: NotificationScheduleRepository,
-    private val notificationEngagementService: NotificationEngagementService
+    private val notificationEngagementService: NotificationEngagementService,
+    private val userRepository: UserRepository,
 ) {
     @Transactional(readOnly = true)
-    fun get(user: User): SettingsDto {
+    fun get(userId: Long): SettingsDto {
+        val user = userRepository.getReferenceById(userId)
         val s = repo.findByUser(user) ?: repo.save(UserSettings(user = user))
         val schedule = notificationScheduleRepository.findByUser(user)
         val engagementStats = user.id?.let {
@@ -30,7 +32,8 @@ class UserSettingsService(
     }
 
     @Transactional
-    fun update(user: User, dto: SettingsDto): SettingsDto {
+    fun update(userId: Long, dto: SettingsDto): SettingsDto {
+        val user = userRepository.getReferenceById(userId)
         val current = repo.findByUser(user) ?: UserSettings(user = user)
         current.languageCode = dto.languageCode
         current.themeMode = dto.themeMode

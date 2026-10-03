@@ -1,8 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.config.AppProperties
-import com.alirezaiyan.vokab.server.domain.entity.User
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.presentation.dto.*
 import com.alirezaiyan.vokab.server.service.AuthService
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -85,10 +84,10 @@ class AuthController(
     
     @PostMapping("/logout")
     fun logout(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: RefreshTokenRequest
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.logout(user.requireId(), request.refreshToken)
+        authService.logout(user.id, request.refreshToken)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
     }
     
@@ -111,18 +110,18 @@ class AuthController(
     
     @PostMapping("/logout-all")
     fun logoutAll(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.logoutAll(user.requireId())
+        authService.logoutAll(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "All sessions logged out successfully"))
     }
     
     @DeleteMapping("/delete-account")
     fun deleteAccount(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
         logger.info { "Delete account request received for user: ${user.id}" }
-        authService.deleteAccount(user.requireId())
+        authService.deleteAccount(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
     }
 

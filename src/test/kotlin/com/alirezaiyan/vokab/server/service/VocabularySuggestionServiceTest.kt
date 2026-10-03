@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.config.AppProperties
 import com.alirezaiyan.vokab.server.config.VocabularyConfig
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -61,9 +62,9 @@ class VocabularySuggestionServiceTest {
     @Test
     fun `suggestForUser drops words the user already has`() {
         aiReturns("Haus", "Baum", "Auto")
-        every { wordService.getExistingTranslationKeys(user, "German") } returns setOf("haus")
+        every { wordService.getExistingTranslationKeys(user.requireId(), "German") } returns setOf("haus")
 
-        val response = service.suggestForUser(user, " German", "beginner", "English")
+        val response = service.suggestForUser(user.requireId(), " German", "beginner", "English")
 
         assertEquals(listOf("Baum", "Auto"), response.items.map { it.originalWord })
     }

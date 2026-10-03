@@ -42,7 +42,7 @@ class StreakReminderService(
 
     fun sendReminderForUser(user: User) {
         try {
-            val progressStats = userProgressService.calculateProgressStats(user)
+            val progressStats = userProgressService.calculateProgressStats(user.requireId())
             val message = openRouterService.generateStreakReminderMessage(
                 currentStreak = user.currentStreak,
                 userName = user.name,

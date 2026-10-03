@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.RecordActivityRequest
 import com.alirezaiyan.vokab.server.presentation.dto.StreakResponse
@@ -9,7 +9,6 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -25,12 +24,12 @@ class StreakController(
      */
     @PostMapping("/record")
     fun recordActivity(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestBody(required = false) request: RecordActivityRequest?
     ): ResponseEntity<ApiResponse<StreakResponse>> {
         val count = request?.count ?: 1
         logger.debug { "Recording activity for userId=${user.id}, count=$count" }
-        val updatedUser = streakService.recordActivity(user.requireId(), count)
+        val updatedUser = streakService.recordActivity(user.id, count)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = StreakResponse(currentStreak = updatedUser.currentStreak), message = "Activity recorded successfully")
         )
@@ -42,9 +41,9 @@ class StreakController(
      */
     @GetMapping
     fun getStreak(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<StreakResponse>> {
-        val streakInfo = streakService.getUserStreak(user.requireId())
+        val streakInfo = streakService.getUserStreak(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = StreakResponse(currentStreak = streakInfo.currentStreak)))
     }
 }

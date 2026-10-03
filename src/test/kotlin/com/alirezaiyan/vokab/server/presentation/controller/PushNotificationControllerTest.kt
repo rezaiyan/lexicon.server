@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.domain.entity.Platform
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.controller.handler.NotificationControllerHandler
@@ -50,7 +52,7 @@ class PushNotificationControllerTest {
         longestStreak = 0
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     private val testToken = "valid-push-token-12345"
     private val deviceId = "device-123"
@@ -71,7 +73,7 @@ class PushNotificationControllerTest {
             deviceId = deviceId
         )
 
-        `when`(handler.registerToken(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.registerToken(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, message = "Push token registered successfully"))
         )
 
@@ -83,7 +85,7 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).registerToken(anyArg(), anyArg())
+        verify(handler).registerToken(eqArg(mockUser.requireId()), anyArg())
     }
 
     @Test
@@ -111,7 +113,7 @@ class PushNotificationControllerTest {
             platform = Platform.IOS
         )
 
-        `when`(handler.registerToken(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.registerToken(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, message = "Push token registered successfully"))
         )
 
@@ -133,7 +135,7 @@ class PushNotificationControllerTest {
 
         // The real handler catches exceptions internally and returns 400.
         // The mock must simulate this behavior by returning a bad request response.
-        `when`(handler.registerToken(anyArg(), anyArg())).thenReturn(
+        `when`(handler.registerToken(eqArg(mockUser.requireId()), anyArg())).thenReturn(
             ResponseEntity.badRequest().body(ApiResponse(success = false, message = "Operation failed: Database error"))
         )
 
@@ -152,7 +154,7 @@ class PushNotificationControllerTest {
 
     @Test
     fun `should deactivate specific token successfully`() {
-        `when`(handler.deactivateToken(anyArg(), eqArg(testToken))).thenReturn(
+        `when`(handler.deactivateToken(eqArg(mockUser.requireId()), eqArg(testToken))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, message = "Token deactivated successfully"))
         )
 
@@ -163,12 +165,12 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).deactivateToken(anyArg(), eqArg(testToken))
+        verify(handler).deactivateToken(eqArg(mockUser.requireId()), eqArg(testToken))
     }
 
     @Test
     fun `should handle deactivate token exception`() {
-        `when`(handler.deactivateToken(anyArg(), anyArg())).thenReturn(
+        `when`(handler.deactivateToken(eqArg(mockUser.requireId()), anyArg())).thenReturn(
             ResponseEntity.badRequest().body(ApiResponse(success = false, message = "Operation failed: Token not found"))
         )
 
@@ -185,7 +187,7 @@ class PushNotificationControllerTest {
     @Test
     fun `should deactivate token with special characters in URL`() {
         val specialToken = "token-with-special-chars_123"
-        `when`(handler.deactivateToken(anyArg(), eqArg(specialToken))).thenReturn(
+        `when`(handler.deactivateToken(eqArg(mockUser.requireId()), eqArg(specialToken))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, message = "Token deactivated successfully"))
         )
 
@@ -196,14 +198,14 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).deactivateToken(anyArg(), eqArg(specialToken))
+        verify(handler).deactivateToken(eqArg(mockUser.requireId()), eqArg(specialToken))
     }
 
     // ── DELETE /api/v1/notifications/tokens ────────────────────────────────────────
 
     @Test
     fun `should deactivate all user tokens successfully`() {
-        `when`(handler.deactivateAllTokens(anyArg())).thenReturn(
+        `when`(handler.deactivateAllTokens(eqArg(mockUser.requireId()))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, message = "All tokens deactivated successfully"))
         )
 
@@ -214,12 +216,12 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).deactivateAllTokens(anyArg())
+        verify(handler).deactivateAllTokens(eqArg(mockUser.requireId()))
     }
 
     @Test
     fun `should handle deactivate all tokens exception`() {
-        `when`(handler.deactivateAllTokens(anyArg())).thenReturn(
+        `when`(handler.deactivateAllTokens(eqArg(mockUser.requireId()))).thenReturn(
             ResponseEntity.badRequest().body(ApiResponse(success = false, message = "Operation failed: Database error"))
         )
 
@@ -240,7 +242,7 @@ class PushNotificationControllerTest {
             body = "Test Body"
         )
 
-        `when`(handler.sendNotification(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.sendNotification(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = emptyList<NotificationResponse>()))
         )
 
@@ -252,7 +254,7 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).sendNotification(anyArg(), anyArg())
+        verify(handler).sendNotification(eqArg(mockUser.requireId()), anyArg())
     }
 
     @Test
@@ -266,7 +268,7 @@ class PushNotificationControllerTest {
             )
         )
 
-        `when`(handler.sendNotification(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.sendNotification(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = emptyList<NotificationResponse>()))
         )
 
@@ -287,7 +289,7 @@ class PushNotificationControllerTest {
             imageUrl = "https://example.com/image.jpg"
         )
 
-        `when`(handler.sendNotification(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.sendNotification(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = emptyList<NotificationResponse>()))
         )
 
@@ -346,7 +348,7 @@ class PushNotificationControllerTest {
             NotificationResponse(success = false, messageId = null)
         )
 
-        `when`(handler.sendNotification(anyArg(), eqArg(request))).thenReturn(
+        `when`(handler.sendNotification(eqArg(mockUser.requireId()), eqArg(request))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = mockResponses))
         )
 
@@ -366,7 +368,7 @@ class PushNotificationControllerTest {
             body = "Test Body"
         )
 
-        `when`(handler.sendNotification(anyArg(), anyArg())).thenReturn(
+        `when`(handler.sendNotification(eqArg(mockUser.requireId()), anyArg())).thenReturn(
             ResponseEntity.badRequest().body(ApiResponse(success = false, message = "Operation failed: FCM unavailable"))
         )
 
@@ -383,7 +385,7 @@ class PushNotificationControllerTest {
 
     @Test
     fun `should get user token count successfully`() {
-        `when`(handler.getUserTokens(anyArg())).thenReturn(
+        `when`(handler.getUserTokens(eqArg(mockUser.requireId()))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = 3, message = "3 active tokens"))
         )
 
@@ -394,12 +396,12 @@ class PushNotificationControllerTest {
             status { isOk() }
         }
 
-        verify(handler).getUserTokens(anyArg())
+        verify(handler).getUserTokens(eqArg(mockUser.requireId()))
     }
 
     @Test
     fun `should return token count as integer`() {
-        `when`(handler.getUserTokens(anyArg())).thenReturn(
+        `when`(handler.getUserTokens(eqArg(mockUser.requireId()))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true, data = 2, message = "2 active tokens"))
         )
 
@@ -413,7 +415,7 @@ class PushNotificationControllerTest {
 
     @Test
     fun `should handle get tokens exception`() {
-        `when`(handler.getUserTokens(anyArg())).thenReturn(
+        `when`(handler.getUserTokens(eqArg(mockUser.requireId()))).thenReturn(
             ResponseEntity.badRequest().body(ApiResponse(success = false, message = "Operation failed: Database error"))
         )
 
@@ -482,7 +484,7 @@ class PushNotificationControllerTest {
 
     @Test
     fun `should record notification open`() {
-        `when`(handler.markOpened(anyArg(), eqArg(42L))).thenReturn(
+        `when`(handler.markOpened(eqArg(mockUser.requireId()), eqArg(42L))).thenReturn(
             ResponseEntity.ok(ApiResponse(success = true))
         )
 
@@ -493,12 +495,12 @@ class PushNotificationControllerTest {
             jsonPath("$.success") { value(true) }
         }
 
-        verify(handler).markOpened(anyArg(), eqArg(42L))
+        verify(handler).markOpened(eqArg(mockUser.requireId()), eqArg(42L))
     }
 
     @Test
     fun `should return 404 when notification log is unknown or not the caller's`() {
-        `when`(handler.markOpened(anyArg(), eqArg(42L))).thenThrow(NoSuchElementException("Notification not found"))
+        `when`(handler.markOpened(eqArg(mockUser.requireId()), eqArg(42L))).thenThrow(NoSuchElementException("Notification not found"))
 
         mockMvc.post("/api/v1/notifications/42/opened") {
             with(authentication(auth))

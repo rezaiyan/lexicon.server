@@ -121,7 +121,7 @@ class StreakNotificationService(
                 return false
             }
 
-            val progressStats = userProgressService.calculateProgressStats(user)
+            val progressStats = userProgressService.calculateProgressStats(user.requireId())
             val message = openRouterService.generateStreakResetWarning(
                 currentStreak = currentStreak,
                 progressStats = progressStats,

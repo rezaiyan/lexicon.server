@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.entity.Tag
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.TagRepository
 import com.alirezaiyan.vokab.server.presentation.dto.TagDto
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -15,10 +15,12 @@ private val logger = KotlinLogging.logger {}
 @Service
 class TagService(
     private val tagRepository: TagRepository,
+    private val userRepository: UserRepository,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
-    fun list(user: User): List<TagDto> {
+    fun list(userId: Long): List<TagDto> {
+        val user = userRepository.getReferenceById(userId)
         return tagRepository.findAllWithWordCountByUser(user).map { row ->
             val tag = row[0] as Tag
             val count = (row[1] as Number).toLong()
@@ -27,7 +29,8 @@ class TagService(
     }
 
     @Transactional
-    fun create(user: User, name: String): TagDto {
+    fun create(userId: Long, name: String): TagDto {
+        val user = userRepository.getReferenceById(userId)
         val trimmed = name.trim()
         require(!tagRepository.existsByUserAndName(user, trimmed)) {
             "A tag named '$trimmed' already exists"
@@ -38,7 +41,8 @@ class TagService(
     }
 
     @Transactional
-    fun rename(user: User, id: Long, name: String): TagDto {
+    fun rename(userId: Long, id: Long, name: String): TagDto {
+        val user = userRepository.getReferenceById(userId)
         val trimmed = name.trim()
         val tag = tagRepository.findByIdAndUser(id, user)
             ?: throw NoSuchElementException("Tag not found")
@@ -57,7 +61,8 @@ class TagService(
     }
 
     @Transactional
-    fun delete(user: User, id: Long) {
+    fun delete(userId: Long, id: Long) {
+        val user = userRepository.getReferenceById(userId)
         val tag = tagRepository.findByIdAndUser(id, user)
             ?: throw NoSuchElementException("Tag not found")
         tagRepository.delete(tag)

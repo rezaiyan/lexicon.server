@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.entity.WordRushGame
 import com.alirezaiyan.vokab.server.domain.repository.WordRushGameRepository
 import com.alirezaiyan.vokab.server.presentation.dto.SyncWordRushGameRequest
@@ -24,6 +24,7 @@ private val logger = KotlinLogging.logger {}
 @Component
 class WordRushGamePersister(
     private val wordRushGameRepository: WordRushGameRepository,
+    private val userRepository: UserRepository,
 ) {
 
     /**
@@ -31,7 +32,8 @@ class WordRushGamePersister(
      * Returns true if the game was saved (or already existed), false if saving failed.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    fun saveGame(user: User, gameReq: SyncWordRushGameRequest): Boolean {
+    fun saveGame(userId: Long, gameReq: SyncWordRushGameRequest): Boolean {
+        val user = userRepository.getReferenceById(userId)
         return try {
             if (wordRushGameRepository.existsByUserAndClientGameId(user, gameReq.clientGameId)) {
                 return true

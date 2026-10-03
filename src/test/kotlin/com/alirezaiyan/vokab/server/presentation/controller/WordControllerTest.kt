@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.BatchAssignTagsRequest
 import com.alirezaiyan.vokab.server.presentation.dto.BatchDeleteRequest
@@ -58,14 +60,14 @@ class WordControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── GET /api/v1/words ──────────────────────────────────────────────────────
 
     @Test
     fun `GET words should return 200 with word list`() {
         val words = listOf(createWordDto(id = 1L, originalWord = "apple", translation = "Apfel"))
-        `when`(wordService.list(mockUser, null)).thenReturn(words)
+        `when`(wordService.list(mockUser.requireId(), null)).thenReturn(words)
 
         mockMvc.perform(
             get("/api/v1/words")
@@ -81,7 +83,7 @@ class WordControllerTest {
 
     @Test
     fun `GET words should return 200 with empty list`() {
-        `when`(wordService.list(mockUser, null)).thenReturn(emptyList())
+        `when`(wordService.list(mockUser.requireId(), null)).thenReturn(emptyList())
 
         mockMvc.perform(
             get("/api/v1/words")
@@ -108,7 +110,7 @@ class WordControllerTest {
     @Test
     fun `POST words upsert should return 200 when successful`() {
         val request = UpsertWordsRequest(words = listOf(createWordDto()))
-        `when`(wordService.upsert(mockUser, request.words)).then { }
+        `when`(wordService.upsert(mockUser.requireId(), request.words)).then { }
 
         mockMvc.perform(
             post("/api/v1/words")
@@ -141,7 +143,7 @@ class WordControllerTest {
     @Test
     fun `PATCH word should return 200 when updated successfully`() {
         val request = createUpdateWordRequest()
-        `when`(wordService.update(mockUser, 1L, request)).then { }
+        `when`(wordService.update(mockUser.requireId(), 1L, request)).then { }
 
         mockMvc.perform(
             patch("/api/v1/words/1")
@@ -158,7 +160,7 @@ class WordControllerTest {
     fun `PATCH word should return 404 when word not found`() {
         val request = createUpdateWordRequest()
         doThrow(NoSuchElementException("Word not found"))
-            .`when`(wordService).update(mockUser, 99L, request)
+            .`when`(wordService).update(mockUser.requireId(), 99L, request)
 
         mockMvc.perform(
             patch("/api/v1/words/99")
@@ -174,7 +176,7 @@ class WordControllerTest {
 
     @Test
     fun `DELETE word should return 200 when deleted`() {
-        `when`(wordService.delete(mockUser, 1L)).then { }
+        `when`(wordService.delete(mockUser.requireId(), 1L)).then { }
 
         mockMvc.perform(
             delete("/api/v1/words/1")
@@ -189,7 +191,7 @@ class WordControllerTest {
     @Test
     fun `DELETE word should return 404 when word not found`() {
         doThrow(NoSuchElementException("Word not found"))
-            .`when`(wordService).delete(mockUser, 99L)
+            .`when`(wordService).delete(mockUser.requireId(), 99L)
 
         mockMvc.perform(
             delete("/api/v1/words/99")
@@ -205,7 +207,7 @@ class WordControllerTest {
     @Test
     fun `POST batch-delete should return 200 with deleted count`() {
         val request = BatchDeleteRequest(ids = listOf(1L, 2L, 3L))
-        `when`(wordService.batchDelete(mockUser, request.ids)).thenReturn(3)
+        `when`(wordService.batchDelete(mockUser.requireId(), request.ids)).thenReturn(3)
 
         mockMvc.perform(
             post("/api/v1/words/batch-delete")
@@ -223,7 +225,7 @@ class WordControllerTest {
     @Test
     fun `PUT word tags should return 200 when updated`() {
         val request = UpdateWordTagsRequest(tagIds = listOf(10L, 20L))
-        `when`(wordService.updateWordTags(mockUser, 1L, request.tagIds)).then { }
+        `when`(wordService.updateWordTags(mockUser.requireId(), 1L, request.tagIds)).then { }
 
         mockMvc.perform(
             put("/api/v1/words/1/tags")
@@ -241,7 +243,7 @@ class WordControllerTest {
     @Test
     fun `POST batch-assign-tags should return 200 when successful`() {
         val request = BatchAssignTagsRequest(wordIds = listOf(1L, 2L), tagIds = listOf(10L))
-        `when`(wordService.batchAssignTags(mockUser, request.wordIds, request.tagIds)).thenReturn(2)
+        `when`(wordService.batchAssignTags(mockUser.requireId(), request.wordIds, request.tagIds)).thenReturn(2)
 
         mockMvc.perform(
             post("/api/v1/words/batch-assign-tags")
@@ -263,7 +265,7 @@ class WordControllerTest {
             sourceLanguage = "en",
             targetLanguage = "de",
         )
-        `when`(wordService.batchUpdateLanguages(mockUser, request.ids, request.sourceLanguage, request.targetLanguage))
+        `when`(wordService.batchUpdateLanguages(mockUser.requireId(), request.ids, request.sourceLanguage, request.targetLanguage))
             .thenReturn(2)
 
         mockMvc.perform(

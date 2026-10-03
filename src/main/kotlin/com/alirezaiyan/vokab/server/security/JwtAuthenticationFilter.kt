@@ -1,8 +1,6 @@
 package com.alirezaiyan.vokab.server.security
 
 import com.alirezaiyan.vokab.server.config.AppProperties
-import com.alirezaiyan.vokab.server.domain.repository.UserRepository
-import com.alirezaiyan.vokab.server.service.AppConfigService
 import com.alirezaiyan.vokab.server.logging.AccessLogFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.FilterChain
@@ -20,9 +18,8 @@ private val log = KotlinLogging.logger {}
 @Component
 class JwtAuthenticationFilter(
     private val jwtTokenProvider: RS256JwtTokenProvider,
-    private val userRepository: UserRepository,
     private val appProperties: AppProperties,
-    private val appConfigService: AppConfigService
+    private val userAccessCache: UserAccessCache,
 ) : OncePerRequestFilter() {
     
     // Paths that should skip JWT authentication
@@ -88,17 +85,9 @@ class JwtAuthenticationFilter(
                     log.debug { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
                     
                     if (userId != null) {
-                        val testEmails = appConfigService.getTestEmails()
-                        val userOptional = userRepository.findById(userId)
-                        val isPresent = userOptional.isPresent
-                        val userEmail = if (isPresent) userOptional.get().email else null
-                        val isTestAccount = userEmail in testEmails
-                        val isActive = if (isPresent) userOptional.get().active else false
-                        log.debug { "🗄️ JWT Filter [DB_LOOKUP]: User found=$isPresent, active=$isActive, testAccount=$isTestAccount for $path" }
-
-                        if (isPresent && (isActive || isTestAccount)) {
+                        if (userAccessCache.isAllowed(userId)) {
                             val authentication = UsernamePasswordAuthenticationToken(
-                                userOptional.get(),
+                                AuthUser(userId),
                                 null,
                                 emptyList()
                             )
@@ -106,10 +95,10 @@ class JwtAuthenticationFilter(
 
                             SecurityContextHolder.getContext().authentication = authentication
                             request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, userId)
-                            log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId, testAccount=$isTestAccount for $path" }
+                            log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId for $path" }
                             log.debug { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
                         } else {
-                            log.warn { "❌ JWT Filter [AUTH_FAILED]: User not found or inactive for userId=$userId, active=$isActive, testAccount=$isTestAccount - returning 403 for $path" }
+                            log.warn { "❌ JWT Filter [AUTH_FAILED]: unknown or inactive userId=$userId - 403 for $path" }
                             response.status = HttpServletResponse.SC_FORBIDDEN
                             response.writer.write("""{"success":false,"message":"User account has been deleted or deactivated"}""")
                             response.contentType = "application/json"

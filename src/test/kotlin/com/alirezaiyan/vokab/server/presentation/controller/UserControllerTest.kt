@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
+import com.alirezaiyan.vokab.server.security.AuthUser
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.presentation.dto.DayActivity
@@ -76,7 +78,7 @@ class UserControllerTest {
         updatedAt = Instant.now(),
     )
 
-    private val auth = UsernamePasswordAuthenticationToken(mockUser, null, emptyList())
+    private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
 
     // ── GET /api/v1/users/me ───────────────────────────────────────────────────
 
@@ -350,7 +352,7 @@ class UserControllerTest {
 
     @Test
     fun `GET profile-stats should return 200 with profile stats`() {
-        `when`(profileStatsService.getProfileStats(mockUser)).thenReturn(createProfileStatsResponse())
+        `when`(profileStatsService.getProfileStats(mockUser.requireId())).thenReturn(createProfileStatsResponse())
 
         mockMvc.perform(
             get("/api/v1/users/profile-stats")
@@ -365,7 +367,7 @@ class UserControllerTest {
 
     @Test
     fun `GET profile-stats should return 200 with empty weekly activity`() {
-        `when`(profileStatsService.getProfileStats(mockUser))
+        `when`(profileStatsService.getProfileStats(mockUser.requireId()))
             .thenReturn(createProfileStatsResponse(weeklyActivity = emptyList()))
 
         mockMvc.perform(
@@ -380,7 +382,7 @@ class UserControllerTest {
 
     @Test
     fun `GET profile-stats should return 500 when service throws exception`() {
-        `when`(profileStatsService.getProfileStats(mockUser))
+        `when`(profileStatsService.getProfileStats(mockUser.requireId()))
             .thenThrow(RuntimeException("stats error"))
 
         mockMvc.perform(

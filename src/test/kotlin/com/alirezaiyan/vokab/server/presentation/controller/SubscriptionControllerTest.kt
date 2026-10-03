@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.service.ClientFeatureFlags
 import com.alirezaiyan.vokab.server.service.FeatureAccessService
@@ -23,7 +23,6 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import java.time.Instant
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -41,11 +40,7 @@ class SubscriptionControllerTest {
     private lateinit var featureAccessService: FeatureAccessService
 
     // Unique ids per test: the per-user sync rate-limit bucket lives in a shared singleton.
-    private fun userAuth(id: Long) = UsernamePasswordAuthenticationToken(
-        User(id = id, email = "u$id@example.com", name = "U", createdAt = Instant.now(), updatedAt = Instant.now()),
-        null,
-        emptyList()
-    )
+    private fun userAuth(id: Long) = UsernamePasswordAuthenticationToken(AuthUser(id), null, emptyList())
 
     private fun stubFeatureAccess(userId: Long, premium: Boolean) {
         `when`(featureAccessService.getFeatureAccess(userId)).thenReturn(

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.DailyInsight
 import com.alirezaiyan.vokab.server.domain.entity.SubscriptionStatus
 import com.alirezaiyan.vokab.server.domain.entity.User
@@ -54,7 +55,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser(currentStreak = 7)
         val stats = createProgressStats(totalWords = 30, dueCards = 5)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(7, user.name, stats)
         } returns "Don't lose it!"
@@ -75,7 +76,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser(currentStreak = 3)
         val stats = createProgressStats(totalWords = 10, dueCards = 2)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(3, user.name, stats)
         } throws UpstreamServiceException("OpenRouter down")
@@ -94,7 +95,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser(currentStreak = 5)
         val stats = createProgressStats()
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
             openRouterService.generateStreakReminderMessage(any(), any(), any())
         } returns "Keep going!"
@@ -115,8 +116,8 @@ class NotificationContentBuilderTest {
         val user = createUser()
         val stats = createProgressStats(totalWords = 20, dueCards = 10)
         val langStats = listOf(createLanguagePairStats(targetLanguage = "Spanish"))
-        every { userProgressService.calculateProgressStats(user) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user) } returns langStats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns langStats
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -133,8 +134,8 @@ class NotificationContentBuilderTest {
         // Arrange - 5 cards * 8 / 60 = 0, so maxOf(1, 0) = 1
         val user = createUser()
         val stats = createProgressStats(dueCards = 5)
-        every { userProgressService.calculateProgressStats(user) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user) } returns listOf(
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns listOf(
             createLanguagePairStats(targetLanguage = "French")
         )
 
@@ -150,8 +151,8 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val stats = createProgressStats(dueCards = 8)
-        every { userProgressService.calculateProgressStats(user) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user) } throws RuntimeException("DB error")
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } throws RuntimeException("DB error")
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -166,8 +167,8 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val stats = createProgressStats(dueCards = 8)
-        every { userProgressService.calculateProgressStats(user) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user) } returns emptyList()
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
+        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -183,7 +184,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val difficultWords = listOf(createDifficultWord(wordId = 42L, wordText = "apple"))
-        every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns difficultWords
+        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns difficultWords
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.COMEBACK_ALERT)
@@ -200,7 +201,7 @@ class NotificationContentBuilderTest {
     fun `should fall back to fallback insight when getDifficultWords returns empty list`() {
         // Arrange
         val user = createUser()
-        every { analyticsService.getDifficultWords(user, minReviews = 3, limit = 1) } returns emptyList()
+        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.COMEBACK_ALERT)
@@ -217,7 +218,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 50, accuracyPercent = 75.0, changePercent = 10.0)
-        every { analyticsService.getWeeklyReport(user) } returns report
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -234,7 +235,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 30, accuracyPercent = 60.0, changePercent = -10.0)
-        every { analyticsService.getWeeklyReport(user) } returns report
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -248,7 +249,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 40, accuracyPercent = 70.0, changePercent = 0.0)
-        every { analyticsService.getWeeklyReport(user) } returns report
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -262,7 +263,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(changePercent = null)
-        every { analyticsService.getWeeklyReport(user) } returns report
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -276,7 +277,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport()
-        every { analyticsService.getWeeklyReport(user) } returns report
+        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -299,7 +300,7 @@ class NotificationContentBuilderTest {
         )
         val stats = createProgressStats(totalWords = 100)
         every { milestoneDetector.getPendingMilestone(user) } returns milestone
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
             openRouterService.generateMilestoneMessage(milestone, stats, user.name)
         } returns "Amazing milestone!"
@@ -322,7 +323,7 @@ class NotificationContentBuilderTest {
         val milestone = createMilestoneEvent(description = "100 words in your collection")
         val stats = createProgressStats()
         every { milestoneDetector.getPendingMilestone(user) } returns milestone
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
             openRouterService.generateMilestoneMessage(any(), any(), any())
         } throws UpstreamServiceException("OpenRouter down")
@@ -389,7 +390,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val stats = createProgressStats(dueCards = 15)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER)
@@ -408,7 +409,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val stats = createProgressStats(dueCards = 0)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER)
@@ -438,7 +439,7 @@ class NotificationContentBuilderTest {
     fun `should return loss_aversion payload with streak count when user has a current streak`() {
         val user  = createUser(currentStreak = 7)
         val stats = createProgressStats(dueCards = 5)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "loss_aversion")
 
@@ -452,7 +453,7 @@ class NotificationContentBuilderTest {
     fun `should return loss_aversion payload about fading vocabulary when streak is 0`() {
         val user  = createUser(currentStreak = 0)
         val stats = createProgressStats(dueCards = 5)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "loss_aversion")
 
@@ -464,7 +465,7 @@ class NotificationContentBuilderTest {
     fun `should return curiosity payload with due card count when cards are due`() {
         val user  = createUser()
         val stats = createProgressStats(dueCards = 12)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "curiosity")
 
@@ -476,7 +477,7 @@ class NotificationContentBuilderTest {
     fun `should return curiosity payload with generic message when no cards are due`() {
         val user  = createUser()
         val stats = createProgressStats(dueCards = 0)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "curiosity")
 
@@ -488,7 +489,7 @@ class NotificationContentBuilderTest {
     fun `should return social_proof payload`() {
         val user  = createUser()
         val stats = createProgressStats()
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "social_proof")
 
@@ -500,7 +501,7 @@ class NotificationContentBuilderTest {
     fun `should return fresh_start payload`() {
         val user  = createUser()
         val stats = createProgressStats()
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "fresh_start")
 
@@ -512,7 +513,7 @@ class NotificationContentBuilderTest {
     fun `should return achievement payload with due card count`() {
         val user  = createUser()
         val stats = createProgressStats(dueCards = 3)
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "achievement")
 
@@ -524,7 +525,7 @@ class NotificationContentBuilderTest {
     fun `should return generic fallback payload for unknown contentHint`() {
         val user  = createUser()
         val stats = createProgressStats()
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, "unknown_hint")
 
@@ -537,7 +538,7 @@ class NotificationContentBuilderTest {
     fun `should return generic fallback payload when contentHint is null`() {
         val user  = createUser()
         val stats = createProgressStats()
-        every { userProgressService.calculateProgressStats(user) } returns stats
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         val result = notificationContentBuilder.build(user, NotificationType.MOTIVATION, null)
 

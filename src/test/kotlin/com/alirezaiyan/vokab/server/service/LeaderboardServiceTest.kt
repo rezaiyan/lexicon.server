@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.answerReferences
+import com.alirezaiyan.vokab.server.domain.entity.requireId
 import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
@@ -18,13 +20,14 @@ import java.time.Instant
 class LeaderboardServiceTest {
 
     private lateinit var userRepository: UserRepository
+    private val knownUsers = mutableListOf<User>()
     private lateinit var wordRepository: WordRepository
     private lateinit var aliasGenerator: AliasGenerator
     private lateinit var leaderboardService: LeaderboardService
 
     @BeforeEach
     fun setUp() {
-        userRepository = mockk()
+        userRepository = mockk<UserRepository>().answerReferences(knownUsers)
         wordRepository = mockk()
         aliasGenerator = AliasGenerator()
         leaderboardService = LeaderboardService(userRepository, wordRepository, aliasGenerator, "")
@@ -42,7 +45,7 @@ class LeaderboardServiceTest {
             arrayOf(2L as Any, 10L as Any)
         )
 
-        val result = leaderboardService.getLeaderboard(user1)
+        val result = leaderboardService.getLeaderboard(user1.requireId())
 
         assertEquals(3, result.entries.size)
         assertEquals(50, result.entries[0].masteredWords)
@@ -59,7 +62,7 @@ class LeaderboardServiceTest {
         every { userRepository.findTopUsersByScore(any(), any()) } returns listOf(user1, user2)
         every { wordRepository.countMasteredWordsByUserIds(listOf(1L, 2L)) } returns emptyList()
 
-        val result = leaderboardService.getLeaderboard(user2)
+        val result = leaderboardService.getLeaderboard(user2.requireId())
 
         assertFalse(result.entries[0].isCurrentUser)
         assertTrue(result.entries[1].isCurrentUser)
@@ -78,7 +81,7 @@ class LeaderboardServiceTest {
         // score = 5*10 + 1*3 + 2*2 = 57
         every { userRepository.findUserRankByScore(57L, any()) } returns 42L
 
-        val result = leaderboardService.getLeaderboard(requestingUser)
+        val result = leaderboardService.getLeaderboard(requestingUser.requireId())
 
         assertNotNull(result.userEntry)
         assertEquals(42, result.userEntry!!.rank)
@@ -93,7 +96,7 @@ class LeaderboardServiceTest {
         every { userRepository.findTopUsersByScore(any(), any()) } returns listOf(userWithAlias)
         every { wordRepository.countMasteredWordsByUserIds(listOf(1L)) } returns emptyList()
 
-        val result = leaderboardService.getLeaderboard(userWithAlias)
+        val result = leaderboardService.getLeaderboard(userWithAlias.requireId())
 
         assertEquals("CoolLearner42", result.entries[0].displayName)
     }
@@ -105,7 +108,7 @@ class LeaderboardServiceTest {
         every { userRepository.findTopUsersByScore(any(), any()) } returns listOf(userWithoutAlias)
         every { wordRepository.countMasteredWordsByUserIds(listOf(1L)) } returns emptyList()
 
-        val result = leaderboardService.getLeaderboard(userWithoutAlias)
+        val result = leaderboardService.getLeaderboard(userWithoutAlias.requireId())
 
         assertTrue(result.entries[0].displayName.isNotEmpty())
     }
@@ -119,7 +122,7 @@ class LeaderboardServiceTest {
         // score = 0*10 + 0*3 + 0*2 = 0
         every { userRepository.findUserRankByScore(0L, any()) } returns 1L
 
-        val result = leaderboardService.getLeaderboard(requestingUser)
+        val result = leaderboardService.getLeaderboard(requestingUser.requireId())
 
         assertTrue(result.entries.isEmpty())
         assertNotNull(result.userEntry)
@@ -135,7 +138,7 @@ class LeaderboardServiceTest {
         every { userRepository.findTopUsersByScore(any(), listOf(ciEmail)) } returns listOf(regularUser)
         every { wordRepository.countMasteredWordsByUserIds(listOf(1L)) } returns emptyList()
 
-        serviceWithCiEmail.getLeaderboard(regularUser)
+        serviceWithCiEmail.getLeaderboard(regularUser.requireId())
 
         verify { userRepository.findTopUsersByScore(any(), listOf(ciEmail)) }
     }
@@ -162,5 +165,5 @@ class LeaderboardServiceTest {
         active = true,
         createdAt = Instant.now(),
         updatedAt = Instant.now()
-    )
+    ).also { knownUsers += it }
 }

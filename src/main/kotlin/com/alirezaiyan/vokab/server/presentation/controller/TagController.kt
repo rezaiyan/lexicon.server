@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.presentation.dto.CreateTagRequest
 import com.alirezaiyan.vokab.server.presentation.dto.RenameTagRequest
@@ -18,37 +18,37 @@ class TagController(private val tagService: TagService) {
 
     @GetMapping
     fun list(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
     ): ResponseEntity<ApiResponse<List<TagDto>>> {
-        val tags = tagService.list(user)
+        val tags = tagService.list(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, data = tags))
     }
 
     @PostMapping
     fun create(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: CreateTagRequest,
     ): ResponseEntity<ApiResponse<TagDto>> {
-        val tag = tagService.create(user, request.name)
+        val tag = tagService.create(user.id, request.name)
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse(success = true, data = tag))
     }
 
     @PutMapping("/{id}")
     fun rename(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @PathVariable id: Long,
         @Valid @RequestBody request: RenameTagRequest,
     ): ResponseEntity<ApiResponse<TagDto>> {
-        val tag = tagService.rename(user, id, request.name)
+        val tag = tagService.rename(user.id, id, request.name)
         return ResponseEntity.ok(ApiResponse(success = true, data = tag))
     }
 
     @DeleteMapping("/{id}")
     fun delete(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @PathVariable id: Long,
     ): ResponseEntity<Unit> {
-        tagService.delete(user, id)
+        tagService.delete(user.id, id)
         return ResponseEntity.noContent().build()
     }
 }

@@ -1,13 +1,11 @@
 package com.alirezaiyan.vokab.server.service
 
-import com.alirezaiyan.vokab.server.domain.entity.User
 import com.alirezaiyan.vokab.server.domain.repository.WordRepository
 import com.alirezaiyan.vokab.server.presentation.dto.ProgressStatsDto
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 private val logger = KotlinLogging.logger {}
 
@@ -18,11 +16,11 @@ class UserProgressService(
 ) {
 
     @Transactional(readOnly = true)
-    fun calculateProgressStats(user: User): ProgressStatsDto {
-        logger.info { "Calculating progress stats for userId=${user.id}" }
+    fun calculateProgressStats(userId: Long): ProgressStatsDto {
+        logger.info { "Calculating progress stats for userId=${userId}" }
 
         val nowMs = clock.millis()
-        val rows = wordRepository.findProgressRowsByUserId(user.requireId(), nowMs)
+        val rows = wordRepository.findProgressRowsByUserId(userId, nowMs)
 
         val levelCounts = IntArray(7)
         var dueCards = 0
@@ -36,7 +34,7 @@ class UserProgressService(
             totalWords += count
         }
 
-        logger.info { "Progress stats for userId=${user.id}: totalWords=$totalWords, dueCards=$dueCards" }
+        logger.info { "Progress stats for userId=${userId}: totalWords=$totalWords, dueCards=$dueCards" }
 
         return ProgressStatsDto(
             totalWords = totalWords,

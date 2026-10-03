@@ -1,12 +1,11 @@
 package com.alirezaiyan.vokab.server.presentation.controller
 
-import com.alirezaiyan.vokab.server.domain.entity.User
+import com.alirezaiyan.vokab.server.security.AuthUser
 import com.alirezaiyan.vokab.server.presentation.dto.ApiResponse
 import com.alirezaiyan.vokab.server.service.email.EmailSubscriptionService
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
-import com.alirezaiyan.vokab.server.domain.entity.requireId
 
 @RestController
 @RequestMapping("/api/v1/email")
@@ -16,19 +15,19 @@ class EmailController(
 
     @GetMapping("/preferences")
     fun getPreferences(
-        @AuthenticationPrincipal user: User
+        @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<List<EmailPreferenceDto>>> {
-        val prefs = emailSubscriptionService.getPreferences(user.requireId())
+        val prefs = emailSubscriptionService.getPreferences(user.id)
             .map { EmailPreferenceDto(category = it.category, subscribed = it.subscribed) }
         return ResponseEntity.ok(ApiResponse(success = true, data = prefs))
     }
 
     @PostMapping("/subscribe")
     fun subscribe(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestBody request: EmailCategoryRequest
     ): ResponseEntity<ApiResponse<EmailPreferenceDto>> {
-        val sub = emailSubscriptionService.subscribe(user.requireId(), request.category)
+        val sub = emailSubscriptionService.subscribe(user.id, request.category)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = EmailPreferenceDto(category = sub.category, subscribed = sub.subscribed))
         )
@@ -36,10 +35,10 @@ class EmailController(
 
     @PostMapping("/unsubscribe")
     fun unsubscribe(
-        @AuthenticationPrincipal user: User,
+        @AuthenticationPrincipal user: AuthUser,
         @RequestBody request: EmailCategoryRequest
     ): ResponseEntity<ApiResponse<EmailPreferenceDto>> {
-        val sub = emailSubscriptionService.unsubscribe(user.requireId(), request.category)
+        val sub = emailSubscriptionService.unsubscribe(user.id, request.category)
         return ResponseEntity.ok(
             ApiResponse(success = true, data = EmailPreferenceDto(category = sub.category, subscribed = sub.subscribed))
         )

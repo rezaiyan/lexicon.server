@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.service
 
+import com.alirezaiyan.vokab.server.security.UserAccessCache
 import com.alirezaiyan.vokab.server.domain.entity.NotificationCategory
 import com.alirezaiyan.vokab.server.domain.repository.UserRepository
 import com.alirezaiyan.vokab.server.presentation.dto.*
@@ -29,6 +30,7 @@ class AppleNotificationService(
     private val objectMapper: ObjectMapper,
     private val pushNotificationService: PushNotificationService,
     private val authService: AuthService,
+    private val userAccessCache: UserAccessCache,
     private val clock: Clock
 ) {
     
@@ -153,7 +155,8 @@ class AppleNotificationService(
         user.active = false
         user.updatedAt = Instant.now(clock)
         userRepository.save(user)
-        
+        user.id?.let(userAccessCache::evict)
+
         logger.info { "✅ Deactivated user account: ${user.id}" }
     }
     

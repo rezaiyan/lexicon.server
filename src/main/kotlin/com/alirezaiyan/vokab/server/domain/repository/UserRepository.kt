@@ -11,7 +11,14 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.util.*
 
+/** The columns the auth filter needs, without loading the entity. */
+interface UserAccessView {
+    val active: Boolean
+    val email: String
+}
+
 interface UserRepository : JpaRepository<User, Long> {
+    fun findAccessById(id: Long): UserAccessView?
     fun findByEmail(email: String): Optional<User>
     fun findByGoogleId(googleId: String): Optional<User>
     fun findByAppleId(appleId: String): Optional<User>

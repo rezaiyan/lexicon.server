@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.domain.entity
 
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 @Entity
@@ -27,6 +29,7 @@ class NotificationLog(
     @Column(name = "opened_at")
     var openedAt: Instant? = null,
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "data_payload", columnDefinition = "jsonb")
     val dataPayload: String? = null              // JSON string
 ) : JpaEntity<Long>() {

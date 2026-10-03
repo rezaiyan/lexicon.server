@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.domain.entity
 
 import jakarta.persistence.*
+import org.hibernate.annotations.JdbcTypeCode
+import org.hibernate.type.SqlTypes
 import java.time.Instant
 
 @Entity
@@ -18,6 +20,7 @@ class AppEvent(
     val eventName: String,
 
     // JSON string for event-specific properties (package_id, word_count, provider, etc.)
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     val properties: String? = null,
 

@@ -4,6 +4,7 @@ import com.alirezaiyan.vokab.server.MutableClock
 import com.alirezaiyan.vokab.server.exception.UpstreamServiceException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.http.HttpStatus
@@ -21,6 +22,9 @@ import java.security.interfaces.RSAPublicKey
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 class ApplePublicKeyServiceTest {
 
@@ -38,6 +42,21 @@ class ApplePublicKeyServiceTest {
         server.expect(once(), requestTo(keysUrl)).andRespond(jwks("kid-1" to key1, "kid-2" to key2))
 
         assertEquals(key2, service.getPublicKey("kid-2"))
+        server.verify()
+    }
+
+    @Test
+    fun `concurrent callers on a cold cache share a single fetch`() {
+        server.expect(once(), requestTo(keysUrl)).andRespond(jwks("kid-1" to key1))
+        val start = CountDownLatch(1)
+
+        val results = Executors.newVirtualThreadPerTaskExecutor().use { executor ->
+            val futures = (1..32).map { executor.submit<Any?> { start.await(); service.getPublicKey("kid-1") } }
+            start.countDown()
+            futures.map { it.get(10, TimeUnit.SECONDS) }
+        }
+
+        assertTrue(results.all { it == key1 })
         server.verify()
     }
 

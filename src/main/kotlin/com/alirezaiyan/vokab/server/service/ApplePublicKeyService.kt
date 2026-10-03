@@ -17,6 +17,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.util.Base64
+import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 private val logger = KotlinLogging.logger {}
 
@@ -38,6 +40,9 @@ class ApplePublicKeyService(
     @Volatile private var keys: Map<String, PublicKey> = emptyMap()
     @Volatile private var fetchedAt: Instant = Instant.EPOCH
 
+    // Not `synchronized`: on JDK 21 blocking I/O inside a monitor pins the virtual thread's carrier.
+    private val refreshLock = ReentrantLock()
+
     /**
      * The signing key with id [kid], or `null` when Apple's current key set doesn't contain it.
      *
@@ -58,28 +63,29 @@ class ApplePublicKeyService(
     }
 
     /** Fetches the key set; true when [keys] is current. Concurrent callers share one fetch. */
-    @Synchronized
     private fun refresh(): Boolean {
-        val now = clock.instant()
-        if (Duration.between(fetchedAt, now) < MIN_REFRESH_INTERVAL) return true
+        refreshLock.withLock {
+            val now = clock.instant()
+            if (Duration.between(fetchedAt, now) < MIN_REFRESH_INTERVAL) return true
 
-        val jwks = try {
-            restClient.get().uri(APPLE_KEYS_URL).retrieve().body<JsonNode>()
-        } catch (e: RestClientException) {
-            logger.error { "Failed to fetch Apple signing keys: ${e.describe()}" }
-            return false
+            val jwks = try {
+                restClient.get().uri(APPLE_KEYS_URL).retrieve().body<JsonNode>()
+            } catch (e: RestClientException) {
+                logger.error { "Failed to fetch Apple signing keys: ${e.describe()}" }
+                return false
+            }
+
+            val parsed = jwks?.get("keys")?.mapNotNull { it.toRsaKeyOrNull() }?.toMap().orEmpty()
+            if (parsed.isEmpty()) {
+                logger.error { "Apple signing key response contained no usable RSA keys" }
+                return false
+            }
+
+            keys = parsed
+            fetchedAt = now
+            logger.info { "Cached ${parsed.size} Apple signing keys" }
+            return true
         }
-
-        val parsed = jwks?.get("keys")?.mapNotNull { it.toRsaKeyOrNull() }?.toMap().orEmpty()
-        if (parsed.isEmpty()) {
-            logger.error { "Apple signing key response contained no usable RSA keys" }
-            return false
-        }
-
-        keys = parsed
-        fetchedAt = now
-        logger.info { "Cached ${parsed.size} Apple signing keys" }
-        return true
     }
 
     private fun JsonNode.toRsaKeyOrNull(): Pair<String, PublicKey>? {

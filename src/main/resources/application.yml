@@ -9,6 +9,27 @@ spring:
     url: ${DATABASE_URL:}
     username: ${DATABASE_USERNAME:}
     password: ${DATABASE_PASSWORD:}
+    hikari:
+      # With virtual threads request concurrency is effectively unbounded; the pool is what caps
+      # concurrent DB work. Waiting longer than this for a connection fails the request instead of
+      # piling up threads behind an overloaded database.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: 10000   # ms (Hikari binds a raw long, not a Duration)
+
+  # Requests, @Async and @Scheduled run on virtual threads (all I/O here is blocking JDBC/HTTP).
+  threads:
+    virtual:
+      enabled: true
+  task:
+    execution:
+      simple:
+        # Bounds fire-and-forget @Async work (audit log, events, geo lookup) so it can't drain the pool
+        concurrency-limit: 16
+    scheduling:
+      simple:
+        # Each cron run gets a fresh virtual thread; 1 keeps the jobs serialized as before, so a slow
+        # notification dispatch can never overlap itself and double-send.
+        concurrency-limit: 1
 
   sql:
     init:

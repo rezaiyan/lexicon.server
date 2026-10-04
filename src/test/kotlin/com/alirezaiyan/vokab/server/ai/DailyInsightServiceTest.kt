@@ -30,7 +30,7 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.dao.DataIntegrityViolationException
 import java.time.Instant
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
@@ -43,7 +43,7 @@ class DailyInsightServiceTest {
     private lateinit var userProgressService: UserProgressService
     private lateinit var pushNotificationService: PushNotificationService
     private lateinit var featureAccessService: FeatureAccessService
-    private lateinit var analyticsService: AnalyticsService
+    private lateinit var learnerSignals: LearnerSignals
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
     private lateinit var userRepository: UserRepository
 
@@ -58,7 +58,7 @@ class DailyInsightServiceTest {
         userProgressService = mockk()
         pushNotificationService = mockk()
         featureAccessService = mockk()
-        analyticsService = mockk()
+        learnerSignals = mockk()
         notificationScheduleRepository = mockk()
         userRepository = mockk()
 
@@ -70,7 +70,7 @@ class DailyInsightServiceTest {
             userProgressService = userProgressService,
             pushNotificationService = pushNotificationService,
             featureAccessService = featureAccessService,
-            analyticsService = analyticsService,
+            learnerSignals = learnerSignals,
             notificationScheduleRepository = notificationScheduleRepository,
             userRepository = userRepository,
             clock = fixedClock()
@@ -168,10 +168,10 @@ class DailyInsightServiceTest {
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns createWeeklyReportResponse()
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
-        every { analyticsService.getStudyInsights(user.requireId()) } returns createStudyInsightsResponse()
+        every { learnerSignals.weeklyReport(user.requireId()) } returns createWeeklyReportResponse()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns null
+        every { learnerSignals.sessionCompletionRate(user.requireId()) } returns createStudyInsightsResponse().sessionCompletionRate
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
         // Act
@@ -196,10 +196,10 @@ class DailyInsightServiceTest {
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns createWeeklyReportResponse()
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
-        every { analyticsService.getStudyInsights(user.requireId()) } returns createStudyInsightsResponse()
+        every { learnerSignals.weeklyReport(user.requireId()) } returns createWeeklyReportResponse()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns null
+        every { learnerSignals.sessionCompletionRate(user.requireId()) } returns createStudyInsightsResponse().sessionCompletionRate
         every { dailyInsightRepository.save(any()) } returns savedInsight
 
         // Act

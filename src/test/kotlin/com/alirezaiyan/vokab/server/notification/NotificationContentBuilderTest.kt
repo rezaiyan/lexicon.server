@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import java.time.Instant
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.ai.AiService
@@ -30,7 +30,7 @@ class NotificationContentBuilderTest {
 
     private lateinit var aiService: AiService
     private lateinit var userProgressService: UserProgressService
-    private lateinit var analyticsService: AnalyticsService
+    private lateinit var learnerSignals: LearnerSignals
     private lateinit var dailyInsightService: DailyInsightService
     private lateinit var milestoneDetector: MilestoneDetector
 
@@ -40,14 +40,14 @@ class NotificationContentBuilderTest {
     fun setUp() {
         aiService = mockk()
         userProgressService = mockk()
-        analyticsService = mockk()
+        learnerSignals = mockk()
         dailyInsightService = mockk()
         milestoneDetector = mockk()
 
         notificationContentBuilder = NotificationContentBuilder(
             aiService,
             userProgressService,
-            analyticsService,
+            learnerSignals,
             dailyInsightService,
             milestoneDetector
         )
@@ -122,7 +122,7 @@ class NotificationContentBuilderTest {
         val stats = createProgressStats(totalWords = 20, dueCards = 10)
         val langStats = listOf(createLanguagePairStats(targetLanguage = "Spanish"))
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns langStats
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns langStats.firstOrNull()?.targetLanguage
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -140,9 +140,7 @@ class NotificationContentBuilderTest {
         val user = createUser()
         val stats = createProgressStats(dueCards = 5)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns listOf(
-            createLanguagePairStats(targetLanguage = "French")
-        )
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "French"
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -157,7 +155,7 @@ class NotificationContentBuilderTest {
         val user = createUser()
         val stats = createProgressStats(dueCards = 8)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } throws RuntimeException("DB error")
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } throws RuntimeException("DB error")
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -173,7 +171,7 @@ class NotificationContentBuilderTest {
         val user = createUser()
         val stats = createProgressStats(dueCards = 8)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { analyticsService.getStatsByLanguagePair(user.requireId()) } returns emptyList()
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns null
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
@@ -189,7 +187,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val difficultWords = listOf(createDifficultWord(wordId = 42L, wordText = "apple"))
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns difficultWords
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns difficultWords.firstOrNull()
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.COMEBACK_ALERT)
@@ -206,7 +204,7 @@ class NotificationContentBuilderTest {
     fun `should fall back to fallback insight when getDifficultWords returns empty list`() {
         // Arrange
         val user = createUser()
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.COMEBACK_ALERT)
@@ -223,7 +221,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 50, accuracyPercent = 75.0, changePercent = 10.0)
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
+        every { learnerSignals.weeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -240,7 +238,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 30, accuracyPercent = 60.0, changePercent = -10.0)
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
+        every { learnerSignals.weeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -254,7 +252,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(cardsReviewed = 40, accuracyPercent = 70.0, changePercent = 0.0)
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
+        every { learnerSignals.weeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -268,7 +266,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport(changePercent = null)
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
+        every { learnerSignals.weeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)
@@ -282,7 +280,7 @@ class NotificationContentBuilderTest {
         // Arrange
         val user = createUser()
         val report = createWeeklyReport()
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns report
+        every { learnerSignals.weeklyReport(user.requireId()) } returns report
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.WEEKLY_PREVIEW)

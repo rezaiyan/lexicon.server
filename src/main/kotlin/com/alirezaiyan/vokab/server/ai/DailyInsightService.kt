@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
 import com.alirezaiyan.vokab.server.user.requireId
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
@@ -30,7 +30,7 @@ class DailyInsightService(
     private val userProgressService: UserProgressService,
     private val pushNotificationService: PushNotificationService,
     private val featureAccessService: FeatureAccessService,
-    private val analyticsService: AnalyticsService,
+    private val learnerSignals: LearnerSignals,
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val userRepository: UserRepository,
     private val clock: Clock
@@ -141,19 +141,19 @@ class DailyInsightService(
             notificationScheduleRepository.findByUser(user)?.optimalSendHour
         }.getOrNull()
 
-        val weeklyReport = runCatching { analyticsService.getWeeklyReport(user.requireId()) }.getOrNull()
+        val weeklyReport = runCatching { learnerSignals.weeklyReport(user.requireId()) }.getOrNull()
         val accuracyTrend = weeklyReport?.changePercent?.toFloat()
 
         val topDifficultWord = runCatching {
-            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1).firstOrNull()?.wordText
+            learnerSignals.topDifficultWord(user.requireId())?.wordText
         }.getOrNull()
 
         val primaryLanguage = runCatching {
-            analyticsService.getStatsByLanguagePair(user.requireId()).firstOrNull()?.targetLanguage
+            learnerSignals.primaryTargetLanguage(user.requireId())
         }.getOrNull()
 
         val sessionCompletionRate = runCatching {
-            analyticsService.getStudyInsights(user.requireId()).sessionCompletionRate?.toFloat()
+            learnerSignals.sessionCompletionRate(user.requireId())?.toFloat()
         }.getOrNull()
 
         return AiService.DailyInsightContext(

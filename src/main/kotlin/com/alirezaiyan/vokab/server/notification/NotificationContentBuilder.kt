@@ -7,7 +7,7 @@ import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.Notifi
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.ai.AiService
@@ -26,7 +26,7 @@ data class NotificationPayload(
 class NotificationContentBuilder(
     private val aiService: AiService,
     private val userProgressService: UserProgressService,
-    private val analyticsService: AnalyticsService,
+    private val learnerSignals: LearnerSignals,
     private val dailyInsightService: DailyInsightService,
     private val milestoneDetector: MilestoneDetector
 ) {
@@ -64,8 +64,8 @@ class NotificationContentBuilder(
     private fun buildDueCards(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
         val estimatedMinutes = maxOf(1, (stats.dueCards * 8) / 60)
-        val primaryLang = runCatching { analyticsService.getStatsByLanguagePair(user.requireId()) }
-            .getOrNull()?.firstOrNull()?.targetLanguage ?: "vocabulary"
+        val primaryLang = runCatching { learnerSignals.primaryTargetLanguage(user.requireId()) }
+            .getOrNull() ?: "vocabulary"
         return NotificationPayload(
             title = "📚 ${stats.dueCards} words are waiting",
             body = "Your $primaryLang review takes ~$estimatedMinutes min.",
@@ -79,8 +79,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildComebackAlert(user: User): NotificationPayload {
-        val difficultWords = analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
-        val word = difficultWords.firstOrNull() ?: return buildFallbackInsight()
+        val word = learnerSignals.topDifficultWord(user.requireId()) ?: return buildFallbackInsight()
         return NotificationPayload(
             title = "\"${word.wordText}\" wants a rematch 🔄",
             body = "You've missed this one recently. 60 seconds to lock it in.",
@@ -95,7 +94,7 @@ class NotificationContentBuilder(
     }
 
     private fun buildWeeklyPreview(user: User): NotificationPayload {
-        val report = analyticsService.getWeeklyReport(user.requireId())
+        val report = learnerSignals.weeklyReport(user.requireId())
         val changePercent = report.changePercent ?: 0.0
         val trend = when {
             changePercent > 5  -> "▲ ${changePercent.toInt()}% more than last week"

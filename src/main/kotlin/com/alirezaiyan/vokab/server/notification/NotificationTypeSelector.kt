@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.study.UserProgressService
@@ -21,7 +21,7 @@ private val logger = KotlinLogging.logger {}
 class NotificationTypeSelector(
     private val dailyActivityRepository: DailyActivityRepository,
     private val userProgressService: UserProgressService,
-    private val analyticsService: AnalyticsService,
+    private val learnerSignals: LearnerSignals,
     private val featureAccessService: FeatureAccessService,
     private val milestoneDetector: MilestoneDetector,
     private val clock: Clock
@@ -62,7 +62,7 @@ class NotificationTypeSelector(
         }
 
         if (LocalDate.now(clock).dayOfWeek == DayOfWeek.MONDAY) {
-            runCatching { analyticsService.getWeeklyReport(user.requireId()) }
+            runCatching { learnerSignals.weeklyReport(user.requireId()) }
                 .getOrNull()
                 ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }
                 ?.let { return NotificationType.WEEKLY_PREVIEW }
@@ -71,10 +71,8 @@ class NotificationTypeSelector(
         val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWords = runCatching {
-            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
-        }.getOrNull()
-        if (!comebackWords.isNullOrEmpty()) return NotificationType.COMEBACK_ALERT
+        val comebackWord = runCatching { learnerSignals.topDifficultWord(user.requireId()) }.getOrNull()
+        if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
         else NotificationType.NONE
@@ -90,10 +88,8 @@ class NotificationTypeSelector(
         val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWords = runCatching {
-            analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1)
-        }.getOrNull()
-        if (!comebackWords.isNullOrEmpty()) return NotificationType.COMEBACK_ALERT
+        val comebackWord = runCatching { learnerSignals.topDifficultWord(user.requireId()) }.getOrNull()
+        if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
         else NotificationType.DUE_CARDS

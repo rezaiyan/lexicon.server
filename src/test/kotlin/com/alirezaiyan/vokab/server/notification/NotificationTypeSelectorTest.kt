@@ -16,7 +16,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.ZoneOffset
-import com.alirezaiyan.vokab.server.analytics.AnalyticsService
+import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.study.UserProgressService
@@ -25,7 +25,7 @@ class NotificationTypeSelectorTest {
 
     private lateinit var dailyActivityRepository: DailyActivityRepository
     private lateinit var userProgressService: UserProgressService
-    private lateinit var analyticsService: AnalyticsService
+    private lateinit var learnerSignals: LearnerSignals
     private lateinit var featureAccessService: FeatureAccessService
     private lateinit var milestoneDetector: MilestoneDetector
 
@@ -35,13 +35,13 @@ class NotificationTypeSelectorTest {
     fun setUp() {
         dailyActivityRepository = mockk()
         userProgressService = mockk()
-        analyticsService = mockk()
+        learnerSignals = mockk()
         featureAccessService = mockk()
         milestoneDetector = mockk()
         notificationTypeSelector = NotificationTypeSelector(
             dailyActivityRepository,
             userProgressService,
-            analyticsService,
+            learnerSignals,
             featureAccessService,
             milestoneDetector,
             clock = fixedClock()
@@ -62,7 +62,7 @@ class NotificationTypeSelectorTest {
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), any(), any()) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
 
         // Act
@@ -82,9 +82,9 @@ class NotificationTypeSelectorTest {
         val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } throws RuntimeException("not monday")
+        every { learnerSignals.weeklyReport(user.requireId()) } throws RuntimeException("not monday")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), any(), any()) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
 
         // Act
@@ -156,7 +156,7 @@ class NotificationTypeSelectorTest {
         val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } throws RuntimeException("not monday")
+        every { learnerSignals.weeklyReport(user.requireId()) } throws RuntimeException("not monday")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 5)
 
         // Act
@@ -174,9 +174,9 @@ class NotificationTypeSelectorTest {
         val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } throws RuntimeException("not monday")
+        every { learnerSignals.weeklyReport(user.requireId()) } throws RuntimeException("not monday")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns listOf(createDifficultWord())
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns createDifficultWord()
 
         // Act
         val result = notificationTypeSelector.selectType(user, schedule)
@@ -193,9 +193,9 @@ class NotificationTypeSelectorTest {
         val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } throws RuntimeException("not monday")
+        every { learnerSignals.weeklyReport(user.requireId()) } throws RuntimeException("not monday")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns true
 
         // Act
@@ -213,9 +213,9 @@ class NotificationTypeSelectorTest {
         val today = TEST_TODAY
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } throws RuntimeException("not monday")
+        every { learnerSignals.weeklyReport(user.requireId()) } throws RuntimeException("not monday")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
 
         // Act
@@ -260,7 +260,7 @@ class NotificationTypeSelectorTest {
         val schedule = createSchedule(user, consecutiveIgnores = 4)
         every { milestoneDetector.hasPendingMilestone(user) } returns false
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 5)
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
 
         // Act
@@ -292,9 +292,9 @@ class NotificationTypeSelectorTest {
         )
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { milestoneDetector.hasPendingMilestone(user) } returns false
-        every { analyticsService.getWeeklyReport(user.requireId()) } returns weeklyReport
+        every { learnerSignals.weeklyReport(user.requireId()) } returns weeklyReport
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
-        every { analyticsService.getDifficultWords(user.requireId(), minReviews = 3, limit = 1) } returns emptyList()
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
         every { featureAccessService.hasActivePremiumAccess(user) } returns false
 
         // Act

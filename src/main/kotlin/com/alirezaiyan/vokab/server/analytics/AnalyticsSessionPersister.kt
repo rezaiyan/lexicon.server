@@ -17,7 +17,7 @@ private val logger = KotlinLogging.logger {}
  * malformed (e.g. a DB constraint violation), it must not roll back all other sessions
  * in the same batch. Each session either commits or is skipped independently.
  *
- * This must be a separate Spring bean (not an inner method of AnalyticsService) so
+ * This must be a separate Spring bean (not an inner method of AnalyticsSyncService) so
  * that Spring's proxy-based AOP can intercept the @Transactional annotation.
  */
 @Component

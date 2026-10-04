@@ -207,3 +207,14 @@ springdoc:
   api-docs:
     enabled: false
   writer-with-order-by-keys: true
+
+# Cross-feature events (Spring Modulith): persisted in event_publication until each listener completes.
+# The table is created by Flyway (V39); completed rows are deleted, failed ones are retried by
+# EventPublicationRetry.
+spring.modulith:
+  events:
+    jdbc:
+      schema-initialization:
+        enabled: false
+    completion-mode: delete
+    republish-outstanding-events-on-restart: false

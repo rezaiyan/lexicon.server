@@ -1,14 +1,13 @@
 package com.alirezaiyan.vokab.server.subscription
 
+import com.alirezaiyan.vokab.server.shared.DomainEventPublisher
+import com.alirezaiyan.vokab.server.shared.DomainEvent
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
-import com.alirezaiyan.vokab.server.notification.PushNotificationService
-import io.mockk.Runs
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -23,16 +22,13 @@ import org.junit.jupiter.api.assertThrows
 import java.time.Duration
 import java.time.Instant
 import java.util.Optional
-import com.alirezaiyan.vokab.server.analytics.EventService
 
 class SubscriptionServiceTest {
 
     private lateinit var subscriptionRepository: SubscriptionRepository
     private lateinit var userRepository: UserRepository
-    private lateinit var eventService: EventService
     private lateinit var processedEvents: ProcessedWebhookEventRepository
     private lateinit var revenueCatClient: RevenueCatClient
-    private lateinit var pushNotificationService: PushNotificationService
 
     private lateinit var subscriptionService: SubscriptionService
 
@@ -42,19 +38,22 @@ class SubscriptionServiceTest {
     private val links = mutableListOf<Pair<Long, String>>()
     private val savedSubscriptions = mutableListOf<Subscription>()
     private val receipts = mutableListOf<ProcessedWebhookEvent>()
+    private val published = mutableListOf<DomainEvent>()
+    private val publisher = object : DomainEventPublisher {
+        override fun publish(event: DomainEvent) {
+            published += event
+        }
+    }
 
     @BeforeEach
     fun setUp() {
         subscriptionRepository = mockk()
         userRepository = mockk()
-        eventService = mockk()
         processedEvents = mockk()
         revenueCatClient = mockk()
-        pushNotificationService = mockk()
 
         subscriptionService = SubscriptionService(
-            subscriptionRepository, userRepository, eventService, processedEvents, revenueCatClient,
-            pushNotificationService,
+            subscriptionRepository, userRepository, publisher, processedEvents, revenueCatClient,
             clock = fixedClock(),
         )
 
@@ -71,11 +70,9 @@ class SubscriptionServiceTest {
         every { subscriptionRepository.findByRevenueCatSubscriptionId(any()) } returns Optional.empty()
         every { userRepository.findByRevenueCatUserId(any()) } returns Optional.empty()
         every { userRepository.findById(any()) } returns Optional.empty()
-        every { eventService.trackAsync(any(), any(), any()) } just Runs
         every { processedEvents.existsById(any()) } returns false
         every { processedEvents.save(any()) } answers { firstArg<ProcessedWebhookEvent>().also { receipts += it } }
         every { revenueCatClient.isConfigured } returns true
-        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) } returns emptyList()
     }
 
     private fun lastUpdate() = statusUpdates.last()
@@ -154,14 +151,14 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    fun `should skip already processed event so analytics fire once`() {
+    fun `should skip already processed event so its events publish once`() {
         linkedUser()
         every { processedEvents.existsById("event-initial_purchase") } returns true
 
         subscriptionService.handleRevenueCatWebhook(webhook(type = "INITIAL_PURCHASE"))
 
         assertTrue(statusUpdates.isEmpty())
-        verify(exactly = 0) { eventService.trackAsync(any(), any(), any()) }
+        assertTrue(published.isEmpty())
     }
 
     // ── INITIAL_PURCHASE ───────────────────────────────────────────────────────
@@ -178,7 +175,7 @@ class SubscriptionServiceTest {
         assertEquals("premium_monthly", sub.productId)
         assertTrue(sub.autoRenew)
         assertEquals(StatusUpdate(1L, SubscriptionStatus.ACTIVE, Instant.ofEpochMilli(expiry)), lastUpdate())
-        verify { eventService.trackAsync(1L, "subscription_started", any()) }
+        assertEquals(Activation.INITIAL_PURCHASE to false, published.filterIsInstance<SubscriptionActivated>().single().let { it.activation to it.isTrial })
     }
 
     @Test
@@ -198,7 +195,7 @@ class SubscriptionServiceTest {
 
         assertEquals(SubscriptionStatus.TRIAL, lastUpdate().status)
         assertTrue(savedSubscriptions.single().isTrial)
-        verify { eventService.trackAsync(1L, "trial_started", any()) }
+        assertEquals(Activation.INITIAL_PURCHASE to true, published.filterIsInstance<SubscriptionActivated>().single().let { it.activation to it.isTrial })
     }
 
     @Test
@@ -238,7 +235,7 @@ class SubscriptionServiceTest {
         assertEquals(SubscriptionStatus.ACTIVE, sub.status)
         assertEquals(Instant.ofEpochMilli(newExpiry), sub.expiresAt)
         assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
-        verify { eventService.trackAsync(1L, "subscription_renewed", any()) }
+        assertEquals(Activation.RENEWAL, published.filterIsInstance<SubscriptionActivated>().single().activation)
     }
 
     @Test
@@ -313,7 +310,7 @@ class SubscriptionServiceTest {
 
         assertEquals(SubscriptionStatus.EXPIRED, savedSubscriptions.single().status)
         assertEquals(StatusUpdate(1L, SubscriptionStatus.EXPIRED, null), lastUpdate())
-        verify { eventService.trackAsync(1L, "subscription_expired", any()) }
+        assertEquals(1L, published.filterIsInstance<SubscriptionExpired>().single().userId)
     }
 
     @Test
@@ -342,39 +339,24 @@ class SubscriptionServiceTest {
     }
 
     @Test
-    fun `BILLING_ISSUE keeps access and pushes a payment reminder`() {
+    fun `BILLING_ISSUE keeps access and publishes a billing issue`() {
         linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(86400))
 
         subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE"))
 
         assertTrue(statusUpdates.isEmpty())
-        verify(exactly = 1) {
-            pushNotificationService.sendNotificationToUser(
-                1L, any(), any(), mapOf("type" to SubscriptionService.BILLING_ISSUE_PUSH_TYPE), any(), any()
-            )
-        }
-        verify { eventService.trackAsync(1L, "subscription_billing_issue", any()) }
-    }
-
-    @Test
-    fun `BILLING_ISSUE push failure does not fail the webhook`() {
-        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(86400))
-        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) } throws
-            IllegalStateException("FCM down")
-
-        subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE"))
-
+        assertEquals(1L, published.filterIsInstance<SubscriptionBillingIssue>().single().userId)
         assertEquals(1, receipts.size)
     }
 
     @Test
-    fun `BILLING_ISSUE redelivery does not push twice`() {
+    fun `BILLING_ISSUE redelivery publishes once`() {
         linkedUser()
         every { processedEvents.existsById("event-billing_issue") } returnsMany listOf(false, true)
 
         repeat(2) { subscriptionService.handleRevenueCatWebhook(webhook(type = "BILLING_ISSUE")) }
 
-        verify(exactly = 1) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) }
+        assertEquals(1, published.filterIsInstance<SubscriptionBillingIssue>().size)
     }
 
     @Test

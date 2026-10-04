@@ -1,20 +1,16 @@
 package com.alirezaiyan.vokab.server.subscription
 
-import com.alirezaiyan.vokab.server.notification.NotificationCategory
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
-import com.alirezaiyan.vokab.server.notification.PushNotificationService
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
-import org.springframework.transaction.support.TransactionSynchronization
-import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration
 import java.time.Instant
 import com.alirezaiyan.vokab.server.user.requireId
-import com.alirezaiyan.vokab.server.analytics.EventService
+import com.alirezaiyan.vokab.server.shared.DomainEventPublisher
 
 private val logger = KotlinLogging.logger {}
 
@@ -22,10 +18,9 @@ private val logger = KotlinLogging.logger {}
 class SubscriptionService(
     private val subscriptionRepository: SubscriptionRepository,
     private val userRepository: UserRepository,
-    private val eventService: EventService,
+    private val domainEventPublisher: DomainEventPublisher,
     private val processedWebhookEventRepository: ProcessedWebhookEventRepository,
     private val revenueCatClient: RevenueCatClient,
-    private val pushNotificationService: PushNotificationService,
     private val clock: Clock,
 ) {
 
@@ -65,10 +60,10 @@ class SubscriptionService(
 
     private fun applyEvent(user: User, event: RevenueCatEvent) {
         when (event.type) {
-            "INITIAL_PURCHASE" -> activate(user, event, autoRenew = true, analyticsEvent = initialPurchaseEvent(event))
-            "RENEWAL" -> activate(user, event, autoRenew = true, analyticsEvent = "subscription_renewed")
-            "UNCANCELLATION" -> activate(user, event, autoRenew = true, analyticsEvent = null)
-            "NON_RENEWING_PURCHASE" -> activate(user, event, autoRenew = false, analyticsEvent = null)
+            "INITIAL_PURCHASE" -> activate(user, event, autoRenew = true, Activation.INITIAL_PURCHASE)
+            "RENEWAL" -> activate(user, event, autoRenew = true, Activation.RENEWAL)
+            "UNCANCELLATION" -> activate(user, event, autoRenew = true, Activation.UNCANCELLATION)
+            "NON_RENEWING_PURCHASE" -> activate(user, event, autoRenew = false, Activation.NON_RENEWING_PURCHASE)
             "CANCELLATION" -> handleCancellation(user, event)
             "EXPIRATION" -> handleExpiration(user, event)
             "BILLING_ISSUE" -> handleBillingIssue(user, event)
@@ -194,32 +189,14 @@ class SubscriptionService(
     /**
      * Renewal payment failed. RevenueCat keeps the entitlement through the store's grace period,
      * so access doesn't change, but the user should fix their payment method before it lapses.
-     * The push is sent after commit so a rolled-back (and later redelivered) event can't notify twice.
+     * Listeners (the push) run after commit, so a rolled-back (and later redelivered) event can't
+     * notify twice.
      */
     private fun handleBillingIssue(user: User, event: RevenueCatEvent) {
-        val userId = user.requireId()
-        eventService.trackAsync(userId, "subscription_billing_issue", mapOf("product_id" to event.product_id.orEmpty()))
-        afterCommit {
-            runCatching {
-                pushNotificationService.sendNotificationToUser(
-                    userId = userId,
-                    title = BILLING_ISSUE_TITLE,
-                    body = BILLING_ISSUE_BODY,
-                    data = mapOf("type" to BILLING_ISSUE_PUSH_TYPE),
-                    category = NotificationCategory.SYSTEM,
-                )
-            }.onFailure { logger.warn(it) { "Billing issue push failed for userId=$userId" } }
-        }
+        domainEventPublisher.publish(SubscriptionBillingIssue(user.requireId(), event.product_id, Instant.now(clock)))
     }
 
-    private fun afterCommit(action: () -> Unit) {
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) return action()
-        TransactionSynchronizationManager.registerSynchronization(object : TransactionSynchronization {
-            override fun afterCommit() = action()
-        })
-    }
-
-    private fun activate(user: User, event: RevenueCatEvent, autoRenew: Boolean, analyticsEvent: String?) {
+    private fun activate(user: User, event: RevenueCatEvent, autoRenew: Boolean, activation: Activation) {
         val expiresAt = event.expiresAt()
         val productId = event.product_id
 
@@ -250,13 +227,9 @@ class SubscriptionService(
         val status = if (event.isTrial) SubscriptionStatus.TRIAL else SubscriptionStatus.ACTIVE
         updateUserSubscriptionStatus(user, status, expiresAt)
 
-        if (analyticsEvent != null) {
-            eventService.trackAsync(
-                user.requireId(),
-                analyticsEvent,
-                mapOf("product_id" to productId.orEmpty(), "is_trial" to event.isTrial.toString())
-            )
-        }
+        domainEventPublisher.publish(
+            SubscriptionActivated(user.requireId(), productId, event.isTrial, activation, Instant.now(clock))
+        )
         logger.info { "RevenueCat ${event.type} applied for userId=${user.id}, status=$status, expiresAt=$expiresAt" }
     }
 
@@ -283,10 +256,8 @@ class SubscriptionService(
             SubscriptionStatus.EXPIRED
         }
         updateUserSubscriptionStatus(user, status, expiresAt)
-        eventService.trackAsync(
-            user.requireId(),
-            "subscription_cancelled",
-            mapOf("product_id" to event.product_id.orEmpty(), "reason" to event.cancel_reason.orEmpty())
+        domainEventPublisher.publish(
+            SubscriptionCancelled(user.requireId(), event.product_id, event.cancel_reason, now)
         )
 
         logger.info { "Subscription cancelled for userId=${user.id}, access until $expiresAt" }
@@ -308,11 +279,7 @@ class SubscriptionService(
         }
 
         updateUserSubscriptionStatus(user, SubscriptionStatus.EXPIRED, null)
-        eventService.trackAsync(
-            user.requireId(),
-            "subscription_expired",
-            mapOf("product_id" to event.product_id.orEmpty())
-        )
+        domainEventPublisher.publish(SubscriptionExpired(user.requireId(), event.product_id, Instant.now(clock)))
 
         logger.info { "Subscription expired for userId=${user.id}" }
     }
@@ -324,17 +291,9 @@ class SubscriptionService(
         userRepository.updateSubscription(user.requireId(), status, expiresAt, Instant.now(clock))
     }
 
-    private fun initialPurchaseEvent(event: RevenueCatEvent): String =
-        if (event.isTrial) "trial_started" else "subscription_started"
-
     private fun RevenueCatEvent.expiresAt(): Instant? = expiration_at_ms?.let { Instant.ofEpochMilli(it) }
 
     companion object {
-        const val BILLING_ISSUE_PUSH_TYPE = "billing_issue"
-        private const val BILLING_ISSUE_TITLE = "Payment problem"
-        private const val BILLING_ISSUE_BODY =
-            "We couldn't renew your Lexicon Premium. Update your payment method in the store to keep it."
-
         /** Statuses that come from the store (and so may be lapsed/expired by it). */
         val STORE_DERIVED_STATUSES = listOf(SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL, SubscriptionStatus.CANCELLED)
     }

@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.admin.AppConfigService
-import com.alirezaiyan.vokab.server.analytics.EventService
 import com.alirezaiyan.vokab.server.user.GeoLocationService
 import com.alirezaiyan.vokab.server.subscription.RevenueCatClient
 import com.alirezaiyan.vokab.server.user.UserDataPurger
@@ -50,7 +49,6 @@ class AuthService(
     private val appProperties: AppProperties,
     private val appConfigService: AppConfigService,
     private val auditLogService: AuditLogService,
-    private val eventService: EventService,
     private val domainEventPublisher: DomainEventPublisher,
     private val geoLocationService: GeoLocationService,
     private val userAccessCache: UserAccessCache,
@@ -278,7 +276,6 @@ class AuthService(
             geoLocationService.resolveCountry(ip)
         }
         if (isNewUser) {
-            eventService.trackAsync(userId, "signup_completed", mapOf("provider" to ctx.provider.eventName))
             domainEventPublisher.publish(
                 UserSignedUpEvent(
                     userId = userId,

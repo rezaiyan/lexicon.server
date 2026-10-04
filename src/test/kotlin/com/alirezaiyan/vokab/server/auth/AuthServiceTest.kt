@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.auth
 
+import com.alirezaiyan.vokab.server.shared.UserSignedUpEvent
 import com.alirezaiyan.vokab.server.shared.AuthRejectedException
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.withAssignedId
@@ -32,7 +33,6 @@ import org.junit.jupiter.api.assertThrows
 import java.time.Instant
 import java.util.Optional
 import com.alirezaiyan.vokab.server.admin.AppConfigService
-import com.alirezaiyan.vokab.server.analytics.EventService
 import com.alirezaiyan.vokab.server.user.GeoLocationService
 import com.alirezaiyan.vokab.server.subscription.RevenueCatClient
 import com.alirezaiyan.vokab.server.user.UserDataPurger
@@ -51,7 +51,6 @@ class AuthServiceTest {
     private lateinit var pushNotificationService: PushNotificationService
     private lateinit var appProperties: AppProperties
     private lateinit var auditLogService: AuditLogService
-    private lateinit var eventService: EventService
     private lateinit var appConfigService: AppConfigService
     private lateinit var domainEventPublisher: DomainEventPublisher
     private lateinit var geoLocationService: GeoLocationService
@@ -71,7 +70,6 @@ class AuthServiceTest {
         userDataPurger = mockk()
         pushNotificationService = mockk()
         auditLogService = mockk(relaxed = true)
-        eventService = mockk(relaxed = true)
         appConfigService = mockk()
         domainEventPublisher = mockk(relaxed = true)
         every { appConfigService.getTestEmails() } returns emptySet()
@@ -120,7 +118,7 @@ class AuthServiceTest {
         assertEquals("access-token", result.accessToken)
         assertEquals("refresh-token", result.refreshToken)
         assertEquals("Bearer", result.tokenType)
-        verify(exactly = 0) { eventService.trackAsync(any(), any(), any()) }
+        verify(exactly = 0) { domainEventPublisher.publish(ofType<UserSignedUpEvent>()) }
     }
 
     @Test
@@ -350,7 +348,7 @@ class AuthServiceTest {
 
         assertEquals(7L, result.user.id)
         assertEquals("access-token", result.accessToken)
-        verify(exactly = 0) { eventService.trackAsync(any(), "signup_completed", any()) }
+        verify(exactly = 0) { domainEventPublisher.publish(ofType<UserSignedUpEvent>()) }
     }
 
     @Test
@@ -369,7 +367,7 @@ class AuthServiceTest {
         assertEquals("apple_abc_123@apple.hidden", result.user.email)
         assertEquals("Jane Doe", result.user.name)
         verify(exactly = 0) { userRepository.findByEmail(any()) }
-        verify { eventService.trackAsync(42L, "signup_completed", mapOf("provider" to "apple")) }
+        verify { domainEventPublisher.publish(match<UserSignedUpEvent> { it.userId == 42L && it.provider == "apple" }) }
     }
 
     @Test
@@ -926,7 +924,6 @@ class AuthServiceTest {
             pushNotificationService = pushNotificationService,
             appProperties = properties,
             auditLogService = auditLogService,
-            eventService = eventService,
             domainEventPublisher = domainEventPublisher,
             geoLocationService = geoLocationService,
             appConfigService = appConfigService,

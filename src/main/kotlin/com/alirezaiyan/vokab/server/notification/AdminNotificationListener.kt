@@ -4,12 +4,12 @@ import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.UserSignedInEvent
 import com.alirezaiyan.vokab.server.shared.UserSignedUpEvent
 import io.github.oshai.kotlinlogging.KotlinLogging
-import org.springframework.context.event.EventListener
-import org.springframework.scheduling.annotation.Async
+import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 
 private val logger = KotlinLogging.logger {}
 
+/** Admin Telegram pings on sign-ups and sign-ins; best effort, delivery failures are only logged. */
 @Component
 class AdminNotificationListener(
     private val notificationChannel: NotificationChannel,
@@ -21,8 +21,7 @@ class AdminNotificationListener(
         return if (parts.isEmpty()) "" else " | ${parts.joinToString(" | ")}"
     }
 
-    @Async
-    @EventListener
+    @ApplicationModuleListener
     fun onUserSignedUp(event: UserSignedUpEvent) {
         if (!appProperties.notifications.admin.enabled) return
 
@@ -37,8 +36,7 @@ class AdminNotificationListener(
         }
     }
 
-    @Async
-    @EventListener
+    @ApplicationModuleListener
     fun onUserSignedIn(event: UserSignedInEvent) {
         if (!appProperties.notifications.admin.enabled) return
 

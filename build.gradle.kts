@@ -22,6 +22,8 @@ repositories {
 dependencies {
 	// Spring Boot Starters
 	implementation(libs.spring.boot.starter.web)
+	// Event publication registry: cross-feature events persisted in Postgres until their listeners complete
+	implementation(libs.spring.modulith.starter.jdbc)
 	// OpenAPI spec of the API, rendered in tests and committed as openapi.json (no UI, route off in prod)
 	implementation(libs.springdoc.openapi.webmvc.api)
 	implementation(libs.spring.boot.starter.data.jpa)

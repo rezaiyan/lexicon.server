@@ -13,13 +13,20 @@ import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.alirezaiyan.vokab.server.notification.NotificationEngagementService
+import com.alirezaiyan.vokab.server.shared.DomainEvent
+import com.alirezaiyan.vokab.server.shared.DomainEventPublisher
+import org.junit.jupiter.api.assertThrows
 
 class EventServiceTest {
 
     private lateinit var appEventRepository: AppEventRepository
     private lateinit var objectMapper: ObjectMapper
-    private lateinit var notificationEngagementService: NotificationEngagementService
+    private val published = mutableListOf<DomainEvent>()
+    private val publisher = object : DomainEventPublisher {
+        override fun publish(event: DomainEvent) {
+            published += event
+        }
+    }
     private lateinit var eventService: EventService
     private val meterRegistry = SimpleMeterRegistry()
 
@@ -27,8 +34,7 @@ class EventServiceTest {
     fun setUp() {
         appEventRepository = mockk()
         objectMapper = ObjectMapper()
-        notificationEngagementService = mockk()
-        eventService = EventService(appEventRepository, objectMapper, notificationEngagementService, clock = fixedClock(), meterRegistry = meterRegistry)
+        eventService = EventService(appEventRepository, objectMapper, publisher, clock = fixedClock(), meterRegistry = meterRegistry)
     }
 
     @Test
@@ -64,53 +70,26 @@ class EventServiceTest {
     }
 
     @Test
-    fun `track should record notification open when eventName is notification_opened`() {
-        // Arrange
-        val logId = 42L
-        val request = createTrackEventRequest(
-            eventName = "notification_opened",
-            properties = mapOf("notification_log_id" to logId.toString())
-        )
-        every { appEventRepository.save(any<AppEvent>()) } returns mockk()
-        every { notificationEngagementService.recordOpen(any(), any()) } returns true
-
-        // Act
-        eventService.track(userId = 1L, request = request)
-
-        // Assert
-        verify(exactly = 1) { notificationEngagementService.recordOpen(1L, logId) }
-    }
-
-    @Test
-    fun `track should not fail when notification open processing fails`() {
-        // Arrange
+    fun `track publishes a notification open when eventName is notification_opened`() {
         val request = createTrackEventRequest(
             eventName = "notification_opened",
             properties = mapOf("notification_log_id" to "99")
         )
         every { appEventRepository.save(any<AppEvent>()) } returns mockk()
-        every { notificationEngagementService.recordOpen(any(), any()) } throws RuntimeException("engagement service down")
 
-        // Act & Assert — track must not propagate the exception
-        assertDoesNotThrow {
-            eventService.track(userId = 1L, request = request)
-        }
+        eventService.track(userId = 1L, request = request)
+
+        assertEquals(listOf(NotificationOpenedEvent(1L, 99L, TEST_NOW)), published)
     }
 
     @Test
-    fun `track should not call engagement service when notification_log_id property is missing`() {
-        // Arrange
-        val request = createTrackEventRequest(
-            eventName = "notification_opened",
-            properties = emptyMap()
-        )
+    fun `track publishes nothing when notification_log_id property is missing`() {
+        val request = createTrackEventRequest(eventName = "notification_opened", properties = emptyMap())
         every { appEventRepository.save(any<AppEvent>()) } returns mockk()
 
-        // Act
         eventService.track(userId = 1L, request = request)
 
-        // Assert
-        verify(exactly = 0) { notificationEngagementService.recordOpen(any(), any()) }
+        assertEquals(emptyList<DomainEvent>(), published)
     }
 
     @Test
@@ -127,26 +106,21 @@ class EventServiceTest {
     }
 
     @Test
-    fun `trackAsync should save event through track internally`() {
-        // Arrange
+    fun `record saves the event at the given time`() {
         every { appEventRepository.save(any<AppEvent>()) } returns mockk()
 
-        // Act
-        eventService.trackAsync(userId = 5L, eventName = "streak_updated", properties = mapOf("streak" to "7"))
+        eventService.record(5L, "subscription_started", mapOf("product_id" to "p1"), TEST_NOW)
 
-        // Assert — the internal save must have been called once
-        verify(exactly = 1) { appEventRepository.save(match { it.eventName == "streak_updated" && it.userId == 5L }) }
+        verify(exactly = 1) {
+            appEventRepository.save(match { it.eventName == "subscription_started" && it.userId == 5L && it.clientTimestamp == TEST_NOW })
+        }
     }
 
     @Test
-    fun `trackAsync should not throw when track fails`() {
-        // Arrange
+    fun `record propagates a failed insert so the event listener is retried`() {
         every { appEventRepository.save(any<AppEvent>()) } throws RuntimeException("connection refused")
 
-        // Act & Assert
-        assertDoesNotThrow {
-            eventService.trackAsync(userId = 1L, eventName = "some_event")
-        }
+        assertThrows<RuntimeException> { eventService.record(1L, "some_event", emptyMap(), TEST_NOW) }
     }
 
     // --- Factory functions ---

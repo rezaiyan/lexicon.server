@@ -3,10 +3,11 @@ package com.alirezaiyan.vokab.server.shared
 import java.time.Instant
 
 /**
- * Marker interface for all domain events.
- * Domain events are plain data — no framework dependency.
+ * Marker for domain events: plain data, published through [DomainEventPublisher] and handled by
+ * `@ApplicationModuleListener`s after the publishing transaction commits. Each event lives in the
+ * module that publishes it; the user lifecycle events below are shared by several modules.
  */
-sealed interface DomainEvent {
+interface DomainEvent {
     val occurredAt: Instant
 }
 

@@ -47,6 +47,7 @@ geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
+spring-modulith-starter-jdbc = { module = "org.springframework.modulith:spring-modulith-starter-jdbc", version.ref = "spring-modulith" }
 spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
 
 [plugins]

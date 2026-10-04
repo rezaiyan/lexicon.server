@@ -6,7 +6,7 @@ import com.alirezaiyan.vokab.server.study.DayActivity
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.study.LanguagePair
 import com.alirezaiyan.vokab.server.study.ProfileStatsResponse
-import com.alirezaiyan.vokab.server.auth.AuthService
+import com.alirezaiyan.vokab.server.auth.AccountDeletionService
 import com.alirezaiyan.vokab.server.subscription.ClientFeatureFlags
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.ProfileStatsService
@@ -50,7 +50,7 @@ class UserControllerTest {
     private lateinit var userService: UserService
 
     @MockitoBean
-    private lateinit var authService: AuthService
+    private lateinit var accountDeletionService: AccountDeletionService
 
     @MockitoBean
     private lateinit var featureAccessService: FeatureAccessService
@@ -252,7 +252,7 @@ class UserControllerTest {
     @Test
     fun `DELETE me should return 500 when deletion fails`() {
         doThrow(RuntimeException("deletion error"))
-            .`when`(authService).deleteAccount(1L)
+            .`when`(accountDeletionService).deleteAccount(1L)
 
         mockMvc.perform(
             delete("/api/v1/users/me")

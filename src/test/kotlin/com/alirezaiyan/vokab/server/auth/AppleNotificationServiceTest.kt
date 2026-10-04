@@ -30,7 +30,7 @@ class AppleNotificationServiceTest {
     private lateinit var applePublicKeyService: ApplePublicKeyService
     private lateinit var objectMapper: ObjectMapper
     private lateinit var pushNotificationService: PushNotificationService
-    private lateinit var authService: AuthService
+    private lateinit var accountDeletionService: AccountDeletionService
 
     private lateinit var appleNotificationService: AppleNotificationService
 
@@ -40,14 +40,14 @@ class AppleNotificationServiceTest {
         applePublicKeyService = mockk()
         objectMapper = jacksonObjectMapper()
         pushNotificationService = mockk()
-        authService = mockk()
+        accountDeletionService = mockk()
 
         appleNotificationService = AppleNotificationService(
             userRepository,
             AppleIdTokenVerifier(applePublicKeyService, AppProperties()),
             objectMapper,
             pushNotificationService,
-            authService,
+            accountDeletionService,
             userAccessCache = mockk(relaxed = true),
             clock = fixedClock()
         )
@@ -249,12 +249,12 @@ class AppleNotificationServiceTest {
         val (token, rsaKey) = buildSignedJwt(appleUserId = "apple-user-1", eventType = "account-delete")
         every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
         every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
-        every { authService.deleteAccount(5L) } just Runs
+        every { accountDeletionService.deleteAccount(5L) } just Runs
 
         val result = appleNotificationService.processNotification(token)
 
         assertTrue(result)
-        verify(exactly = 1) { authService.deleteAccount(5L) }
+        verify(exactly = 1) { accountDeletionService.deleteAccount(5L) }
     }
 
     @Test
@@ -263,7 +263,7 @@ class AppleNotificationServiceTest {
         val (token, rsaKey) = buildSignedJwt(appleUserId = "apple-user-1", eventType = "account-delete")
         every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
         every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
-        every { authService.deleteAccount(5L) } throws RuntimeException("deletion failed")
+        every { accountDeletionService.deleteAccount(5L) } throws RuntimeException("deletion failed")
 
         val result = appleNotificationService.processNotification(token)
 
@@ -305,7 +305,7 @@ class AppleNotificationServiceTest {
         val result = appleNotificationService.processNotification(token)
 
         assertFalse(result)
-        verify(exactly = 0) { authService.deleteAccount(any()) }
+        verify(exactly = 0) { accountDeletionService.deleteAccount(any()) }
     }
 
     // ── factory functions ──────────────────────────────────────────────────────

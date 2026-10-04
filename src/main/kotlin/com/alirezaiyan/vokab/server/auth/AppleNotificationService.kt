@@ -26,7 +26,7 @@ class AppleNotificationService(
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
     private val objectMapper: ObjectMapper,
     private val pushNotificationService: PushNotificationService,
-    private val authService: AuthService,
+    private val accountDeletionService: AccountDeletionService,
     private val userAccessCache: UserAccessCache,
     private val clock: Clock
 ) {
@@ -166,7 +166,7 @@ class AppleNotificationService(
         logger.info { "Account deletion requested for userId=${user.id}, reason: ${event?.reason ?: "Not provided"}" }
 
         // Delegate to the shared hard-delete flow (push notification + Firebase + RevenueCat + all local data)
-        authService.deleteAccount(user.requireId())
+        accountDeletionService.deleteAccount(user.requireId())
 
         logger.info { "✅ Processed account deletion for user: ${user.id}" }
     }

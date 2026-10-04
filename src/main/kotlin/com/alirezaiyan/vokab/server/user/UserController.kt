@@ -4,7 +4,7 @@ import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.ApiResponse
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessResponse
 import com.alirezaiyan.vokab.server.study.ProfileStatsResponse
-import com.alirezaiyan.vokab.server.auth.AuthService
+import com.alirezaiyan.vokab.server.auth.AccountDeletionService
 import com.alirezaiyan.vokab.server.subscription.ClientFeatureFlags
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.ProfileStatsService
@@ -18,7 +18,7 @@ import org.springframework.web.multipart.MultipartFile
 @RequestMapping("/api/v1/users")
 class UserController(
     private val userService: UserService,
-    private val authService: AuthService,
+    private val accountDeletionService: AccountDeletionService,
     private val featureAccessService: FeatureAccessService,
     private val profileStatsService: ProfileStatsService,
     private val avatarService: AvatarService
@@ -62,7 +62,7 @@ class UserController(
     fun deleteCurrentUser(
         @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.deleteAccount(user.id)
+        accountDeletionService.deleteAccount(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
     }
     

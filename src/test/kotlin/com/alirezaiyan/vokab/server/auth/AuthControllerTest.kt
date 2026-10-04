@@ -43,6 +43,12 @@ class AuthControllerTest {
     @MockitoBean
     private lateinit var authService: AuthService
 
+    @MockitoBean
+    private lateinit var tokenService: TokenService
+
+    @MockitoBean
+    private lateinit var accountDeletionService: AccountDeletionService
+
     private val mockUser = User(
         id = 1L,
         email = "test@example.com",
@@ -204,7 +210,7 @@ class AuthControllerTest {
     @Test
     fun `POST refresh should return 200 with new auth response when token is valid`() {
         val authResponse = createAuthResponse()
-        `when`(authService.refreshAccessToken("valid-refresh-token")).thenReturn(authResponse)
+        `when`(tokenService.rotate("valid-refresh-token")).thenReturn(authResponse)
 
         mockMvc.perform(
             post("/api/v1/auth/refresh")
@@ -218,7 +224,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST refresh should return 401 when the token is rejected`() {
-        `when`(authService.refreshAccessToken("expired-refresh-token"))
+        `when`(tokenService.rotate("expired-refresh-token"))
             .thenThrow(AuthRejectedException("Refresh token has expired"))
 
         mockMvc.perform(
@@ -233,7 +239,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST refresh should return 500 without leaking details when the server fails`() {
-        `when`(authService.refreshAccessToken("expired-refresh-token"))
+        `when`(tokenService.rotate("expired-refresh-token"))
             .thenThrow(IllegalStateException("db password=secret"))
 
         mockMvc.perform(
@@ -259,7 +265,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST logout should return 200 when authenticated and token is valid`() {
-        doNothing().`when`(authService).logout(1L, "my-refresh-token")
+        doNothing().`when`(tokenService).logout(1L, "my-refresh-token")
 
         mockMvc.perform(
             post("/api/v1/auth/logout")
@@ -273,7 +279,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST logout should return 500 when service throws`() {
-        doThrow(RuntimeException("Token not found")).`when`(authService).logout(1L, "unknown-token")
+        doThrow(RuntimeException("Token not found")).`when`(tokenService).logout(1L, "unknown-token")
 
         mockMvc.perform(
             post("/api/v1/auth/logout")
@@ -299,7 +305,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST logout-all should return 200 when authenticated`() {
-        doNothing().`when`(authService).logoutAll(1L)
+        doNothing().`when`(tokenService).logoutAll(1L)
 
         mockMvc.perform(
             post("/api/v1/auth/logout-all")
@@ -312,7 +318,7 @@ class AuthControllerTest {
 
     @Test
     fun `POST logout-all should return 500 when service throws`() {
-        doThrow(RuntimeException("Logout all failed")).`when`(authService).logoutAll(1L)
+        doThrow(RuntimeException("Logout all failed")).`when`(tokenService).logoutAll(1L)
 
         mockMvc.perform(
             post("/api/v1/auth/logout-all")
@@ -336,7 +342,7 @@ class AuthControllerTest {
 
     @Test
     fun `DELETE delete-account should return 200 when authenticated`() {
-        doNothing().`when`(authService).deleteAccount(1L)
+        doNothing().`when`(accountDeletionService).deleteAccount(1L)
 
         mockMvc.perform(
             delete("/api/v1/auth/delete-account")
@@ -349,7 +355,7 @@ class AuthControllerTest {
 
     @Test
     fun `DELETE delete-account should return 500 when service throws`() {
-        doThrow(RuntimeException("Deletion failed")).`when`(authService).deleteAccount(1L)
+        doThrow(RuntimeException("Deletion failed")).`when`(accountDeletionService).deleteAccount(1L)
 
         mockMvc.perform(
             delete("/api/v1/auth/delete-account")

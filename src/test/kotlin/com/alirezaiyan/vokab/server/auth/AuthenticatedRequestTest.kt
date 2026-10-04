@@ -35,7 +35,7 @@ class AuthenticatedRequestTest {
     @Autowired lateinit var testUserHelper: TestUserHelper
     @Autowired lateinit var userRepository: UserRepository
     @Autowired lateinit var tagRepository: TagRepository
-    @Autowired lateinit var authService: AuthService
+    @Autowired lateinit var accountDeletionService: AccountDeletionService
     @Autowired lateinit var entityManagerFactory: EntityManagerFactory
 
     private val created = mutableListOf<Long>()
@@ -50,7 +50,7 @@ class AuthenticatedRequestTest {
 
     @AfterEach
     fun cleanUp() {
-        created.filter { userRepository.existsById(it) }.forEach(authService::deleteAccount)
+        created.filter { userRepository.existsById(it) }.forEach(accountDeletionService::deleteAccount)
     }
 
     @Test
@@ -105,7 +105,7 @@ class AuthenticatedRequestTest {
         val token = bearer(user)
         mockMvc.perform(get("/api/v1/tags").header("Authorization", token)).andExpect(status().isOk)
 
-        authService.deleteAccount(user.requireId())
+        accountDeletionService.deleteAccount(user.requireId())
 
         mockMvc.perform(get("/api/v1/tags").header("Authorization", token)).andExpect(status().isForbidden)
     }

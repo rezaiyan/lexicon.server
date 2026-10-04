@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.shared
 
 import com.alirezaiyan.vokab.server.TestUserHelper
-import com.alirezaiyan.vokab.server.auth.AuthService
+import com.alirezaiyan.vokab.server.auth.AccountDeletionService
 import com.alirezaiyan.vokab.server.subscription.SubscriptionExpired
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.requireId
@@ -58,7 +58,7 @@ class EventPublicationIntegrationTest {
     @Autowired lateinit var transactionTemplate: TransactionTemplate
     @Autowired lateinit var jdbcTemplate: JdbcTemplate
     @Autowired lateinit var testUserHelper: TestUserHelper
-    @Autowired lateinit var authService: AuthService
+    @Autowired lateinit var accountDeletionService: AccountDeletionService
 
     private var userId: Long = 0
 
@@ -71,7 +71,7 @@ class EventPublicationIntegrationTest {
     fun cleanUp() {
         if (userId != 0L) {
             jdbcTemplate.update("DELETE FROM app_events WHERE user_id = ?", userId)
-            authService.deleteAccount(userId)
+            accountDeletionService.deleteAccount(userId)
         }
     }
 

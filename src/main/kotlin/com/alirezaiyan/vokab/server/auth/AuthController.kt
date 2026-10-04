@@ -18,6 +18,8 @@ private val logger = KotlinLogging.logger {}
 @RequestMapping("/api/v1/auth")
 class AuthController(
     private val authService: AuthService,
+    private val tokenService: TokenService,
+    private val accountDeletionService: AccountDeletionService,
     private val appProperties: AppProperties
 ) {
     
@@ -77,7 +79,7 @@ class AuthController(
     fun refreshToken(
         @Valid @RequestBody request: RefreshTokenRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        val response = authService.refreshAccessToken(request.refreshToken)
+        val response = tokenService.rotate(request.refreshToken)
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
     
@@ -86,7 +88,7 @@ class AuthController(
         @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody request: RefreshTokenRequest
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.logout(user.id, request.refreshToken)
+        tokenService.logout(user.id, request.refreshToken)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
     }
     
@@ -111,7 +113,7 @@ class AuthController(
     fun logoutAll(
         @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
-        authService.logoutAll(user.id)
+        tokenService.logoutAll(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "All sessions logged out successfully"))
     }
     
@@ -120,7 +122,7 @@ class AuthController(
         @AuthenticationPrincipal user: AuthUser
     ): ResponseEntity<ApiResponse<Unit>> {
         logger.info { "Delete account request received for user: ${user.id}" }
-        authService.deleteAccount(user.id)
+        accountDeletionService.deleteAccount(user.id)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Account deleted successfully"))
     }
 

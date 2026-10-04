@@ -23,12 +23,12 @@ import java.time.Instant
 import com.alirezaiyan.vokab.server.analytics.AnalyticsService
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class NotificationContentBuilderTest {
 
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiService: AiService
     private lateinit var userProgressService: UserProgressService
     private lateinit var analyticsService: AnalyticsService
     private lateinit var dailyInsightService: DailyInsightService
@@ -38,14 +38,14 @@ class NotificationContentBuilderTest {
 
     @BeforeEach
     fun setUp() {
-        openRouterService = mockk()
+        aiService = mockk()
         userProgressService = mockk()
         analyticsService = mockk()
         dailyInsightService = mockk()
         milestoneDetector = mockk()
 
         notificationContentBuilder = NotificationContentBuilder(
-            openRouterService,
+            aiService,
             userProgressService,
             analyticsService,
             dailyInsightService,
@@ -62,7 +62,7 @@ class NotificationContentBuilderTest {
         val stats = createProgressStats(totalWords = 30, dueCards = 5)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
-            openRouterService.generateStreakReminderMessage(7, user.name, stats)
+            aiService.generateStreakReminderMessage(7, user.name, stats)
         } returns "Don't lose it!"
 
         // Act
@@ -83,7 +83,7 @@ class NotificationContentBuilderTest {
         val stats = createProgressStats(totalWords = 10, dueCards = 2)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
-            openRouterService.generateStreakReminderMessage(3, user.name, stats)
+            aiService.generateStreakReminderMessage(3, user.name, stats)
         } throws UpstreamServiceException("OpenRouter down")
 
         // Act
@@ -102,7 +102,7 @@ class NotificationContentBuilderTest {
         val stats = createProgressStats()
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
-            openRouterService.generateStreakReminderMessage(any(), any(), any())
+            aiService.generateStreakReminderMessage(any(), any(), any())
         } returns "Keep going!"
 
         // Act
@@ -307,7 +307,7 @@ class NotificationContentBuilderTest {
         every { milestoneDetector.getPendingMilestone(user) } returns milestone
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
-            openRouterService.generateMilestoneMessage(milestone, stats, user.name)
+            aiService.generateMilestoneMessage(milestone, user.name)
         } returns "Amazing milestone!"
 
         // Act
@@ -330,7 +330,7 @@ class NotificationContentBuilderTest {
         every { milestoneDetector.getPendingMilestone(user) } returns milestone
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every {
-            openRouterService.generateMilestoneMessage(any(), any(), any())
+            aiService.generateMilestoneMessage(any(), any())
         } throws UpstreamServiceException("OpenRouter down")
 
         // Act

@@ -12,7 +12,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import com.alirezaiyan.vokab.server.user.requireId
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.StreakService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
@@ -25,7 +25,7 @@ class StreakNotificationService(
     private val dailyInsightRepository: DailyInsightRepository,
     private val pushTokenRepository: PushTokenRepository,
     private val streakService: StreakService,
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val pushNotificationService: PushNotificationService,
     private val userProgressService: UserProgressService,
     private val notificationLogRepository: NotificationLogRepository,
@@ -120,7 +120,7 @@ class StreakNotificationService(
             }
 
             val progressStats = userProgressService.calculateProgressStats(user.requireId())
-            val message = openRouterService.generateStreakResetWarning(
+            val message = aiService.generateStreakResetWarning(
                 currentStreak = currentStreak,
                 progressStats = progressStats,
                 userName = user.name

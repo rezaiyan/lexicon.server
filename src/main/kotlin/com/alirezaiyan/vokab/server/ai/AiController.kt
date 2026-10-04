@@ -19,7 +19,7 @@ private val logger = KotlinLogging.logger {}
 @RestController
 @RequestMapping("/api/v1/ai")
 class AiController(
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val rateLimitConfig: RateLimitConfig,
     private val featureAccessService: FeatureAccessService,
     private val appProperties: AppProperties,
@@ -37,7 +37,7 @@ class AiController(
         requirePremium(user, "AI image extraction")
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
-        val extractedText = openRouterService.extractVocabularyFromImage(
+        val extractedText = aiService.extractVocabularyFromImage(
             imageBase64 = request.imageBase64,
             targetLanguage = request.targetLanguage,
             extractWords = request.extractWords,
@@ -96,7 +96,7 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "text translation")
 
-        val translation = openRouterService.translateText(
+        val translation = aiService.translateText(
             text = text,
             targetLanguage = request.targetLanguage
         )

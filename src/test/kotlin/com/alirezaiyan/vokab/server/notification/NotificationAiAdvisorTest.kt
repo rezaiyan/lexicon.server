@@ -8,19 +8,20 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiClient
+import com.alirezaiyan.vokab.server.ai.PromptTemplates
 
 class NotificationAiAdvisorTest {
 
     private lateinit var advisor: NotificationAiAdvisor
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiClient: AiClient
 
     private val objectMapper = ObjectMapper()
 
     @BeforeEach
     fun setUp() {
-        openRouterService = mockk()
-        advisor = NotificationAiAdvisor(openRouterService, objectMapper)
+        aiClient = mockk()
+        advisor = NotificationAiAdvisor(aiClient, PromptTemplates(), objectMapper)
     }
 
     // ── parseResponse: valid JSON ─────────────────────────────────────────────────
@@ -167,7 +168,7 @@ class NotificationAiAdvisorTest {
 
     @Test
     fun `advise should return defaultAdvice when OpenRouter is unavailable`() {
-        every { openRouterService.complete(any(), any()) } throws UpstreamServiceException("OpenRouter down")
+        every { aiClient.complete(any(), any()) } throws UpstreamServiceException("OpenRouter down")
 
         val context = testContext()
         val result = advisor.advise(context)
@@ -179,14 +180,14 @@ class NotificationAiAdvisorTest {
 
     @Test
     fun `advise should return defaultAdvice when OpenRouter returns no text`() {
-        every { openRouterService.complete(any(), any()) } returns null
+        every { aiClient.complete(any(), any()) } returns null
 
         assertEquals("send", advisor.advise(testContext()).action)
     }
 
     @Test
     fun `advise should return valid advice when OpenRouter returns good JSON`() {
-        every { openRouterService.complete(any(), any()) } returns """{"action":"motivate","intervalDays":5,"contentHint":"fresh_start"}"""
+        every { aiClient.complete(any(), any()) } returns """{"action":"motivate","intervalDays":5,"contentHint":"fresh_start"}"""
 
         val result = advisor.advise(testContext())
 

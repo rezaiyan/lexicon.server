@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.StreakInfo
 import com.alirezaiyan.vokab.server.study.StreakService
 import com.alirezaiyan.vokab.server.study.UserProgressService
@@ -31,7 +31,7 @@ class StreakNotificationServiceTest {
     private lateinit var dailyInsightRepository: DailyInsightRepository
     private lateinit var pushTokenRepository: PushTokenRepository
     private lateinit var streakService: StreakService
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiService: AiService
     private lateinit var pushNotificationService: PushNotificationService
     private lateinit var userProgressService: UserProgressService
     private lateinit var notificationLogRepository: NotificationLogRepository
@@ -45,7 +45,7 @@ class StreakNotificationServiceTest {
         dailyInsightRepository = mockk()
         pushTokenRepository = mockk()
         streakService = mockk()
-        openRouterService = mockk()
+        aiService = mockk()
         pushNotificationService = mockk()
         userProgressService = mockk()
         notificationLogRepository = mockk()
@@ -56,7 +56,7 @@ class StreakNotificationServiceTest {
             dailyInsightRepository = dailyInsightRepository,
             pushTokenRepository = pushTokenRepository,
             streakService = streakService,
-            openRouterService = openRouterService,
+            aiService = aiService,
             pushNotificationService = pushNotificationService,
             userProgressService = userProgressService,
             notificationLogRepository = notificationLogRepository,
@@ -127,7 +127,7 @@ class StreakNotificationServiceTest {
 
         // Assert
         assertFalse(result)
-        verify(exactly = 0) { openRouterService.generateStreakResetWarning(any(), any(), any()) }
+        verify(exactly = 0) { aiService.generateStreakResetWarning(any(), any(), any()) }
     }
 
     @Test
@@ -139,7 +139,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep your streak!"
+        every { aiService.generateStreakResetWarning(10, stats, user.name) } returns "Keep your streak!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -175,7 +175,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
+        every { aiService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -202,7 +202,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
+        every { aiService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -229,7 +229,7 @@ class StreakNotificationServiceTest {
         every { pushTokenRepository.findByUserAndActiveTrue(user) } returns listOf(token)
         every { streakService.getUserStreak(user.id!!) } returns StreakInfo(currentStreak = 10)
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { openRouterService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
+        every { aiService.generateStreakResetWarning(10, stats, user.name) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user.id!!,
@@ -270,7 +270,7 @@ class StreakNotificationServiceTest {
         every { streakService.getUserStreak(user1.id!!) } returns StreakInfo(currentStreak = 10)
         every { streakService.getUserStreak(user2.id!!) } returns StreakInfo(currentStreak = 5)
         every { userProgressService.calculateProgressStats(any()) } returns stats
-        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
+        every { aiService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = any(),
@@ -310,7 +310,7 @@ class StreakNotificationServiceTest {
         every { streakService.getUserStreak(user1.id!!) } throws RuntimeException("DB timeout")
         every { streakService.getUserStreak(user2.id!!) } returns StreakInfo(currentStreak = 5)
         every { userProgressService.calculateProgressStats(user2.requireId()) } returns stats
-        every { openRouterService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
+        every { aiService.generateStreakResetWarning(any(), any(), any()) } returns "Keep going!"
         every {
             pushNotificationService.sendNotificationToUser(
                 userId = user2.id!!,

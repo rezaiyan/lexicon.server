@@ -12,29 +12,20 @@ import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
-import org.springframework.http.HttpHeaders
-import org.springframework.http.HttpMethod
-import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.test.web.client.MockRestServiceServer
 import org.springframework.test.web.client.RequestMatcher
 import org.springframework.test.web.client.match.MockRestRequestMatchers.content
-import org.springframework.test.web.client.match.MockRestRequestMatchers.header
 import org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath
-import org.springframework.test.web.client.match.MockRestRequestMatchers.method
 import org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo
-import org.springframework.test.web.client.response.MockRestResponseCreators.withException
-import org.springframework.test.web.client.response.MockRestResponseCreators.withStatus
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
-import java.io.IOException
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 
-class OpenRouterServiceTest {
+class AiServiceTest {
 
     private val chatUrl = "https://openrouter.ai/api/v1/chat/completions"
     private val mapper = jacksonObjectMapper()
@@ -42,65 +33,11 @@ class OpenRouterServiceTest {
 
     private val builder = RestClient.builder()
     private val server = MockRestServiceServer.bindTo(builder).build()
-    private val service = OpenRouterService(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock()))
-
-    // ── transport ─────────────────────────────────────────────────────────────
-
-    @Test
-    fun `requests post the configured model with auth and attribution headers`() {
-        val custom = RestClient.builder()
-        val customServer = MockRestServiceServer.bindTo(custom).build()
-        val customService = OpenRouterService(custom, meterRegistry = meterRegistry, aiCallTracker = AiCallTracker(fixedClock()), appProperties = appProperties(model = "anthropic/custom-model"))
-        customServer.expect(requestTo(chatUrl))
-            .andExpect(method(HttpMethod.POST))
-            .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer test-api-key"))
-            .andExpect(header("X-Title", "Vokab"))
-            .andExpect(jsonPath("$.model").value("anthropic/custom-model"))
-            .andExpect(jsonPath("$.messages[0].role").value("user"))
-            .andRespond(answer("Hallo"))
-
-        assertEquals("Hallo", customService.translateText("Hello", "German"))
-        customServer.verify()
-    }
-
-    @Test
-    fun `complete returns the trimmed answer`() {
-        expectChat().andRespond(answer("  {\"action\":\"send\"}  \n"))
-
-        assertEquals("{\"action\":\"send\"}", service.complete("prompt", "test"))
-        assertEquals(1.0, meterRegistry.counter("ai.requests", "operation", "test", "outcome", "success").count())
-    }
-
-    @Test
-    fun `complete returns null for a blank or missing answer`() {
-        expectChat().andRespond(answer("   "))
-        expectChat().andRespond(json("""{"choices":[{"message":{"content":null}}]}"""))
-        expectChat().andRespond(json("""{"choices":[]}"""))
-
-        repeat(3) { assertNull(service.complete("prompt", "test")) }
-    }
-
-    @Test
-    fun `an HTTP error status becomes UpstreamServiceException`() {
-        expectChat().andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE))
-
-        assertThrows<UpstreamServiceException> { service.complete("prompt", "test") }
-        assertEquals(1.0, meterRegistry.counter("ai.requests", "operation", "test", "outcome", "error").count())
-    }
-
-    @Test
-    fun `a network failure becomes UpstreamServiceException`() {
-        expectChat().andRespond(withException(IOException("read timed out")))
-
-        assertThrows<UpstreamServiceException> { service.complete("prompt", "test") }
-    }
-
-    @Test
-    fun `an API error field becomes UpstreamServiceException`() {
-        expectChat().andRespond(json("""{"error":{"message":"model overloaded"}}"""))
-
-        assertThrows<UpstreamServiceException> { service.complete("prompt", "test") }
-    }
+    private val service = AiService(
+        OpenRouterClient(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock())),
+        PromptTemplates(),
+        appProperties(),
+    )
 
     // ── extractVocabularyFromImage ────────────────────────────────────────────
 
@@ -191,7 +128,7 @@ class OpenRouterServiceTest {
         expectChat().andExpect(promptContains("100 words")).andRespond(answer("Big milestone 🏆"))
 
         assertEquals("Nice work on Schadenfreude 🎯", service.generateDailyInsight(insightContext()))
-        assertEquals("Big milestone 🏆", service.generateMilestoneMessage(milestone(), stats(), null))
+        assertEquals("Big milestone 🏆", service.generateMilestoneMessage(milestone(), null))
     }
 
     @Test
@@ -199,7 +136,7 @@ class OpenRouterServiceTest {
         repeat(2) { expectChat().andRespond(json("""{"choices":[]}""")) }
 
         assertThrows<UpstreamServiceException> { service.generateDailyInsight(insightContext()) }
-        assertThrows<UpstreamServiceException> { service.generateMilestoneMessage(milestone(), stats(), "Ali") }
+        assertThrows<UpstreamServiceException> { service.generateMilestoneMessage(milestone(), "Ali") }
     }
 
     // ── translateText ─────────────────────────────────────────────────────────
@@ -241,11 +178,6 @@ class OpenRouterServiceTest {
         assertThrows<UserFacingException> { service.generateVocabularyFromPreferences("German", "beginner", "English") }
     }
 
-    @Test
-    fun `default model is the configured Haiku model`() {
-        assertEquals("anthropic/claude-haiku-4.5", OpenRouterConfig().model)
-    }
-
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun expectChat() = server.expect(requestTo(chatUrl))
@@ -268,7 +200,7 @@ class OpenRouterServiceTest {
         level4Count = 5, level5Count = 5, level6Count = 5,
     )
 
-    private fun insightContext() = OpenRouterService.DailyInsightContext(
+    private fun insightContext() = AiService.DailyInsightContext(
         stats = stats(),
         userName = "Alice",
         optimalStudyHour = 18,

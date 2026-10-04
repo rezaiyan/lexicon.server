@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service
 import com.alirezaiyan.vokab.server.analytics.AnalyticsService
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 private val logger = KotlinLogging.logger {}
@@ -24,7 +24,7 @@ data class NotificationPayload(
 
 @Service
 class NotificationContentBuilder(
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val userProgressService: UserProgressService,
     private val analyticsService: AnalyticsService,
     private val dailyInsightService: DailyInsightService,
@@ -47,7 +47,7 @@ class NotificationContentBuilder(
     private fun buildStreakRisk(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
         val body = aiCopyOr("Your ${user.currentStreak}-day streak ends at midnight. Keep it alive! 🔥") {
-            openRouterService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
+            aiService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
         }
         return NotificationPayload(
             title = "Your ${user.currentStreak}-day streak ends at midnight 🔥",
@@ -116,9 +116,8 @@ class NotificationContentBuilder(
     private fun buildMilestone(user: User): NotificationPayload {
         val milestone = milestoneDetector.getPendingMilestone(user)
             ?: return buildFallbackInsight()
-        val stats = userProgressService.calculateProgressStats(user.requireId())
         val body = aiCopyOr("You hit a new milestone: ${milestone.description}! 🏆") {
-            openRouterService.generateMilestoneMessage(milestone, stats, user.name)
+            aiService.generateMilestoneMessage(milestone, user.name)
         }
         return NotificationPayload(
             title = milestone.title,

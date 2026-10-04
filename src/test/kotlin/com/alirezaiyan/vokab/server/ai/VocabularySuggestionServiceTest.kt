@@ -12,10 +12,10 @@ import com.alirezaiyan.vokab.server.words.WordService
 
 class VocabularySuggestionServiceTest {
 
-    private val openRouterService = mockk<OpenRouterService>()
+    private val aiService = mockk<AiService>()
     private val wordService = mockk<WordService>()
     private val appProperties = AppProperties(vocabulary = VocabularyConfig(suggestionCount = 3))
-    private val service = VocabularySuggestionService(openRouterService, wordService, appProperties)
+    private val service = VocabularySuggestionService(aiService, wordService, appProperties)
 
     private val user = User(id = 1L, email = "u@example.com", name = "U")
 
@@ -23,7 +23,7 @@ class VocabularySuggestionServiceTest {
 
     private fun aiReturns(vararg words: String) {
         every {
-            openRouterService.generateVocabularyFromPreferences(any(), any(), any(), any())
+            aiService.generateVocabularyFromPreferences(any(), any(), any(), any())
         } returns words.map(::item)
     }
 
@@ -48,7 +48,7 @@ class VocabularySuggestionServiceTest {
     @Test
     fun `suggestForOnboarding trims request fields and blank interests before calling the AI`() {
         every {
-            openRouterService.generateVocabularyFromPreferences("German", "beginner", "English", listOf("travel"))
+            aiService.generateVocabularyFromPreferences("German", "beginner", "English", listOf("travel"))
         } returns listOf(item("Reise"))
 
         val response = service.suggestForOnboarding(" German ", " beginner", "English ", listOf(" travel ", "  "))

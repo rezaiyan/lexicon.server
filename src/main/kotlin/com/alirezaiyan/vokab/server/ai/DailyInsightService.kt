@@ -26,7 +26,7 @@ class DailyInsightService(
     private val dailyInsightRepository: DailyInsightRepository,
     private val userSettingsRepository: UserSettingsRepository,
     private val dailyActivityRepository: DailyActivityRepository,
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val userProgressService: UserProgressService,
     private val pushNotificationService: PushNotificationService,
     private val featureAccessService: FeatureAccessService,
@@ -50,7 +50,7 @@ class DailyInsightService(
             ?.let { return TodaysInsight(it.insightText, it.generatedAt) }
 
         logger.info { "Generating new daily insight for userId=$userId" }
-        val ctx = OpenRouterService.DailyInsightContext(
+        val ctx = AiService.DailyInsightContext(
             stats = userProgressService.calculateProgressStats(userId),
             userName = user.name,
             optimalStudyHour = null,
@@ -60,7 +60,7 @@ class DailyInsightService(
             sessionCompletionRate = null,
             currentStreak = user.currentStreak
         )
-        val insightText = openRouterService.generateDailyInsight(ctx)
+        val insightText = aiService.generateDailyInsight(ctx)
         val saved = saveDailyInsight(user, insightText)
         return TodaysInsight(saved?.insightText ?: insightText, saved?.generatedAt ?: Instant.now(clock))
     }
@@ -108,10 +108,10 @@ class DailyInsightService(
         return try {
             val stats = userProgressService.calculateProgressStats(user.requireId())
             val insightText = if (hasActivityToday) {
-                openRouterService.generateCelebrationInsight(stats, user.name)
+                aiService.generateCelebrationInsight(stats, user.name)
             } else {
                 val ctx = buildInsightContext(user, stats)
-                openRouterService.generateDailyInsight(ctx)
+                aiService.generateDailyInsight(ctx)
             }
 
             val insight = DailyInsight(
@@ -136,7 +136,7 @@ class DailyInsightService(
         }
     }
 
-    private fun buildInsightContext(user: User, stats: com.alirezaiyan.vokab.server.study.ProgressStatsDto): OpenRouterService.DailyInsightContext {
+    private fun buildInsightContext(user: User, stats: com.alirezaiyan.vokab.server.study.ProgressStatsDto): AiService.DailyInsightContext {
         val optimalStudyHour = runCatching {
             notificationScheduleRepository.findByUser(user)?.optimalSendHour
         }.getOrNull()
@@ -156,7 +156,7 @@ class DailyInsightService(
             analyticsService.getStudyInsights(user.requireId()).sessionCompletionRate?.toFloat()
         }.getOrNull()
 
-        return OpenRouterService.DailyInsightContext(
+        return AiService.DailyInsightContext(
             stats = stats,
             userName = user.name,
             optimalStudyHour = optimalStudyHour,

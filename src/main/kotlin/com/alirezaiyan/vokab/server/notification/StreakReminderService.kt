@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.LocalDate
 import com.alirezaiyan.vokab.server.user.requireId
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 private val logger = KotlinLogging.logger {}
@@ -19,7 +19,7 @@ class StreakReminderService(
     private val userRepository: UserRepository,
     private val dailyActivityRepository: DailyActivityRepository,
     private val pushNotificationService: PushNotificationService,
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val userProgressService: UserProgressService,
     private val clock: Clock
 ) {
@@ -43,7 +43,7 @@ class StreakReminderService(
     fun sendReminderForUser(user: User) {
         try {
             val progressStats = userProgressService.calculateProgressStats(user.requireId())
-            val message = openRouterService.generateStreakReminderMessage(
+            val message = aiService.generateStreakReminderMessage(
                 currentStreak = user.currentStreak,
                 userName = user.name,
                 progressStats = progressStats

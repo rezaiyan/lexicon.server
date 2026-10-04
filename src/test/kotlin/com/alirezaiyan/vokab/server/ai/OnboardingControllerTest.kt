@@ -31,7 +31,7 @@ class OnboardingControllerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @MockitoBean
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiService: AiService
 
     @MockitoBean
     private lateinit var rateLimitConfig: RateLimitConfig
@@ -52,7 +52,7 @@ class OnboardingControllerTest {
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello"),
             SuggestVocabularyItemResponse(originalWord = "Welt", translation = "world"),
         )
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -110,7 +110,7 @@ class OnboardingControllerTest {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getOnboardingBucket(org.mockito.ArgumentMatchers.anyString())).thenReturn(bucket)
 
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -139,7 +139,7 @@ class OnboardingControllerTest {
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello again"),
             SuggestVocabularyItemResponse(originalWord = "Welt", translation = "world"),
         )
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -168,7 +168,7 @@ class OnboardingControllerTest {
         val items = listOf(
             SuggestVocabularyItemResponse(originalWord = "Reise", translation = "trip"),
         )
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -197,7 +197,7 @@ class OnboardingControllerTest {
         val items = listOf(
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello"),
         )
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -226,7 +226,7 @@ class OnboardingControllerTest {
         val manyItems = (1..55).map { i ->
             SuggestVocabularyItemResponse(originalWord = "Word$i", translation = "translation$i")
         }
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -250,7 +250,7 @@ class OnboardingControllerTest {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getOnboardingBucket(org.mockito.ArgumentMatchers.anyString())).thenReturn(bucket)
 
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",

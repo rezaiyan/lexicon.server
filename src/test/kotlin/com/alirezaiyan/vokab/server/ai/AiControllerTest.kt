@@ -42,7 +42,7 @@ class AiControllerTest {
     private lateinit var objectMapper: ObjectMapper
 
     @MockitoBean
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiService: AiService
 
     @MockitoBean
     private lateinit var rateLimitConfig: RateLimitConfig
@@ -103,7 +103,7 @@ class AiControllerTest {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.extractVocabularyFromImage(
+        `when`(aiService.extractVocabularyFromImage(
             imageBase64 = "dGVzdA==",
             targetLanguage = "German",
             extractWords = true,
@@ -129,7 +129,7 @@ class AiControllerTest {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.extractVocabularyFromImage(
+        `when`(aiService.extractVocabularyFromImage(
             imageBase64 = "dGVzdA==",
             targetLanguage = "German",
             extractWords = true,
@@ -153,7 +153,7 @@ class AiControllerTest {
         `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.extractVocabularyFromImage(
+        `when`(aiService.extractVocabularyFromImage(
             imageBase64 = "dGVzdA==",
             targetLanguage = "German",
             extractWords = true,
@@ -304,7 +304,7 @@ class AiControllerTest {
     fun `POST translate-text should return 200 with translation on success`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.translateText("Hello", "German")).thenReturn("Hallo")
+        `when`(aiService.translateText("Hello", "German")).thenReturn("Hallo")
 
         val request = TranslateTextRequest(text = "Hello", targetLanguage = "German")
 
@@ -324,7 +324,7 @@ class AiControllerTest {
     fun `POST translate-text should return 500 when translation throws exception`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(openRouterService.translateText("Hello", "German")).thenThrow(RuntimeException("Translation service unavailable"))
+        `when`(aiService.translateText("Hello", "German")).thenThrow(RuntimeException("Translation service unavailable"))
 
         val request = TranslateTextRequest(text = "Hello", targetLanguage = "German")
 
@@ -371,7 +371,7 @@ class AiControllerTest {
             SuggestVocabularyItemResponse(originalWord = "Welt", translation = "world"),
             SuggestVocabularyItemResponse(originalWord = "Welt", translation = "world duplicate"),
         )
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
@@ -399,7 +399,7 @@ class AiControllerTest {
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
         `when`(wordService.getExistingTranslationKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
-        `when`(openRouterService.generateVocabularyFromPreferences(
+        `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",

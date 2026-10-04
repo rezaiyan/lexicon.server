@@ -5,12 +5,15 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiClient
+import com.alirezaiyan.vokab.server.ai.AiOperation
+import com.alirezaiyan.vokab.server.ai.Prompt
+import com.alirezaiyan.vokab.server.ai.PromptTemplates
 
 private val logger = KotlinLogging.logger {}
 
 /**
- * Asks the configured OpenRouter model (through [OpenRouterService], so the shared timeout applies)
+ * Asks the configured OpenRouter model (through [AiClient], so the shared timeout applies)
  * to decide the notification strategy for a COLD or DORMANT user. Result is cached on
  * NotificationSchedule for 7 days.
  *
@@ -22,7 +25,8 @@ private val logger = KotlinLogging.logger {}
  */
 @Service
 class NotificationAiAdvisor(
-    private val openRouterService: OpenRouterService,
+    private val aiClient: AiClient,
+    private val promptTemplates: PromptTemplates,
     private val objectMapper: ObjectMapper
 ) {
     data class UserNotificationContext(
@@ -60,7 +64,7 @@ class NotificationAiAdvisor(
     fun advise(context: UserNotificationContext): AiAdvice {
         val prompt = buildPrompt(context)
         val raw = try {
-            openRouterService.complete(prompt, "notification advice")
+            aiClient.complete(prompt, AiOperation.NOTIFICATION_ADVICE)
         } catch (e: UpstreamServiceException) {
             logger.warn { "AI advisor unavailable for user=${context.userId} — using default advice: ${e.message}" }
             return defaultAdvice
@@ -72,36 +76,19 @@ class NotificationAiAdvisor(
         return parseResponse(raw, context.userId)
     }
 
-    private fun buildPrompt(ctx: UserNotificationContext): String = """
-        You are a push notification strategy advisor for a vocabulary learning app.
-
-        Decide the best notification strategy for this user based on their engagement data.
-
-        User data:
-        - segment: ${ctx.segment}
-        - open rate last 7 days: ${ctx.openRate7dPercent}%
-        - open rate last 30 days: ${ctx.openRate30dPercent}%
-        - days since last notification open: ${ctx.daysSinceLastOpen ?: "never"}
-        - current streak: ${ctx.currentStreak} days
-        - longest streak ever: ${ctx.longestStreak} days
-        - words due for review: ${ctx.dueCards}
-        - account age: ${ctx.accountAgeDays} days
-
-        Choose ONE action:
-        - "send": user may still engage with the right content (use intervalDays 1-3)
-        - "pause": user is burned out, skip notifications entirely (use intervalDays 3-7)
-        - "motivate": user needs emotional re-engagement (use intervalDays 3-7)
-
-        If action = "motivate", choose ONE contentHint:
-        - "loss_aversion": they had progress they're losing (good when longestStreak > 0)
-        - "curiosity": something interesting is waiting for them
-        - "social_proof": other learners are progressing
-        - "fresh_start": it's never too late to restart (good for DORMANT users)
-        - "achievement": they're close to a milestone (good when dueCards > 0)
-
-        Respond with ONLY valid JSON, no explanation, no markdown:
-        {"action":"...","intervalDays":N,"contentHint":"..." or null}
-    """.trimIndent()
+    private fun buildPrompt(ctx: UserNotificationContext): String = promptTemplates.render(
+        Prompt.NOTIFICATION_ADVICE,
+        mapOf(
+            "segment" to ctx.segment,
+            "openRate7dPercent" to ctx.openRate7dPercent,
+            "openRate30dPercent" to ctx.openRate30dPercent,
+            "daysSinceLastOpen" to (ctx.daysSinceLastOpen ?: "never"),
+            "currentStreak" to ctx.currentStreak,
+            "longestStreak" to ctx.longestStreak,
+            "dueCards" to ctx.dueCards,
+            "accountAgeDays" to ctx.accountAgeDays,
+        ),
+    )
 
     internal fun parseResponse(raw: String, userId: Long): AiAdvice {
         val aiResponse = runCatching {

@@ -1,0 +1,4 @@
+{{userName}} just hit {{milestone}}.
+Write 1 sentence celebrating this achievement. Warm but not over-the-top. 1 emoji max.
+Do not mention any specific numbers or word counts.
+Return ONLY the message, no quotes or extra formatting.

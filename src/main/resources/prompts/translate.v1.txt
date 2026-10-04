@@ -1,0 +1,3 @@
+Translate the following text to {{targetLanguage}}. Return only the translation, no explanations, no quotes, no additional text. Just the translation:
+
+{{text}}

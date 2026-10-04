@@ -10,12 +10,12 @@ private val logger = KotlinLogging.logger {}
 /**
  * AI vocabulary suggestions, trimmed to the configured count.
  *
- * The model returns extra items (see [OpenRouterService.generateVocabularyFromPreferences]) so
+ * The model returns extra items (see [AiService.generateVocabularyFromPreferences]) so
  * that duplicates can be dropped and the list still reaches `app.vocabulary.suggestion-count`.
  */
 @Service
 class VocabularySuggestionService(
-    private val openRouterService: OpenRouterService,
+    private val aiService: AiService,
     private val wordService: WordService,
     private val appProperties: AppProperties,
 ) {
@@ -58,7 +58,7 @@ class VocabularySuggestionService(
         interests: List<String>,
         existingKeys: Set<String>,
     ): SuggestVocabularyResponse {
-        val rawItems = openRouterService.generateVocabularyFromPreferences(
+        val rawItems = aiService.generateVocabularyFromPreferences(
             targetLanguage = targetLanguage,
             currentLevel = currentLevel,
             nativeLanguage = nativeLanguage,

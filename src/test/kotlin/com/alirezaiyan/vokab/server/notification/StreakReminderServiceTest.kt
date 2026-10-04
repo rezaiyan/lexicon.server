@@ -11,7 +11,7 @@ import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import io.mockk.*
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import com.alirezaiyan.vokab.server.ai.OpenRouterService
+import com.alirezaiyan.vokab.server.ai.AiService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class StreakReminderServiceTest {
@@ -19,7 +19,7 @@ class StreakReminderServiceTest {
     private lateinit var userRepository: UserRepository
     private lateinit var dailyActivityRepository: DailyActivityRepository
     private lateinit var pushNotificationService: PushNotificationService
-    private lateinit var openRouterService: OpenRouterService
+    private lateinit var aiService: AiService
     private lateinit var userProgressService: UserProgressService
     private lateinit var streakReminderService: StreakReminderService
 
@@ -28,13 +28,13 @@ class StreakReminderServiceTest {
         userRepository = mockk()
         dailyActivityRepository = mockk()
         pushNotificationService = mockk<PushNotificationService>()
-        openRouterService = mockk()
+        aiService = mockk()
         userProgressService = mockk()
         streakReminderService = StreakReminderService(
             userRepository,
             dailyActivityRepository,
             pushNotificationService,
-            openRouterService,
+            aiService,
             userProgressService,
             clock = fixedClock()
         )
@@ -111,14 +111,14 @@ class StreakReminderServiceTest {
         every { userProgressService.calculateProgressStats(user1.requireId()) } returns progressStats1
         every { userProgressService.calculateProgressStats(user2.requireId()) } returns progressStats2
         every {
-            openRouterService.generateStreakReminderMessage(
+            aiService.generateStreakReminderMessage(
                 currentStreak = 5,
                 userName = "Alice",
                 progressStats = progressStats1
             )
         } returns "Hey Alice! Your 5-day streak is on fire! 🔥 Keep it going!"
         every {
-            openRouterService.generateStreakReminderMessage(
+            aiService.generateStreakReminderMessage(
                 currentStreak = 10,
                 userName = "Bob",
                 progressStats = progressStats2
@@ -186,7 +186,7 @@ class StreakReminderServiceTest {
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
-            openRouterService.generateStreakReminderMessage(
+            aiService.generateStreakReminderMessage(
                 currentStreak = 5,
                 userName = "Alice",
                 progressStats = progressStats
@@ -236,7 +236,7 @@ class StreakReminderServiceTest {
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
-            openRouterService.generateStreakReminderMessage(
+            aiService.generateStreakReminderMessage(
                 currentStreak = 5,
                 userName = "Alice",
                 progressStats = progressStats
@@ -286,7 +286,7 @@ class StreakReminderServiceTest {
         every { dailyActivityRepository.existsByUserAndActivityDate(user, today) } returns false
         every { userProgressService.calculateProgressStats(user.requireId()) } returns progressStats
         every {
-            openRouterService.generateStreakReminderMessage(
+            aiService.generateStreakReminderMessage(
                 currentStreak = 5,
                 userName = "Alice",
                 progressStats = progressStats
@@ -322,7 +322,7 @@ class StreakReminderServiceTest {
         streakReminderService.sendReminderNotifications()
 
         verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) }
-        verify(exactly = 0) { openRouterService.generateStreakReminderMessage(any(), any(), any()) }
+        verify(exactly = 0) { aiService.generateStreakReminderMessage(any(), any(), any()) }
     }
 
     private fun createUser(

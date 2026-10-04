@@ -13,8 +13,7 @@ import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
-import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
@@ -25,10 +24,9 @@ import java.time.Instant
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@AutoConfigureMockMvc
+@WebMvcTest(WebhookController::class)
 @ActiveProfiles("test")
-@Import(ControllerTestSecurityConfig::class)
+@Import(ControllerTestSecurityConfig::class, RevenueCatWebhookAuthenticator::class)
 class WebhookControllerTest {
 
     @Autowired

@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.shared
 
 import com.alirezaiyan.vokab.server.auth.JwtAuthenticationFilter
 import com.alirezaiyan.vokab.server.auth.RS256JwtTokenProvider
+import com.alirezaiyan.vokab.server.auth.SecurityConfig
 import com.alirezaiyan.vokab.server.auth.UserAccessCache
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -9,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse
 import org.mockito.Mockito
 import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.context.annotation.Bean
+import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 
 /**
@@ -20,8 +22,10 @@ import org.springframework.context.annotation.Primary
  * - A no-op [JwtAuthenticationFilter] that skips JWT validation for every request, letting
  *   [org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication]
  *   inject the principal directly from the test.
+ * - The security, rate-limit and clock configuration a `@WebMvcTest` slice doesn't scan.
  */
 @TestConfiguration
+@Import(SecurityConfig::class, RateLimitConfig::class, ClockConfig::class)
 class ControllerTestSecurityConfig {
 
     @Bean

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.words.WordService
 import com.alirezaiyan.vokab.server.shared.ControllerTestSecurityConfig
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -7,8 +8,7 @@ import io.github.bucket4j.Bucket
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
-import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType
@@ -18,10 +18,9 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-@AutoConfigureMockMvc
+@WebMvcTest(OnboardingController::class)
 @ActiveProfiles("test")
-@Import(ControllerTestSecurityConfig::class)
+@Import(ControllerTestSecurityConfig::class, VocabularySuggestionService::class)
 class OnboardingControllerTest {
 
     @Autowired
@@ -29,6 +28,11 @@ class OnboardingControllerTest {
 
     @Autowired
     private lateinit var objectMapper: ObjectMapper
+
+    // VocabularySuggestionService is real (its dedup is under test) and needs a WordService bean
+    @Suppress("UnusedPrivateProperty")
+    @MockitoBean
+    private lateinit var wordService: WordService
 
     @MockitoBean
     private lateinit var aiService: AiService

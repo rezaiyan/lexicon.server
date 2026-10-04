@@ -91,14 +91,14 @@ class RevenueCatClient(
         .body<ListDto<ProjectDto>>()
         ?.items?.singleOrNull()?.id
         ?.also { projectId = it }
-        ?: throw IllegalStateException("RevenueCat key must be scoped to exactly one project")
+        ?: throw RestClientException("RevenueCat key must be scoped to exactly one project")
 
     private inline fun <reified T : Any> get(project: String, crossinline segments: UriBuilder.() -> UriBuilder): T =
         restClient.get()
             .uri { it.projectPath(project).segments().build() }
             .retrieve()
             .body<T>()
-            ?: throw IllegalStateException("Empty RevenueCat response")
+            ?: throw RestClientException("Empty RevenueCat response")
 
     /** Every id is a single path segment, encoded exactly once (a `/` or space can't change the path). */
     private fun UriBuilder.projectPath(project: String): UriBuilder = pathSegment("projects", project)

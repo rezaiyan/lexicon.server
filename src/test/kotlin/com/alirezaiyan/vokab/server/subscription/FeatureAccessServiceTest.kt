@@ -204,6 +204,49 @@ class FeatureAccessServiceTest {
         assertFalse(result.hasPremiumAccess)
     }
 
+    @Test
+    fun `store subscription with a billing issue reports it`() {
+        val user = createUser(subscriptionStatus = SubscriptionStatus.ACTIVE, subscriptionExpiresAt = TEST_NOW.plusSeconds(86400))
+        user.mirrorSubscriptionIssues(billingIssueAt = TEST_NOW, pauseResumesAt = null)
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertTrue(access.hasPremiumAccess)
+        assertTrue(access.hasBillingIssue)
+    }
+
+    @Test
+    fun `paused subscription reports the resume date without premium`() {
+        val resumesAt = TEST_NOW.plusSeconds(30L * 86400)
+        val user = createUser(subscriptionStatus = SubscriptionStatus.EXPIRED)
+        user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = resumesAt)
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertFalse(access.hasPremiumAccess)
+        assertEquals(resumesAt.toString(), access.pauseResumesAt)
+    }
+
+    @Test
+    fun `scheduled pause is reported while premium still runs`() {
+        val resumesAt = TEST_NOW.plusSeconds(60L * 86400)
+        val user = createUser(subscriptionStatus = SubscriptionStatus.ACTIVE, subscriptionExpiresAt = TEST_NOW.plusSeconds(86400))
+        user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = resumesAt)
+
+        val access = featureAccessService.getUserFeatureAccess(user)
+
+        assertTrue(access.hasPremiumAccess)
+        assertEquals(resumesAt.toString(), access.pauseResumesAt)
+    }
+
+    @Test
+    fun `past pause date is not reported`() {
+        val user = createUser(subscriptionStatus = SubscriptionStatus.EXPIRED)
+        user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = TEST_NOW.minusSeconds(60))
+
+        assertEquals(null, featureAccessService.getUserFeatureAccess(user).pauseResumesAt)
+    }
+
     // --- Grants and premium source ---
 
     @Test

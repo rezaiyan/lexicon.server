@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.notification
 
 import com.google.firebase.messaging.FirebaseMessaging
+import com.google.firebase.messaging.Message
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
@@ -23,6 +24,9 @@ interface NotificationSender {
         imageUrl: String?,
         category: NotificationCategory
     ): List<NotificationResponse>
+
+    /** See [NotificationMessageBuilder.buildSilent]. */
+    fun sendSilentToTokens(tokens: List<PushToken>, data: Map<String, String>): List<NotificationResponse>
 }
 
 class FirebaseNotificationSender(
@@ -72,6 +76,20 @@ class FirebaseNotificationSender(
             send(pushToken.token, title, body, data, imageUrl, category)
         }
     }
+
+    override fun sendSilentToTokens(tokens: List<PushToken>, data: Map<String, String>): List<NotificationResponse> =
+        tokens.map { pushToken -> deliver(pushToken.token) { messageBuilder.buildSilent(pushToken.token, data) } }
+
+    private fun deliver(token: String, message: () -> Message): NotificationResponse =
+        try {
+            val messageId = FirebaseMessaging.getInstance().send(message())
+            logger.info { "Silent push sent. Message ID: $messageId" }
+            NotificationResponse(success = true, messageId = messageId)
+        } catch (e: Exception) {
+            logger.error(e) { "Failed to send silent push" }
+            tokenInvalidationHandler.handleInvalidToken(e, token)
+            NotificationResponse(success = false, error = e.message)
+        }
 }
 
 interface TokenInvalidationHandler {

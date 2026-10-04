@@ -38,6 +38,20 @@ interface UserRepository : JpaRepository<User, Long> {
         @Param("now") now: Instant,
     ): Int
 
+    /** Sets (or with nulls, clears) the store's billing-issue and pause markers. */
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        "UPDATE User u SET u.subscriptionBillingIssueAt = :billingIssueAt, " +
+            "u.subscriptionPauseResumesAt = :pauseResumesAt, u.updatedAt = :now WHERE u.id = :id"
+    )
+    fun updateSubscriptionIssues(
+        @Param("id") id: Long,
+        @Param("billingIssueAt") billingIssueAt: Instant?,
+        @Param("pauseResumesAt") pauseResumesAt: Instant?,
+        @Param("now") now: Instant,
+    ): Int
+
     /** Sets (or with nulls, revokes) a premium grant. */
     @Transactional
     @Modifying(clearAutomatically = true, flushAutomatically = true)

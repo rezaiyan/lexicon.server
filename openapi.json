@@ -2632,11 +2632,17 @@
           "expiresAt" : {
             "type" : [ "string", "null" ]
           },
+          "hasBillingIssue" : {
+            "type" : "boolean"
+          },
           "hasPremiumAccess" : {
             "type" : "boolean"
           },
           "isTrial" : {
             "type" : "boolean"
+          },
+          "pauseResumesAt" : {
+            "type" : [ "string", "null" ]
           },
           "source" : {
             "enum" : [ "STORE", "GRANT", "NONE" ],
@@ -2646,7 +2652,7 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "hasPremiumAccess", "isTrial", "source", "willRenew" ],
+        "required" : [ "hasBillingIssue", "hasPremiumAccess", "isTrial", "source", "willRenew" ],
         "type" : "object"
       },
       "VocabularyExtractionResponse" : {

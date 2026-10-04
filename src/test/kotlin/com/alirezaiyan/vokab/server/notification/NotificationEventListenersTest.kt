@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.analytics.NotificationOpenedEvent
+import com.alirezaiyan.vokab.server.subscription.Activation
+import com.alirezaiyan.vokab.server.subscription.SubscriptionActivated
 import com.alirezaiyan.vokab.server.subscription.SubscriptionBillingIssue
 import io.mockk.every
 import io.mockk.mockk
@@ -45,6 +47,22 @@ class NotificationEventListenersTest {
                 data = mapOf("type" to NotificationEventListeners.BILLING_ISSUE_PUSH_TYPE),
                 imageUrl = null,
                 category = NotificationCategory.SYSTEM,
+            )
+        }
+    }
+
+    @Test
+    fun `subscription change sends a silent subscription_updated push`() {
+        every { pushNotificationService.sendSilentToUser(any(), any()) } returns emptyList()
+
+        listeners.onSubscriptionChange(
+            SubscriptionActivated(userId = 5L, productId = "annual", isTrial = false, Activation.RENEWAL, occurredAt = AT)
+        )
+
+        verify(exactly = 1) {
+            pushNotificationService.sendSilentToUser(
+                5L,
+                mapOf("type" to NotificationEventListeners.SUBSCRIPTION_UPDATED_PUSH_TYPE),
             )
         }
     }

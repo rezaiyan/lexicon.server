@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.analytics.NotificationOpenedEvent
 import com.alirezaiyan.vokab.server.subscription.SubscriptionBillingIssue
+import com.alirezaiyan.vokab.server.subscription.SubscriptionChange
 import org.springframework.modulith.events.ApplicationModuleListener
 import org.springframework.stereotype.Component
 
@@ -29,7 +30,17 @@ class NotificationEventListeners(
         )
     }
 
+    /**
+     * Any subscription change from a store webhook: tell the user's devices to refetch it. The push
+     * carries no subscription data; the app reads the authoritative state from the API.
+     */
+    @ApplicationModuleListener
+    fun onSubscriptionChange(event: SubscriptionChange) {
+        pushNotificationService.sendSilentToUser(event.userId, mapOf("type" to SUBSCRIPTION_UPDATED_PUSH_TYPE))
+    }
+
     companion object {
+        const val SUBSCRIPTION_UPDATED_PUSH_TYPE = "subscription_updated"
         const val BILLING_ISSUE_PUSH_TYPE = "billing_issue"
         private const val BILLING_ISSUE_TITLE = "Payment problem"
         private const val BILLING_ISSUE_BODY =

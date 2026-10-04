@@ -34,7 +34,10 @@ class SubscriptionServiceTest {
 
     private data class StatusUpdate(val userId: Long, val status: SubscriptionStatus, val expiresAt: Instant?)
 
+    private data class IssuesUpdate(val userId: Long, val billingIssueAt: Instant?, val pauseResumesAt: Instant?)
+
     private val statusUpdates = mutableListOf<StatusUpdate>()
+    private val issuesUpdates = mutableListOf<IssuesUpdate>()
     private val links = mutableListOf<Pair<Long, String>>()
     private val savedSubscriptions = mutableListOf<Subscription>()
     private val receipts = mutableListOf<ProcessedWebhookEvent>()
@@ -59,6 +62,10 @@ class SubscriptionServiceTest {
 
         every { userRepository.updateSubscription(any(), any(), any(), any()) } answers {
             statusUpdates += StatusUpdate(firstArg(), secondArg(), thirdArg())
+            1
+        }
+        every { userRepository.updateSubscriptionIssues(any(), any(), any(), any()) } answers {
+            issuesUpdates += IssuesUpdate(firstArg(), secondArg(), thirdArg())
             1
         }
         every { userRepository.linkRevenueCatUserId(any(), any(), any()) } answers {
@@ -360,6 +367,93 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    fun `BILLING_ISSUE extends access to the grace period end and marks the issue`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(3600))
+        val graceEnd = Instant.ofEpochMilli(TEST_NOW.plus(Duration.ofDays(16)).toEpochMilli())
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "BILLING_ISSUE").withEvent { copy(gracePeriodExpirationAtMs = graceEnd.toEpochMilli()) }
+        )
+
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.ACTIVE, graceEnd), lastUpdate())
+        assertEquals(IssuesUpdate(1L, TEST_NOW, null), issuesUpdates.single())
+    }
+
+    @Test
+    fun `BILLING_ISSUE does not revive an expired subscription`() {
+        linkedUser(status = SubscriptionStatus.EXPIRED, expiresAt = TEST_NOW.minusSeconds(3600))
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "BILLING_ISSUE")
+                .withEvent { copy(gracePeriodExpirationAtMs = TEST_NOW.plus(Duration.ofDays(3)).toEpochMilli()) }
+        )
+
+        assertTrue(statusUpdates.isEmpty())
+    }
+
+    @Test
+    fun `SUBSCRIPTION_PAUSED records the resume date and publishes the pause`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(86400))
+        val resumesAt = Instant.ofEpochMilli(TEST_NOW.plus(Duration.ofDays(60)).toEpochMilli())
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "SUBSCRIPTION_PAUSED").withEvent { copy(autoResumeAtMs = resumesAt.toEpochMilli()) }
+        )
+
+        assertTrue(statusUpdates.isEmpty())
+        assertEquals(IssuesUpdate(1L, null, resumesAt), issuesUpdates.single())
+        assertEquals(resumesAt, published.filterIsInstance<SubscriptionPaused>().single().resumesAt)
+    }
+
+    @Test
+    fun `EXPIRATION caused by a pause keeps the resume date`() {
+        val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.minusSeconds(10))
+        val resumesAt = TEST_NOW.plus(Duration.ofDays(60))
+        user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = resumesAt)
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "EXPIRATION", expirationAtMs = TEST_NOW.minusSeconds(10).toEpochMilli())
+                .withEvent { copy(expirationReason = "SUBSCRIPTION_PAUSED") }
+        )
+
+        assertEquals(StatusUpdate(1L, SubscriptionStatus.EXPIRED, null), lastUpdate())
+        assertEquals(IssuesUpdate(1L, null, resumesAt), issuesUpdates.single())
+    }
+
+    @Test
+    fun `EXPIRATION for any other reason clears pause and billing markers`() {
+        val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.minusSeconds(10))
+        user.mirrorSubscriptionIssues(billingIssueAt = TEST_NOW.minusSeconds(86400), pauseResumesAt = TEST_NOW)
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "EXPIRATION", expirationAtMs = TEST_NOW.minusSeconds(10).toEpochMilli())
+        )
+
+        assertEquals(IssuesUpdate(1L, null, null), issuesUpdates.single())
+    }
+
+    @Test
+    fun `RENEWAL clears pause and billing markers`() {
+        val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(3600))
+        user.mirrorSubscriptionIssues(billingIssueAt = TEST_NOW.minusSeconds(86400), pauseResumesAt = TEST_NOW)
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "RENEWAL"))
+
+        assertEquals(IssuesUpdate(1L, null, null), issuesUpdates.single())
+    }
+
+    @Test
+    fun `every state-changing event is a SubscriptionChange so devices get told to refetch`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(86400))
+
+        listOf("INITIAL_PURCHASE", "CANCELLATION", "BILLING_ISSUE", "SUBSCRIPTION_PAUSED", "EXPIRATION").forEach { type ->
+            subscriptionService.handleRevenueCatWebhook(webhook(type = type))
+        }
+
+        assertEquals(5, published.filterIsInstance<SubscriptionChange>().size)
+    }
+
+    @Test
     fun `TRANSFER re-syncs both the source and the target user`() {
         val source = createUser(id = 1L, revenueCatUserId = "1", subscriptionStatus = SubscriptionStatus.ACTIVE,
             expiresAt = TEST_NOW.plusSeconds(86400))
@@ -419,6 +513,35 @@ class SubscriptionServiceTest {
             every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry, willRenew = false)
             subscriptionService.syncFromRevenueCat(1L)
             assertEquals(SubscriptionStatus.CANCELLED, lastUpdate().status)
+        }
+
+        @Test
+        fun `maps a canceled store trial to CANCELLED not TRIAL`() {
+            unlinkedUser()
+            val expiry = TEST_NOW.plus(Duration.ofDays(3))
+            every { revenueCatClient.fetchEntitlementState("1") } returns
+                activeState(expiresAt = expiry, isTrial = true, willRenew = false)
+
+            subscriptionService.syncFromRevenueCat(1L)
+
+            assertEquals(SubscriptionStatus.CANCELLED, lastUpdate().status)
+        }
+
+        @Test
+        fun `marks a billing issue the store reports and clears it once resolved`() {
+            val expiry = TEST_NOW.plus(Duration.ofDays(30))
+            val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = expiry)
+            every { revenueCatClient.fetchEntitlementState("1") } returns
+                activeState(expiresAt = expiry, hasBillingIssue = true)
+
+            assertEquals(SyncOutcome.UPDATED, subscriptionService.syncFromRevenueCat(1L))
+            assertEquals(IssuesUpdate(1L, TEST_NOW, null), issuesUpdates.last())
+
+            user.mirrorSubscriptionIssues(billingIssueAt = TEST_NOW, pauseResumesAt = null)
+            every { revenueCatClient.fetchEntitlementState("1") } returns activeState(expiresAt = expiry)
+
+            assertEquals(SyncOutcome.UPDATED, subscriptionService.syncFromRevenueCat(1L))
+            assertEquals(IssuesUpdate(1L, null, null), issuesUpdates.last())
         }
 
         @Test
@@ -519,15 +642,20 @@ class SubscriptionServiceTest {
         return user
     }
 
-    private fun activeState(expiresAt: Instant?, isTrial: Boolean = false, willRenew: Boolean = true) =
-        StoreEntitlementState(
-            hasPurchaseHistory = true,
-            isActive = true,
-            expiresAt = expiresAt,
-            productId = "premium_monthly",
-            isTrial = isTrial,
-            willRenew = willRenew,
-        )
+    private fun activeState(
+        expiresAt: Instant?,
+        isTrial: Boolean = false,
+        willRenew: Boolean = true,
+        hasBillingIssue: Boolean = false,
+    ) = StoreEntitlementState(
+        hasPurchaseHistory = true,
+        isActive = true,
+        expiresAt = expiresAt,
+        productId = "premium_monthly",
+        isTrial = isTrial,
+        willRenew = willRenew,
+        hasBillingIssue = hasBillingIssue,
+    )
 
     private fun inactiveState(hasHistory: Boolean) = StoreEntitlementState(
         hasPurchaseHistory = hasHistory,
@@ -589,6 +717,9 @@ class SubscriptionServiceTest {
             original_transaction_id = "orig-tx-1",
         ),
     )
+
+    private fun RevenueCatWebhookEvent.withEvent(change: RevenueCatEvent.() -> RevenueCatEvent) =
+        copy(event = event.change())
 
     /** Shaped like RevenueCat's TRANSFER payload: no app_user_id, only both sides. */
     private fun transferWebhook(from: List<String>, to: List<String>) = RevenueCatWebhookEvent(

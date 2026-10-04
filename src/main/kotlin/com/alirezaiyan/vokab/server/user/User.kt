@@ -102,10 +102,26 @@ class User(
     var premiumGrantReason: String? = premiumGrantReason
         protected set
 
+    /** When the store couldn't charge the renewal; null once a payment succeeds. */
+    @Column(name = "subscription_billing_issue_at", updatable = false)
+    var subscriptionBillingIssueAt: Instant? = null
+        protected set
+
+    /** Google Play pause: when the subscription resumes; null when not paused. */
+    @Column(name = "subscription_pause_resumes_at", updatable = false)
+    var subscriptionPauseResumesAt: Instant? = null
+        protected set
+
     /** Reflects a UserRepository.updateSubscription write (or sets the value for a not-yet-inserted user). */
     fun mirrorSubscription(status: SubscriptionStatus, expiresAt: Instant?) {
         subscriptionStatus = status
         subscriptionExpiresAt = expiresAt
+    }
+
+    /** Reflects a UserRepository.updateSubscriptionIssues write. */
+    fun mirrorSubscriptionIssues(billingIssueAt: Instant?, pauseResumesAt: Instant?) {
+        subscriptionBillingIssueAt = billingIssueAt
+        subscriptionPauseResumesAt = pauseResumesAt
     }
 
     /** Reflects a UserRepository.updateGrant write (or sets the value for a not-yet-inserted user). */

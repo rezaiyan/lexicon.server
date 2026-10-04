@@ -77,6 +77,8 @@ class FeatureAccessService(
     fun getUserFeatureAccess(user: User): UserFeatureAccess {
         val now = Instant.now(clock)
         val source = premiumSource(user, now)
+        // A pause date in the past means it already resumed (or lapsed); RENEWAL clears it anyway.
+        val pauseResumesAt = user.subscriptionPauseResumesAt?.takeIf { it.isAfter(now) }?.toString()
         logger.debug { "userId=${user.id} premium source=$source" }
         return when (source) {
             PremiumSource.STORE -> UserFeatureAccess(
@@ -85,13 +87,15 @@ class FeatureAccessService(
                 expiresAt = user.subscriptionExpiresAt?.toString(),
                 willRenew = user.subscriptionStatus != SubscriptionStatus.CANCELLED,
                 isTrial = user.subscriptionStatus == SubscriptionStatus.TRIAL,
+                pauseResumesAt = pauseResumesAt,
+                hasBillingIssue = user.subscriptionBillingIssueAt != null,
             )
             PremiumSource.GRANT -> UserFeatureAccess(
                 hasPremiumAccess = true,
                 source = source,
                 expiresAt = user.premiumGrantUntil?.toString(),
             )
-            PremiumSource.NONE -> UserFeatureAccess(hasPremiumAccess = false)
+            PremiumSource.NONE -> UserFeatureAccess(hasPremiumAccess = false, pauseResumesAt = pauseResumesAt)
         }
     }
 }
@@ -116,4 +120,8 @@ data class UserFeatureAccess(
     val expiresAt: String? = null,
     val willRenew: Boolean = false,
     val isTrial: Boolean = false,
+    /** ISO-8601; set while a Google Play pause is scheduled or in effect. */
+    val pauseResumesAt: String? = null,
+    /** The store couldn't charge the renewal; access continues through its grace period. */
+    val hasBillingIssue: Boolean = false,
 )

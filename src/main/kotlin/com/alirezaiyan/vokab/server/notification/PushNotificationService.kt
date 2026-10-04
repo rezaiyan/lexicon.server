@@ -29,6 +29,13 @@ class PushNotificationService(
         return notificationSender.sendToTokens(tokens, title, body, data, imageUrl, category)
     }
     
+    /** Data-only push the app handles in the background; nothing is shown to the user. */
+    fun sendSilentToUser(userId: Long, data: Map<String, String>): List<NotificationResponse> {
+        val tokens = pushTokenService.getActiveTokensForUser(userId)
+        if (tokens.isEmpty()) return emptyList()
+        return notificationSender.sendSilentToTokens(tokens, data)
+    }
+
     fun sendNotification(
         token: String,
         title: String,

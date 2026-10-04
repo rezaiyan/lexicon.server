@@ -93,6 +93,8 @@ data class StoreEntitlementState(
     val productId: String?,
     val isTrial: Boolean,
     val willRenew: Boolean,
+    /** The store couldn't charge the latest renewal (access may continue in a grace period). */
+    val hasBillingIssue: Boolean = false,
 )
 
 // ── Response DTOs (only the fields we use) ─────────────────────────────────────
@@ -120,6 +122,7 @@ data class SubscriptionInfoDto(
     @JsonProperty("period_type") val periodType: String? = null,
     @JsonProperty("unsubscribe_detected_at") val unsubscribeDetectedAt: Instant? = null,
     @JsonProperty("refunded_at") val refundedAt: Instant? = null,
+    @JsonProperty("billing_issues_detected_at") val billingIssuesDetectedAt: Instant? = null,
 )
 
 internal fun Subscriber.toEntitlementState(now: Instant): StoreEntitlementState {
@@ -139,5 +142,6 @@ internal fun Subscriber.toEntitlementState(now: Instant): StoreEntitlementState 
         productId = active?.productIdentifier,
         isTrial = subscription?.periodType.equals("trial", ignoreCase = true),
         willRenew = subscription != null && subscription.unsubscribeDetectedAt == null && subscription.refundedAt == null,
+        hasBillingIssue = subscription?.billingIssuesDetectedAt != null,
     )
 }

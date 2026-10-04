@@ -67,8 +67,9 @@ class SubscriptionService(
             "CANCELLATION" -> handleCancellation(user, event)
             "EXPIRATION" -> handleExpiration(user, event)
             "BILLING_ISSUE" -> handleBillingIssue(user, event)
+            "SUBSCRIPTION_PAUSED" -> handlePause(user, event)
             // Entitlement is unchanged by these; RevenueCat follows up with the events above when it is.
-            "PRODUCT_CHANGE", "SUBSCRIBER_ALIAS", "SUBSCRIPTION_PAUSED" ->
+            "PRODUCT_CHANGE", "SUBSCRIBER_ALIAS" ->
                 logger.info { "RevenueCat ${event.type} for userId=${user.id}, no state change" }
             else -> logger.warn { "Unknown webhook event type: ${event.type}" }
         }
@@ -90,24 +91,50 @@ class SubscriptionService(
             userRepository.linkRevenueCatUserId(userId, appUserId, Instant.now(clock))
         }
 
-        val target = targetState(user, state) ?: return SyncOutcome.UNCHANGED
-        if (target.first == user.subscriptionStatus && target.second == user.subscriptionExpiresAt) {
-            return SyncOutcome.UNCHANGED
-        }
-
-        userRepository.updateSubscription(userId, target.first, target.second, Instant.now(clock))
-        logger.info {
-            "RevenueCat sync updated userId=$userId: ${user.subscriptionStatus} -> ${target.first}, expiresAt=${target.second}"
-        }
-        return SyncOutcome.UPDATED
+        val statusUpdated = syncStatus(user, state)
+        val billingUpdated = syncBillingIssue(user, state)
+        return if (statusUpdated || billingUpdated) SyncOutcome.UPDATED else SyncOutcome.UNCHANGED
     }
 
-    /** Status/expiry our DB should hold for this store state, or null to leave it alone. */
+    private fun syncStatus(user: User, state: StoreEntitlementState): Boolean {
+        val target = targetState(user, state) ?: return false
+        if (target.first == user.subscriptionStatus && target.second == user.subscriptionExpiresAt) return false
+
+        userRepository.updateSubscription(user.requireId(), target.first, target.second, Instant.now(clock))
+        logger.info {
+            "RevenueCat sync updated userId=${user.id}: ${user.subscriptionStatus} -> ${target.first}, " +
+                "expiresAt=${target.second}"
+        }
+        return true
+    }
+
+    /**
+     * Keeps the billing-issue marker in line with the store, so a missed BILLING_ISSUE (or the
+     * renewal that fixed it) is still reflected. The pause marker is webhook-only: the REST API
+     * doesn't report pauses.
+     */
+    private fun syncBillingIssue(user: User, state: StoreEntitlementState): Boolean {
+        val target = if (state.isActive && state.hasBillingIssue) {
+            user.subscriptionBillingIssueAt ?: Instant.now(clock)
+        } else {
+            null
+        }
+        if (target == user.subscriptionBillingIssueAt) return false
+        userRepository.updateSubscriptionIssues(
+            user.requireId(), target, user.subscriptionPauseResumesAt, Instant.now(clock)
+        )
+        return true
+    }
+
+    /**
+     * Status/expiry our DB should hold for this store state, or null to leave it alone.
+     * Canceled is checked before trial: a canceled trial won't charge, which is what the app shows.
+     */
     private fun targetState(user: User, state: StoreEntitlementState): Pair<SubscriptionStatus, Instant?>? = when {
         state.isActive -> {
             val status = when {
-                state.isTrial -> SubscriptionStatus.TRIAL
                 !state.willRenew && state.expiresAt != null -> SubscriptionStatus.CANCELLED
+                state.isTrial -> SubscriptionStatus.TRIAL
                 else -> SubscriptionStatus.ACTIVE
             }
             status to state.expiresAt
@@ -188,12 +215,33 @@ class SubscriptionService(
 
     /**
      * Renewal payment failed. RevenueCat keeps the entitlement through the store's grace period,
-     * so access doesn't change, but the user should fix their payment method before it lapses.
+     * so access continues until the grace period ends (not the paid period's end, or the nightly
+     * expiry would revoke it early), and the user should fix their payment method before then.
      * Listeners (the push) run after commit, so a rolled-back (and later redelivered) event can't
      * notify twice.
      */
     private fun handleBillingIssue(user: User, event: RevenueCatEvent) {
-        domainEventPublisher.publish(SubscriptionBillingIssue(user.requireId(), event.product_id, Instant.now(clock)))
+        val now = Instant.now(clock)
+        val graceEnd = event.gracePeriodExpirationAtMs?.let { Instant.ofEpochMilli(it) }
+        if (graceEnd != null && user.hasStoreAccessEndingBefore(graceEnd)) {
+            updateUserSubscriptionStatus(user, user.subscriptionStatus, graceEnd)
+        }
+        userRepository.updateSubscriptionIssues(user.requireId(), now, user.subscriptionPauseResumesAt, now)
+        domainEventPublisher.publish(SubscriptionBillingIssue(user.requireId(), event.product_id, now))
+        logger.info { "Billing issue for userId=${user.id}, grace period until $graceEnd" }
+    }
+
+    /**
+     * Google Play pause. Sent when the user schedules it: access continues until the paid period
+     * ends, then EXPIRATION (reason SUBSCRIPTION_PAUSED) follows. Either way the app shows when
+     * the subscription resumes, so that date is kept until it renews.
+     */
+    private fun handlePause(user: User, event: RevenueCatEvent) {
+        val resumesAt = event.autoResumeAtMs?.let { Instant.ofEpochMilli(it) }
+        val now = Instant.now(clock)
+        userRepository.updateSubscriptionIssues(user.requireId(), user.subscriptionBillingIssueAt, resumesAt, now)
+        domainEventPublisher.publish(SubscriptionPaused(user.requireId(), event.product_id, resumesAt, now))
+        logger.info { "Subscription pause for userId=${user.id}, resumes at $resumesAt" }
     }
 
     private fun activate(user: User, event: RevenueCatEvent, autoRenew: Boolean, activation: Activation) {
@@ -226,6 +274,8 @@ class SubscriptionService(
 
         val status = if (event.isTrial) SubscriptionStatus.TRIAL else SubscriptionStatus.ACTIVE
         updateUserSubscriptionStatus(user, status, expiresAt)
+        // A successful charge (or resumed pause) ends both
+        userRepository.updateSubscriptionIssues(user.requireId(), null, null, Instant.now(clock))
 
         domainEventPublisher.publish(
             SubscriptionActivated(user.requireId(), productId, event.isTrial, activation, Instant.now(clock))
@@ -279,10 +329,19 @@ class SubscriptionService(
         }
 
         updateUserSubscriptionStatus(user, SubscriptionStatus.EXPIRED, null)
+        // A pause taking effect expires access but keeps the resume date the app shows; any other
+        // expiry ends the subscription, and with it a pending pause or payment problem.
+        val pauseResumesAt = user.subscriptionPauseResumesAt
+            .takeIf { event.expirationReason == EXPIRATION_REASON_PAUSED }
+        userRepository.updateSubscriptionIssues(user.requireId(), null, pauseResumesAt, Instant.now(clock))
         domainEventPublisher.publish(SubscriptionExpired(user.requireId(), event.product_id, Instant.now(clock)))
 
         logger.info { "Subscription expired for userId=${user.id}" }
     }
+
+    /** Store access (not an expired or free status) that ends before [instant]. */
+    private fun User.hasStoreAccessEndingBefore(instant: Instant): Boolean =
+        subscriptionStatus in STORE_DERIVED_STATUSES && subscriptionExpiresAt?.isBefore(instant) == true
 
     private fun findSubscription(event: RevenueCatEvent): Subscription? =
         subscriptionRepository.findByRevenueCatSubscriptionId(event.subscriptionKey).orElse(null)
@@ -294,6 +353,8 @@ class SubscriptionService(
     private fun RevenueCatEvent.expiresAt(): Instant? = expiration_at_ms?.let { Instant.ofEpochMilli(it) }
 
     companion object {
+        private const val EXPIRATION_REASON_PAUSED = "SUBSCRIPTION_PAUSED"
+
         /** Statuses that come from the store (and so may be lapsed/expired by it). */
         val STORE_DERIVED_STATUSES = listOf(SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIAL, SubscriptionStatus.CANCELLED)
     }

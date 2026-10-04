@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
@@ -62,8 +63,7 @@ class NotificationTypeSelector(
         }
 
         if (LocalDate.now(clock).dayOfWeek == DayOfWeek.MONDAY) {
-            runCatching { learnerSignals.weeklyReport(user.requireId()) }
-                .getOrNull()
+            bestEffort("Weekly report for user=${user.id}") { learnerSignals.weeklyReport(user.requireId()) }
                 ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }
                 ?.let { return NotificationType.WEEKLY_PREVIEW }
         }
@@ -71,7 +71,9 @@ class NotificationTypeSelector(
         val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWord = runCatching { learnerSignals.topDifficultWord(user.requireId()) }.getOrNull()
+        val comebackWord = bestEffort("Difficult word for user=${user.id}") {
+            learnerSignals.topDifficultWord(user.requireId())
+        }
         if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
@@ -88,7 +90,9 @@ class NotificationTypeSelector(
         val stats = userProgressService.calculateProgressStats(user.requireId())
         if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
 
-        val comebackWord = runCatching { learnerSignals.topDifficultWord(user.requireId()) }.getOrNull()
+        val comebackWord = bestEffort("Difficult word for user=${user.id}") {
+            learnerSignals.topDifficultWord(user.requireId())
+        }
         if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
         return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT

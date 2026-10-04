@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.notification.EngagementSegmentService.EngagementSegment
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -90,8 +91,9 @@ class EngagementSegmentScheduler(
         val stats7d  = notificationEngagementService.getEngagementStats(userId, windowDays = 7)
         val stats30d = notificationEngagementService.getEngagementStats(userId, windowDays = 30)
         val daysSinceOpen = notificationEngagementService.getDaysSinceLastOpen(userId)
-        val dueCards = runCatching { userProgressService.calculateProgressStats(user.requireId()).dueCards }
-            .getOrElse { 0 }
+        val dueCards = bestEffort("Due cards for user=${user.id}") {
+            userProgressService.calculateProgressStats(user.requireId()).dueCards
+        } ?: 0
         val accountAgeDays = ChronoUnit.DAYS.between(user.createdAt, Instant.now(clock))
 
         return NotificationAiAdvisor.UserNotificationContext(

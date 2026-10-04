@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.notification.NotificationCategory
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
@@ -137,24 +138,26 @@ class DailyInsightService(
     }
 
     private fun buildInsightContext(user: User, stats: com.alirezaiyan.vokab.server.study.ProgressStatsDto): AiService.DailyInsightContext {
-        val optimalStudyHour = runCatching {
+        val optimalStudyHour = bestEffort("Optimal study hour for user=${user.id}") {
             notificationScheduleRepository.findByUser(user)?.optimalSendHour
-        }.getOrNull()
+        }
 
-        val weeklyReport = runCatching { learnerSignals.weeklyReport(user.requireId()) }.getOrNull()
+        val weeklyReport = bestEffort("Weekly report for user=${user.id}") {
+            learnerSignals.weeklyReport(user.requireId())
+        }
         val accuracyTrend = weeklyReport?.changePercent?.toFloat()
 
-        val topDifficultWord = runCatching {
+        val topDifficultWord = bestEffort("Difficult word for user=${user.id}") {
             learnerSignals.topDifficultWord(user.requireId())?.wordText
-        }.getOrNull()
+        }
 
-        val primaryLanguage = runCatching {
+        val primaryLanguage = bestEffort("Primary language for user=${user.id}") {
             learnerSignals.primaryTargetLanguage(user.requireId())
-        }.getOrNull()
+        }
 
-        val sessionCompletionRate = runCatching {
+        val sessionCompletionRate = bestEffort("Session completion rate for user=${user.id}") {
             learnerSignals.sessionCompletionRate(user.requireId())?.toFloat()
-        }.getOrNull()
+        }
 
         return AiService.DailyInsightContext(
             stats = stats,

@@ -433,6 +433,26 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    fun `CANCELLATION after a scheduled pause clears the pause`() {
+        val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(3600))
+        user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = TEST_NOW.plusSeconds(86400))
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "CANCELLATION"))
+
+        assertEquals(SubscriptionStatus.CANCELLED, lastUpdate().status)
+        assertEquals(IssuesUpdate(1L, null, null), issuesUpdates.single())
+    }
+
+    @Test
+    fun `CANCELLATION without a pause leaves the markers alone`() {
+        linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(3600))
+
+        subscriptionService.handleRevenueCatWebhook(webhook(type = "CANCELLATION"))
+
+        assertTrue(issuesUpdates.isEmpty())
+    }
+
+    @Test
     fun `RENEWAL clears pause and billing markers`() {
         val user = linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plusSeconds(3600))
         user.mirrorSubscriptionIssues(billingIssueAt = TEST_NOW.minusSeconds(86400), pauseResumesAt = TEST_NOW)
@@ -545,6 +565,18 @@ class SubscriptionServiceTest {
         }
 
         @Test
+        fun `a cancel the store reports voids a scheduled pause`() {
+            val expiry = TEST_NOW.plus(Duration.ofDays(30))
+            val user = linkedUser(status = SubscriptionStatus.CANCELLED, expiresAt = expiry)
+            user.mirrorSubscriptionIssues(billingIssueAt = null, pauseResumesAt = expiry.plus(Duration.ofDays(30)))
+            every { revenueCatClient.fetchEntitlementState("1") } returns
+                activeState(expiresAt = expiry, willRenew = false, isCanceled = true)
+
+            assertEquals(SyncOutcome.UPDATED, subscriptionService.syncFromRevenueCat(1L))
+            assertEquals(IssuesUpdate(1L, null, null), issuesUpdates.single())
+        }
+
+        @Test
         fun `expires store-derived status the store no longer backs`() {
             linkedUser(status = SubscriptionStatus.ACTIVE, expiresAt = TEST_NOW.plus(Duration.ofDays(3)))
             every { revenueCatClient.fetchEntitlementState("1") } returns inactiveState(hasHistory = true)
@@ -647,6 +679,7 @@ class SubscriptionServiceTest {
         isTrial: Boolean = false,
         willRenew: Boolean = true,
         hasBillingIssue: Boolean = false,
+        isCanceled: Boolean = false,
     ) = StoreEntitlementState(
         hasPurchaseHistory = true,
         isActive = true,
@@ -655,6 +688,7 @@ class SubscriptionServiceTest {
         isTrial = isTrial,
         willRenew = willRenew,
         hasBillingIssue = hasBillingIssue,
+        isCanceled = isCanceled,
     )
 
     private fun inactiveState(hasHistory: Boolean) = StoreEntitlementState(

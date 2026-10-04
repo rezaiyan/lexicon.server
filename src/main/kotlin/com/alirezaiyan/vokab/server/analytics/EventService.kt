@@ -52,8 +52,7 @@ class EventService(
         platform: String? = null,
         appVersion: String? = null,
     ) {
-        val propertiesJson = if (properties.isEmpty()) null
-                             else runCatching { objectMapper.writeValueAsString(properties) }.getOrNull()
+        val propertiesJson = if (properties.isEmpty()) null else objectMapper.writeValueAsString(properties)
         appEventRepository.save(
             AppEvent(
                 userId = userId,

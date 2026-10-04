@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.user
 
+import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.notification.NotificationSchedule
 import com.alirezaiyan.vokab.server.notification.NotificationScheduleRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -22,7 +23,9 @@ class UserSettingsService(
         val s = repo.findByUser(user) ?: repo.save(UserSettings(user = user))
         val schedule = notificationScheduleRepository.findByUser(user)
         val engagementStats = user.id?.let {
-            runCatching { notificationEngagementService.getEngagementStats(it) }.getOrNull()
+            bestEffort("Notification engagement stats for user=$it") {
+                notificationEngagementService.getEngagementStats(it)
+            }
         }
         return s.toDto(schedule, engagementStats)
     }

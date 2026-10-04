@@ -92,8 +92,8 @@ class SubscriptionService(
         }
 
         val statusUpdated = syncStatus(user, state)
-        val billingUpdated = syncBillingIssue(user, state)
-        return if (statusUpdated || billingUpdated) SyncOutcome.UPDATED else SyncOutcome.UNCHANGED
+        val issuesUpdated = syncIssues(user, state)
+        return if (statusUpdated || issuesUpdated) SyncOutcome.UPDATED else SyncOutcome.UNCHANGED
     }
 
     private fun syncStatus(user: User, state: StoreEntitlementState): Boolean {
@@ -109,20 +109,21 @@ class SubscriptionService(
     }
 
     /**
-     * Keeps the billing-issue marker in line with the store, so a missed BILLING_ISSUE (or the
-     * renewal that fixed it) is still reflected. The pause marker is webhook-only: the REST API
-     * doesn't report pauses.
+     * Keeps the billing-issue and pause markers in line with the store, so a missed BILLING_ISSUE
+     * (or the renewal that fixed it) and a cancel that voided a scheduled pause are still
+     * reflected. The resume date itself only comes from SUBSCRIPTION_PAUSED: the API doesn't report it.
      */
-    private fun syncBillingIssue(user: User, state: StoreEntitlementState): Boolean {
-        val target = if (state.isActive && state.hasBillingIssue) {
+    private fun syncIssues(user: User, state: StoreEntitlementState): Boolean {
+        val billingIssueAt = if (state.isActive && state.hasBillingIssue) {
             user.subscriptionBillingIssueAt ?: Instant.now(clock)
         } else {
             null
         }
-        if (target == user.subscriptionBillingIssueAt) return false
-        userRepository.updateSubscriptionIssues(
-            user.requireId(), target, user.subscriptionPauseResumesAt, Instant.now(clock)
-        )
+        val pauseResumesAt = user.subscriptionPauseResumesAt.takeUnless { state.isCanceled }
+        if (billingIssueAt == user.subscriptionBillingIssueAt && pauseResumesAt == user.subscriptionPauseResumesAt) {
+            return false
+        }
+        userRepository.updateSubscriptionIssues(user.requireId(), billingIssueAt, pauseResumesAt, Instant.now(clock))
         return true
     }
 
@@ -306,6 +307,10 @@ class SubscriptionService(
             SubscriptionStatus.EXPIRED
         }
         updateUserSubscriptionStatus(user, status, expiresAt)
+        // Canceling voids a scheduled pause: the subscription ends instead of resuming
+        if (user.subscriptionPauseResumesAt != null) {
+            userRepository.updateSubscriptionIssues(user.requireId(), user.subscriptionBillingIssueAt, null, now)
+        }
         domainEventPublisher.publish(
             SubscriptionCancelled(user.requireId(), event.product_id, event.cancel_reason, now)
         )

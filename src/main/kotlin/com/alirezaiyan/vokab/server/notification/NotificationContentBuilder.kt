@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.user.User
@@ -64,8 +65,9 @@ class NotificationContentBuilder(
     private fun buildDueCards(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
         val estimatedMinutes = maxOf(1, (stats.dueCards * 8) / 60)
-        val primaryLang = runCatching { learnerSignals.primaryTargetLanguage(user.requireId()) }
-            .getOrNull() ?: "vocabulary"
+        val primaryLang = bestEffort("Primary language for user=${user.id}") {
+            learnerSignals.primaryTargetLanguage(user.requireId())
+        } ?: "vocabulary"
         return NotificationPayload(
             title = "📚 ${stats.dueCards} words are waiting",
             body = "Your $primaryLang review takes ~$estimatedMinutes min.",
@@ -170,7 +172,9 @@ class NotificationContentBuilder(
      * contentHint selects the emotional angle; all copy is pre-written (no AI generation).
      */
     private fun buildMotivation(user: User, contentHint: String?): NotificationPayload {
-        val stats = runCatching { userProgressService.calculateProgressStats(user.requireId()) }.getOrNull()
+        val stats = bestEffort("Progress stats for user=${user.id}") {
+            userProgressService.calculateProgressStats(user.requireId())
+        }
         val dueCards = stats?.dueCards ?: 0
 
         val (title, body) = when (contentHint) {

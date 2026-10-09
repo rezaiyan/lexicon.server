@@ -15,8 +15,8 @@ data class CreditProperties(
     var trialMonthlyAllowance: Int = 30,
     var premiumMonthlyAllowance: Int = 300,
     var costs: Map<CreditAction, Int> = mapOf(
-        CreditAction.PHOTO_EXTRACTION to 3,
-        CreditAction.AI_SUGGESTION to 1,
+        CreditAction.PHOTO_EXTRACTION to 2,
+        CreditAction.AI_SUGGESTION to 2,
         CreditAction.TEXT_TRANSLATION to 1,
     ),
 ) {

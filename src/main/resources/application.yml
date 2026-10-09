@@ -115,8 +115,8 @@ app:
     trial-monthly-allowance: ${CREDITS_TRIAL_MONTHLY:30}
     premium-monthly-allowance: ${CREDITS_PREMIUM_MONTHLY:300}
     costs:
-      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:3}
-      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:1}
+      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:2}
+      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:2}
       TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
 
   # Per-user call limits on the AI endpoints; each limit resets in full every window.

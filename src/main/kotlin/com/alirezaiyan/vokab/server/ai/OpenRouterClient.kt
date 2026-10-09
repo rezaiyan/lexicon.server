@@ -13,6 +13,7 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.client.RestClientException
 import org.springframework.web.client.RestClientResponseException
 import org.springframework.web.client.body
+import java.math.BigDecimal
 
 private val logger = KotlinLogging.logger {}
 
@@ -21,7 +22,8 @@ private const val CHAT_COMPLETIONS = "/chat/completions"
 /**
  * [AiClient] over OpenRouter's chat-completions API. Calls are synchronous and bounded by
  * `app.openrouter.timeout-seconds` (the [AiRestClient] builder). Every call counts in
- * `ai.requests{operation,outcome}` and in [AiCallTracker].
+ * `ai.requests{operation,outcome}` and in [AiCallTracker]; every answered one reports its tokens and
+ * cost to [AiUsageRecorder].
  */
 @Component
 class OpenRouterClient(
@@ -29,6 +31,7 @@ class OpenRouterClient(
     private val appProperties: AppProperties,
     private val meterRegistry: MeterRegistry,
     private val aiCallTracker: AiCallTracker,
+    private val usageRecorder: AiUsageRecorder,
 ) : AiClient {
 
     private val restClient: RestClient = restClientBuilder
@@ -38,7 +41,14 @@ class OpenRouterClient(
         .defaultHeader("X-Title", "Vokab")
         .build()
 
-    private data class ChatRequest(val model: String, val messages: List<Message>)
+    /** [usage] asks OpenRouter to report the call's cost next to its token counts. */
+    private data class ChatRequest(
+        val model: String,
+        val messages: List<Message>,
+        val usage: UsageOption = UsageOption(include = true),
+    )
+
+    private data class UsageOption(val include: Boolean)
 
     private data class Message(val role: String, val content: List<Content>)
 
@@ -47,7 +57,14 @@ class OpenRouterClient(
 
     private data class ImageUrl(val url: String)
 
-    private data class ChatResponse(val choices: List<Choice>?, val error: ErrorDetail?)
+    private data class ChatResponse(val choices: List<Choice>?, val error: ErrorDetail?, val usage: Usage? = null)
+
+    @Suppress("ConstructorParameterNaming") // OpenRouter's wire names
+    private data class Usage(
+        val prompt_tokens: Int? = null,
+        val completion_tokens: Int? = null,
+        val cost: BigDecimal? = null,
+    )
 
     private data class Choice(val message: MessageContent)
 
@@ -69,7 +86,7 @@ class OpenRouterClient(
         )
 
     private fun chat(content: List<Content>, operation: AiOperation): String? {
-        val result = runCatching { requestChat(content, operation.tag) }
+        val result = runCatching { requestChat(content, operation) }
         val outcome = when {
             result.isFailure -> "error"
             result.getOrNull() == null -> "empty"
@@ -82,15 +99,20 @@ class OpenRouterClient(
     }
 
     /** Response bodies are logged, never put into exception messages. */
-    private fun requestChat(content: List<Content>, operation: String): String? {
-        val request = ChatRequest(
-            model = appProperties.openrouter.model,
-            messages = listOf(Message(role = "user", content = content)),
-        )
-        val response = post(request, operation)
+    private fun requestChat(content: List<Content>, operation: AiOperation): String? {
+        val model = appProperties.openrouter.model
+        val request = ChatRequest(model = model, messages = listOf(Message(role = "user", content = content)))
+        val response = post(request, operation.tag)
         response?.error?.let { error ->
-            logger.error { "[OpenRouter] $operation API error: ${error.message}" }
-            throw UpstreamServiceException("OpenRouter $operation returned an error")
+            logger.error { "[OpenRouter] ${operation.tag} API error: ${error.message}" }
+            throw UpstreamServiceException("OpenRouter ${operation.tag} returned an error")
+        }
+        // Answered, even if empty: the call was billed
+        response?.let {
+            val usage = it.usage
+            usageRecorder.record(
+                operation, model, AiUsageReport(usage?.prompt_tokens, usage?.completion_tokens, usage?.cost),
+            )
         }
         return response?.choices?.firstOrNull()?.message?.content?.trim()?.ifEmpty { null }
     }

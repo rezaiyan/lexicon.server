@@ -24,12 +24,14 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
 import java.io.IOException
+import java.math.BigDecimal
 
 class OpenRouterClientTest {
 
     private val chatUrl = "https://openrouter.ai/api/v1/chat/completions"
     private val mapper = jacksonObjectMapper()
     private val meterRegistry = SimpleMeterRegistry()
+    private val recorded = mutableListOf<Triple<AiOperation, String, AiUsageReport>>()
 
     private val builder = RestClient.builder()
     private val server = MockRestServiceServer.bindTo(builder).build()
@@ -114,11 +116,57 @@ class OpenRouterClientTest {
         assertEquals("anthropic/claude-haiku-4.5", OpenRouterConfig().model)
     }
 
+    @Test
+    fun `requests ask OpenRouter to report usage`() {
+        expectChat().andExpect(jsonPath("$.usage.include").value(true)).andRespond(answer("Hallo"))
+
+        client.complete("Translate", AiOperation.TRANSLATION)
+        server.verify()
+    }
+
+    @Test
+    fun `an answered call reports its tokens and cost under the operation`() {
+        expectChat().andRespond(
+            json(
+                mapper.writeValueAsString(
+                    mapOf(
+                        "choices" to listOf(mapOf("message" to mapOf("content" to "Hund,dog"))),
+                        "usage" to mapOf("prompt_tokens" to 1200, "completion_tokens" to 340, "cost" to 0.00290),
+                    )
+                )
+            )
+        )
+
+        client.completeWithImage("QUJD", "Extract", AiOperation.IMAGE_EXTRACTION)
+
+        val (operation, model, usage) = recorded.single()
+        assertEquals(AiOperation.IMAGE_EXTRACTION, operation)
+        assertEquals("anthropic/claude-haiku-4.5", model)
+        assertEquals(AiUsageReport(1200, 340, BigDecimal("0.0029")), usage)
+    }
+
+    @Test
+    fun `an empty answer is still recorded since it was billed`() {
+        expectChat().andRespond(answer("  "))
+
+        assertNull(client.complete("Translate", AiOperation.TRANSLATION))
+        assertEquals(AiUsageReport(null, null, null), recorded.single().third)
+    }
+
+    @Test
+    fun `a failed call records no usage`() {
+        expectChat().andRespond(withStatus(HttpStatus.BAD_GATEWAY))
+
+        assertThrows<UpstreamServiceException> { client.complete("Translate", AiOperation.TRANSLATION) }
+        assertEquals(emptyList<Any>(), recorded)
+    }
+
     private fun client(builder: RestClient.Builder, model: String) = OpenRouterClient(
         builder,
         AppProperties(openrouter = OpenRouterConfig(apiKey = "test-api-key", baseUrl = "https://openrouter.ai/api/v1", model = model)),
         meterRegistry,
         AiCallTracker(fixedClock()),
+        { operation, model, usage -> recorded += Triple(operation, model, usage) },
     )
 
     private fun expectChat() = server.expect(requestTo(chatUrl))

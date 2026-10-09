@@ -49,8 +49,8 @@ class CreditControllerTest {
             .andExpect(jsonPath("$.data.bonusBalance").value(15))
             .andExpect(jsonPath("$.data.periodEndsAt").value("2026-11-09T10:00:00Z"))
             .andExpect(jsonPath("$.data.tier").value("FREE"))
-            .andExpect(jsonPath("$.data.costs.PHOTO_EXTRACTION").value(3))
-            .andExpect(jsonPath("$.data.costs.AI_SUGGESTION").value(1))
+            .andExpect(jsonPath("$.data.costs.PHOTO_EXTRACTION").value(2))
+            .andExpect(jsonPath("$.data.costs.AI_SUGGESTION").value(2))
             .andExpect(jsonPath("$.data.monthlyAllowances.PREMIUM").value(300))
     }
 }

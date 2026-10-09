@@ -149,7 +149,12 @@ class CreditService(
                 wallet.allowanceRemaining = clamped
                 wallet.updatedAt = now
                 if (delta != 0) {
-                    record(wallet.userId, CreditTransactionType.ALLOWANCE_ADJUSTED, allowanceDelta = delta, note = level.name)
+                    record(
+                        wallet.userId,
+                        CreditTransactionType.ALLOWANCE_ADJUSTED,
+                        allowanceDelta = delta,
+                        note = level.name,
+                    )
                 }
             }
             wallet.tier != level -> wallet.tier = level

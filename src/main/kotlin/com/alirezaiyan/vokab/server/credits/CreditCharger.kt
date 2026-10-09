@@ -32,6 +32,8 @@ class CreditCharger(private val creditService: CreditService) {
         if (spend == null) return
         runCatching { creditService.refund(spend) }
             .onSuccess { logger.info { "Refunded ${spend.cost} credits to userId=${spend.userId}" } }
-            .onFailure { logger.error(it) { "Refund of spend ${spend.transactionId} for userId=${spend.userId} failed" } }
+            .onFailure {
+                logger.error(it) { "Refund of spend ${spend.transactionId} for userId=${spend.userId} failed" }
+            }
     }
 }

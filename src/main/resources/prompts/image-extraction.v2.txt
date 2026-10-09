@@ -8,6 +8,8 @@ For every item:
 - "note": optional short context (article, gender, plural, or a usage hint); empty string when there is nothing useful.
 
 Rules:
+- The photo may be taken sideways or upside down. Read each line in its own orientation, as a person would after turning the page upright.
+- Copy terms letter by letter from the image. If a word is not clearly legible, skip it rather than guessing.
 - Each distinct term once.
 - Keep punctuation that belongs to the item (commas, semicolons, quotes are allowed).
 - Never invent items that are not in the image.

@@ -36,14 +36,6 @@ class GlobalExceptionHandler {
             .body(ApiResponse(success = false, message = ex.message))
     }
 
-    @ExceptionHandler(PremiumRequiredException::class)
-    fun handlePremiumRequiredException(ex: PremiumRequiredException): ResponseEntity<ApiResponse<Unit>> {
-        logger.info { "PremiumRequiredException: ${ex.message}" }
-        return ResponseEntity
-            .status(HttpStatus.PAYMENT_REQUIRED)
-            .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.PREMIUM_REQUIRED))
-    }
-
     @ExceptionHandler(InsufficientCreditsException::class)
     fun handleInsufficientCreditsException(ex: InsufficientCreditsException): ResponseEntity<ApiResponse<Unit>> {
         logger.info { "InsufficientCreditsException: ${ex.message}" }

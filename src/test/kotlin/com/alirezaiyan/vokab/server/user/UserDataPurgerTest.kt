@@ -65,6 +65,7 @@ class UserDataPurgerTest {
         "review_events", "study_sessions", "words", "tags", "word_rush_games", "refresh_tokens",
         "push_tokens", "daily_insights", "daily_activities", "subscriptions", "user_settings",
         "user_platforms", "notification_schedule", "notification_log", "email_subscriptions",
+        "credit_wallets", "credit_transactions",
     )
 
     private fun count(table: String, userId: Long): Int =
@@ -104,6 +105,15 @@ class UserDataPurgerTest {
         jdbc.update("INSERT INTO notification_schedule (user_id) VALUES (?)", id)
         jdbc.update("INSERT INTO notification_log (user_id, notification_type) VALUES (?, 'STREAK')", id)
         jdbc.update("INSERT INTO email_subscriptions (user_id, category) VALUES (?, 'newsletter')", id)
+        jdbc.update(
+            "INSERT INTO credit_wallets (user_id, tier, allowance_remaining, period_start, period_end, bonus_balance, created_at, updated_at) " +
+                "VALUES (?, 'FREE', 5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 15, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+            id,
+        )
+        jdbc.update(
+            "INSERT INTO credit_transactions (user_id, type, allowance_delta, bonus_delta, created_at) VALUES (?, 'SIGNUP_BONUS', 0, 15, CURRENT_TIMESTAMP)",
+            id,
+        )
         jdbc.update(
             "INSERT INTO email_log (user_id, recipient_email, category, template_id, subject) VALUES (?, ?, 'c', 't', 's')",
             id, email,

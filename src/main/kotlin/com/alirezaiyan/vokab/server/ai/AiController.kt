@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.credits.CreditAction
+import com.alirezaiyan.vokab.server.credits.CreditCharger
 import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
@@ -16,6 +18,11 @@ import org.springframework.web.bind.annotation.*
 
 private val logger = KotlinLogging.logger {}
 
+/**
+ * AI features. Photo extraction, suggestions and translation spend credits (402
+ * `INSUFFICIENT_CREDITS` when short; refunded when the call fails or yields nothing); the daily
+ * insight is a premium perk (402 `PREMIUM_REQUIRED`). Rate limits apply on top of both.
+ */
 @RestController
 @RequestMapping("/api/v1/ai")
 class AiController(
@@ -25,6 +32,7 @@ class AiController(
     private val appProperties: AppProperties,
     private val dailyInsightService: DailyInsightService,
     private val vocabularySuggestionService: VocabularySuggestionService,
+    private val creditCharger: CreditCharger,
 ) {
     
     @PostMapping("/extract-vocabulary")
@@ -34,15 +42,16 @@ class AiController(
     ): ResponseEntity<ApiResponse<VocabularyExtractionResponse>> {
         logger.info { "userId=${user.id} requesting vocabulary extraction" }
 
-        requirePremium(user, "AI image extraction")
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
-        val extractedText = aiService.extractVocabularyFromImage(
-            imageBase64 = request.imageBase64,
-            targetLanguage = request.targetLanguage,
-            extractWords = request.extractWords,
-            extractSentences = request.extractSentences
-        )
+        val extractedText = creditCharger.charge(user.id, CreditAction.PHOTO_EXTRACTION, refundIf = String::isBlank) {
+            aiService.extractVocabularyFromImage(
+                imageBase64 = request.imageBase64,
+                targetLanguage = request.targetLanguage,
+                extractWords = request.extractWords,
+                extractSentences = request.extractSentences
+            )
+        }
 
         val wordCount = extractedText.split(";").size
         logger.info { "Vocabulary extraction successful for userId=${user.id}: $wordCount words" }
@@ -61,15 +70,17 @@ class AiController(
     ): ResponseEntity<ApiResponse<ExtractWordsResponse>> {
         logger.info { "userId=${user.id} requesting word extraction (v2)" }
 
-        requirePremium(user, "AI image extraction")
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
-        val items = aiService.extractWordsFromImage(
-            imageBase64 = request.imageBase64,
-            learningLanguage = request.learningLanguage,
-            nativeLanguage = request.nativeLanguage,
-            includePhrases = request.includePhrases,
-        )
+        // Nothing recognised is refunded: the user got nothing for the credits
+        val items = creditCharger.charge(user.id, CreditAction.PHOTO_EXTRACTION, refundIf = { it.isEmpty() }) {
+            aiService.extractWordsFromImage(
+                imageBase64 = request.imageBase64,
+                learningLanguage = request.learningLanguage,
+                nativeLanguage = request.nativeLanguage,
+                includePhrases = request.includePhrases,
+            )
+        }
         logger.info { "Word extraction (v2) for userId=${user.id}: ${items.size} items" }
         return ResponseEntity.ok(ApiResponse(success = true, data = ExtractWordsResponse(items)))
     }
@@ -117,10 +128,12 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "text translation")
 
-        val translation = aiService.translateText(
-            text = text,
-            targetLanguage = request.targetLanguage
-        )
+        val translation = creditCharger.charge(user.id, CreditAction.TEXT_TRANSLATION, refundIf = String::isBlank) {
+            aiService.translateText(
+                text = text,
+                targetLanguage = request.targetLanguage
+            )
+        }
 
         return ResponseEntity.ok(ApiResponse(success = true, data = TranslateTextResponse(
             originalText = text,
@@ -137,14 +150,16 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "suggest-vocabulary")
 
-        val response = vocabularySuggestionService.suggestForUser(
-            userId = user.id,
-            targetLanguage = request.targetLanguage,
-            currentLevel = request.currentLevel,
-            nativeLanguage = request.nativeLanguage,
-            interests = request.interests,
-            targetLanguageCode = request.targetLanguageCode,
-        )
+        val response = creditCharger.charge(user.id, CreditAction.AI_SUGGESTION, refundIf = { it.items.isEmpty() }) {
+            vocabularySuggestionService.suggestForUser(
+                userId = user.id,
+                targetLanguage = request.targetLanguage,
+                currentLevel = request.currentLevel,
+                nativeLanguage = request.nativeLanguage,
+                interests = request.interests,
+                targetLanguageCode = request.targetLanguageCode,
+            )
+        }
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 

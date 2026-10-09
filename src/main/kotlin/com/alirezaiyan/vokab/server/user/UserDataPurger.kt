@@ -42,6 +42,8 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "daily_insights" to "DELETE FROM daily_insights WHERE user_id = :userId",
             "daily_activities" to "DELETE FROM daily_activities WHERE user_id = :userId",
             "subscriptions" to "DELETE FROM subscriptions WHERE user_id = :userId",
+            "credit_transactions" to "DELETE FROM credit_transactions WHERE user_id = :userId",
+            "credit_wallets" to "DELETE FROM credit_wallets WHERE user_id = :userId",
             "user_settings" to "DELETE FROM user_settings WHERE user_id = :userId",
             "user_platforms" to "DELETE FROM user_platforms WHERE user_id = :userId",
             "notification_schedule" to "DELETE FROM notification_schedule WHERE user_id = :userId",

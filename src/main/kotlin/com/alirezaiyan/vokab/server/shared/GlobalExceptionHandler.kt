@@ -43,6 +43,14 @@ class GlobalExceptionHandler {
             .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.PREMIUM_REQUIRED))
     }
 
+    @ExceptionHandler(InsufficientCreditsException::class)
+    fun handleInsufficientCreditsException(ex: InsufficientCreditsException): ResponseEntity<ApiResponse<Unit>> {
+        logger.info { "InsufficientCreditsException: ${ex.message}" }
+        return ResponseEntity
+            .status(HttpStatus.PAYMENT_REQUIRED)
+            .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.INSUFFICIENT_CREDITS))
+    }
+
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimitExceededException(ex: RateLimitExceededException): ResponseEntity<ApiResponse<Unit>> {
         logger.warn { "RateLimitExceededException: ${ex.message}" }

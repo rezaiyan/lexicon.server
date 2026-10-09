@@ -34,7 +34,7 @@ class AiServiceTest {
     private val builder = RestClient.builder()
     private val server = MockRestServiceServer.bindTo(builder).build()
     private val service = AiService(
-        OpenRouterClient(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock())),
+        OpenRouterClient(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock())) { _, _, _ -> },
         PromptTemplates(),
         appProperties(),
     )

@@ -178,6 +178,53 @@ class AiServiceTest {
         assertThrows<UserFacingException> { service.generateVocabularyFromPreferences("German", "beginner", "English") }
     }
 
+    // ── extractWordsFromImage (v2) ────────────────────────────────────────────
+
+    @Test
+    fun `extractWordsFromImage returns clean de-duplicated items from the JSON answer`() {
+        expectChat()
+            .andExpect(promptContains("learner of German whose native language is English"))
+            .andRespond(
+                answer(
+                    "```json\n{\"items\":[" +
+                        "{\"term\":\" gehen \",\"translation\":\"to go, to walk\",\"note\":\"verb\"}," +
+                        "{\"term\":\"Gehen\",\"translation\":\"TO GO, TO WALK\"}," +
+                        "{\"term\":\"\",\"translation\":\"empty\"}," +
+                        "{\"term\":\"Haus\",\"translation\":\"house\",\"extra\":1}" +
+                        "]}\n```",
+                ),
+            )
+
+        val items = service.extractWordsFromImage("AAAA", "German", "English")
+
+        assertEquals(
+            listOf(ExtractedWordItem("gehen", "to go, to walk", "verb"), ExtractedWordItem("Haus", "house", "")),
+            items,
+        )
+    }
+
+    @Test
+    fun `extractWordsFromImage returns an empty list for an image without vocabulary`() {
+        expectChat().andRespond(answer("{\"items\":[]}"))
+
+        assertEquals(emptyList<ExtractedWordItem>(), service.extractWordsFromImage("AAAA", "German", "English"))
+    }
+
+    @Test
+    fun `extractWordsFromImage reports an unparseable answer to the user`() {
+        expectChat().andRespond(answer("Hallo,hello;Welt,world"))
+
+        assertThrows<UserFacingException> { service.extractWordsFromImage("AAAA", "German", "English") }
+    }
+
+    @Test
+    fun `extractWordsFromImage rejects images over 5MB without calling the API`() {
+        val oversize = "A".repeat((5 * 1024 * 1024 / 0.75).toInt() + 10)
+
+        assertThrows<IllegalArgumentException> { service.extractWordsFromImage(oversize, "German", "English") }
+        server.verify()
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun expectChat() = server.expect(requestTo(chatUrl))

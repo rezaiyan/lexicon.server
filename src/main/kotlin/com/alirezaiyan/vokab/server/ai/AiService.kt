@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service
 private val logger = KotlinLogging.logger {}
 
 private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
-
 /**
  * LLM features: each renders a [Prompt] template, calls the [AiClient] and decides what an empty
  * answer means (a fallback text or an error). Transport and API failures surface as
@@ -70,6 +69,40 @@ class AiService(
             ?: throw UserFacingException("No response from AI. Please try again.")
         unusableExtraction(text)?.let { throw UserFacingException(it) }
         return text
+    }
+
+    /**
+     * v2 photo extraction: the model answers JSON, which is validated here so clients receive clean,
+     * de-duplicated items and never parse text. An image without vocabulary yields an empty list.
+     */
+    fun extractWordsFromImage(
+        imageBase64: String,
+        learningLanguage: String,
+        nativeLanguage: String,
+        includePhrases: Boolean = false,
+    ): List<ExtractedWordItem> {
+        val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
+        require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
+        logger.info {
+            "[AI] Word extraction v2: size=~${estimatedSizeBytes / 1024}KB, " +
+                "learning=$learningLanguage, native=$nativeLanguage"
+        }
+
+        val prompt = promptTemplates.render(
+            Prompt.IMAGE_EXTRACTION_V2,
+            mapOf(
+                "learningLanguage" to learningLanguage,
+                "nativeLanguage" to nativeLanguage,
+                "extractionRule" to if (includePhrases) {
+                    "Extract individual words and short phrases (up to 6 words). Skip full paragraphs."
+                } else {
+                    "Extract individual words or short phrases of at most 3 words. Skip full sentences."
+                },
+            ),
+        )
+        val raw = aiClient.completeWithImage(imageBase64, prompt, AiOperation.IMAGE_EXTRACTION)
+            ?: throw UserFacingException("No response from AI. Please try again.")
+        return ExtractedWordsParser.parse(raw)
     }
 
     /** Why an extraction answer can't be imported, as a user-facing message; null when it can. */

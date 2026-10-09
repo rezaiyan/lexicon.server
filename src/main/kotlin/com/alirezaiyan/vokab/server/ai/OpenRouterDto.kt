@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Size
 import jakarta.validation.constraints.NotNull
 
 data class ExtractVocabularyRequest(
@@ -53,7 +54,15 @@ data class SuggestVocabularyRequest(
     val currentLevel: String,
 
     @field:NotBlank(message = "Native or current language is required")
-    val nativeLanguage: String
+    val nativeLanguage: String,
+
+    /** Optional focus topics; older clients omit it. */
+    @field:Size(max = 10, message = "At most 10 interests")
+    val interests: List<@Size(max = 40) String> = emptyList(),
+
+    /** ISO code of [targetLanguage] (e.g. "de"), used to skip words the user already has. */
+    @field:Size(max = 8)
+    val targetLanguageCode: String? = null,
 )
 
 /**
@@ -94,4 +103,29 @@ data class SuggestVocabularyResponse(
     val nativeLanguage: String,
     val currentLevel: String,
     val items: List<SuggestVocabularyItemResponse>
+)
+
+/** v2 photo extraction: explicit language pair in, structured items out (no text format to parse). */
+data class ExtractWordsRequest(
+    @field:NotBlank(message = "Image data is required")
+    val imageBase64: String,
+
+    @field:NotBlank(message = "Learning language is required")
+    val learningLanguage: String,
+
+    @field:NotBlank(message = "Native language is required")
+    val nativeLanguage: String,
+
+    /** Also return short phrases, not only single words. */
+    val includePhrases: Boolean = false,
+)
+
+data class ExtractedWordItem(
+    val term: String,
+    val translation: String,
+    val note: String = "",
+)
+
+data class ExtractWordsResponse(
+    val items: List<ExtractedWordItem>,
 )

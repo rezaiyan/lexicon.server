@@ -25,7 +25,7 @@ class WordUpsertPreparer(
             // Some words are new (no ID): must full-scan to detect duplicates by content
             wordRepository.findAllByUser(user)
         }
-        return existing.associateBy { WordKey(it.originalWord, it.translation) }
+        return existing.associateBy { WordKey.of(it.originalWord, it.translation, it.targetLanguage) }
     }
 
     /** Batch-loads all tags referenced by any DTO in the request (single query). */
@@ -44,7 +44,7 @@ class WordUpsertPreparer(
     ): LinkedHashMap<WordKey, Word> {
         val result = LinkedHashMap<WordKey, Word>()
         for (dto in words) {
-            val key = WordKey(dto.originalWord, dto.translation)
+            val key = WordKey.of(dto.originalWord, dto.translation, dto.targetLanguage)
             val entity = existingByKey[key]?.let { updateEntityFromDto(it, dto, tagById) }
                 ?: createEntityFromDto(user, dto, tagById)
             // last write wins within the same request
@@ -89,7 +89,19 @@ class WordUpsertPreparer(
         tags = dto.tagIds.mapNotNull { tagById[it] }.toMutableSet(),
     )
 
-    private data class WordKey(val originalWord: String, val translation: String)
+    /**
+     * Content identity of a word: same term and translation (case-insensitive) in the same learning
+     * language. The same term learned in two languages is two words.
+     */
+    private data class WordKey(val originalWord: String, val translation: String, val targetLanguage: String) {
+        companion object {
+            fun of(originalWord: String, translation: String, targetLanguage: String) = WordKey(
+                originalWord.trim().lowercase(),
+                translation.trim().lowercase(),
+                targetLanguage.trim().lowercase(),
+            )
+        }
+    }
 }
 
 

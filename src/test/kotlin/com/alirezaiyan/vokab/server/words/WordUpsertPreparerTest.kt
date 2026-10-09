@@ -69,6 +69,32 @@ class WordUpsertPreparerTest {
     }
 
     @Test
+    fun `prepareUpsertEntities matches existing words case-insensitively`() {
+        val user = createUser()
+        val existing = createWord(id = 42L, user = user, originalWord = "Apple", translation = "Apfel", level = 0)
+        every { wordRepository.findAllByUser(user) } returns listOf(existing)
+
+        val result = wordUpsertPreparer.prepareUpsertEntities(user, listOf(createWordDto(originalWord = "apple ", translation = "APFEL")))
+
+        assertEquals(42L, result.single().id)
+    }
+
+    @Test
+    fun `prepareUpsertEntities treats the same word in another learning language as new`() {
+        val user = createUser()
+        val existing = createWord(id = 42L, user = user, originalWord = "bank", translation = "bank")
+        every { wordRepository.findAllByUser(user) } returns listOf(existing)
+
+        val result = wordUpsertPreparer.prepareUpsertEntities(
+            user,
+            listOf(createWordDto(originalWord = "bank", translation = "bank", targetLanguage = "nl")),
+        )
+
+        assertNull(result.single().id)
+        assertEquals("nl", result.single().targetLanguage)
+    }
+
+    @Test
     fun `prepareUpsertEntities should handle duplicate keys by using last write`() {
         val user = createUser()
         val dto1 = createWordDto(originalWord = "apple", translation = "Apfel", level = 1)

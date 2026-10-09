@@ -37,12 +37,13 @@ interface WordRepository : JpaRepository<Word, Long> {
     """)
     fun findProgressRowsByUserId(userId: Long, nowMs: Long): List<ProgressRow>
 
+    /** Terms (originalWord, in the learning language) the user already has in [targetLanguage]. */
     @Query("""
-        SELECT w.translation FROM Word w
+        SELECT w.originalWord FROM Word w
         WHERE w.user = :user AND LOWER(w.targetLanguage) = LOWER(:targetLanguage)
-        AND TRIM(w.translation) <> ''
+        AND TRIM(w.originalWord) <> ''
     """)
-    fun findTranslationsByUserAndTargetLanguage(user: User, targetLanguage: String): List<String>
+    fun findTermsByUserAndTargetLanguage(user: User, targetLanguage: String): List<String>
 
     @Query(
         "SELECT w.user.id, COUNT(w) FROM Word w " +

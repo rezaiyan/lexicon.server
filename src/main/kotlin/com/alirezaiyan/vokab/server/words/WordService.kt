@@ -28,10 +28,11 @@ class WordService(
         return words.map { it.toDto() }
     }
 
+    /** Lower-cased terms the user already has in [targetLanguage] (stored as a language code, e.g. "de"). */
     @Transactional(readOnly = true)
-    fun getExistingTranslationKeys(userId: Long, targetLanguage: String): Set<String> {
+    fun getExistingTermKeys(userId: Long, targetLanguage: String): Set<String> {
         val user = userRepository.getReferenceById(userId)
-        return wordRepository.findTranslationsByUserAndTargetLanguage(user, targetLanguage)
+        return wordRepository.findTermsByUserAndTargetLanguage(user, targetLanguage)
             .map { it.trim().lowercase() }
             .toSet()
     }

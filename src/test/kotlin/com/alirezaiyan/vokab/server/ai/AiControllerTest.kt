@@ -362,7 +362,7 @@ class AiControllerTest {
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
         val existingKeys = setOf("hallo")
-        `when`(wordService.getExistingTranslationKeys(mockUser.requireId(), "German")).thenReturn(existingKeys)
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(existingKeys)
 
         val rawItems = listOf(
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello"),
@@ -396,7 +396,7 @@ class AiControllerTest {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
-        `when`(wordService.getExistingTranslationKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
         `when`(aiService.generateVocabularyFromPreferences(
             targetLanguage = "German",
             currentLevel = "beginner",
@@ -448,6 +448,54 @@ class AiControllerTest {
         createdAt = Instant.now(),
         updatedAt = Instant.now(),
     )
+
+    // ── POST /api/v1/ai/extract-words (v2) ────────────────────────────────────
+
+    @Test
+    fun `POST extract-words returns 402 when user lacks premium access`() {
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
+
+        mockMvc.perform(
+            post("/api/v1/ai/extract-words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+        )
+            .andExpect(status().isPaymentRequired)
+            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
+    }
+
+    @Test
+    fun `POST extract-words returns structured items`() {
+        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false))
+            .thenReturn(listOf(ExtractedWordItem("gehen", "to go, to walk", "verb")))
+
+        mockMvc.perform(
+            post("/api/v1/ai/extract-words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.data.items[0].term").value("gehen"))
+            .andExpect(jsonPath("$.data.items[0].translation").value("to go, to walk"))
+            .andExpect(jsonPath("$.data.items[0].note").value("verb"))
+    }
+
+    @Test
+    fun `POST extract-words returns 400 when languages are missing`() {
+        mockMvc.perform(
+            post("/api/v1/ai/extract-words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"imageBase64":"dGVzdA==","learningLanguage":"","nativeLanguage":"English"}""")
+        )
+            .andExpect(status().isBadRequest)
+    }
 
     private fun createExtractVocabularyRequest(
         imageBase64: String = "dGVzdA==",

@@ -34,20 +34,25 @@ class VocabularySuggestionService(
         existingKeys = emptySet(),
     )
 
-    /** Signed-in user: also drops words the user already has in [targetLanguage]. */
+    /**
+     * Signed-in user: also drops words the user already has. Words store language codes ("de") while
+     * prompts use names ("German"), so [targetLanguageCode] is used for that lookup when given.
+     */
     fun suggestForUser(
         userId: Long,
         targetLanguage: String,
         currentLevel: String,
         nativeLanguage: String,
+        interests: List<String> = emptyList(),
+        targetLanguageCode: String? = null,
     ): SuggestVocabularyResponse {
         val target = targetLanguage.trim()
         return suggest(
             targetLanguage = target,
             currentLevel = currentLevel.trim(),
             nativeLanguage = nativeLanguage.trim(),
-            interests = emptyList(),
-            existingKeys = wordService.getExistingTranslationKeys(userId, target),
+            interests = interests.map { it.trim() }.filter { it.isNotBlank() },
+            existingKeys = wordService.getExistingTermKeys(userId, targetLanguageCode?.trim() ?: target),
         )
     }
 

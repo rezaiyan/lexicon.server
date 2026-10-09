@@ -62,10 +62,22 @@ class VocabularySuggestionServiceTest {
     @Test
     fun `suggestForUser drops words the user already has`() {
         aiReturns("Haus", "Baum", "Auto")
-        every { wordService.getExistingTranslationKeys(user.requireId(), "German") } returns setOf("haus")
+        every { wordService.getExistingTermKeys(user.requireId(), "German") } returns setOf("haus")
 
         val response = service.suggestForUser(user.requireId(), " German", "beginner", "English")
 
         assertEquals(listOf("Baum", "Auto"), response.items.map { it.originalWord })
+    }
+
+    @Test
+    fun `suggestForUser looks up existing words by language code when given`() {
+        aiReturns("Haus", "Baum")
+        every { wordService.getExistingTermKeys(user.requireId(), "de") } returns setOf("haus")
+
+        val response = service.suggestForUser(
+            user.requireId(), "German", "beginner", "English", interests = listOf(" food "), targetLanguageCode = "de",
+        )
+
+        assertEquals(listOf("Baum"), response.items.map { it.originalWord })
     }
 }

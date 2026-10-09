@@ -53,6 +53,27 @@ class AiController(
         )))
     }
     
+    /** v2 photo extraction: explicit language pair, structured items (see [AiService.extractWordsFromImage]). */
+    @PostMapping("/extract-words")
+    fun extractWords(
+        @AuthenticationPrincipal user: AuthUser,
+        @Valid @RequestBody request: ExtractWordsRequest
+    ): ResponseEntity<ApiResponse<ExtractWordsResponse>> {
+        logger.info { "userId=${user.id} requesting word extraction (v2)" }
+
+        requirePremium(user, "AI image extraction")
+        consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
+
+        val items = aiService.extractWordsFromImage(
+            imageBase64 = request.imageBase64,
+            learningLanguage = request.learningLanguage,
+            nativeLanguage = request.nativeLanguage,
+            includePhrases = request.includePhrases,
+        )
+        logger.info { "Word extraction (v2) for userId=${user.id}: ${items.size} items" }
+        return ResponseEntity.ok(ApiResponse(success = true, data = ExtractWordsResponse(items)))
+    }
+
     @GetMapping("/generate-insight")
     fun generateInsight(
         @AuthenticationPrincipal user: AuthUser
@@ -121,6 +142,8 @@ class AiController(
             targetLanguage = request.targetLanguage,
             currentLevel = request.currentLevel,
             nativeLanguage = request.nativeLanguage,
+            interests = request.interests,
+            targetLanguageCode = request.targetLanguageCode,
         )
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }

@@ -177,6 +177,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseExtractWordsResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ExtractWordsResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseFeatureAccessResponse" : {
         "properties" : {
           "code" : {
@@ -1495,6 +1517,54 @@
         "required" : [ "extractSentences", "extractWords", "imageBase64", "targetLanguage" ],
         "type" : "object"
       },
+      "ExtractWordsRequest" : {
+        "properties" : {
+          "imageBase64" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "includePhrases" : {
+            "type" : "boolean"
+          },
+          "learningLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "nativeLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "imageBase64", "includePhrases", "learningLanguage", "nativeLanguage" ],
+        "type" : "object"
+      },
+      "ExtractWordsResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ExtractedWordItem"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "items" ],
+        "type" : "object"
+      },
+      "ExtractedWordItem" : {
+        "properties" : {
+          "note" : {
+            "type" : "string"
+          },
+          "term" : {
+            "type" : "string"
+          },
+          "translation" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "note", "term", "translation" ],
+        "type" : "object"
+      },
       "FeatureAccessResponse" : {
         "properties" : {
           "featureFlags" : {
@@ -2121,6 +2191,14 @@
             "minLength" : 1,
             "type" : "string"
           },
+          "interests" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 10,
+            "minItems" : 0,
+            "type" : "array"
+          },
           "nativeLanguage" : {
             "minLength" : 1,
             "type" : "string"
@@ -2128,9 +2206,14 @@
           "targetLanguage" : {
             "minLength" : 1,
             "type" : "string"
+          },
+          "targetLanguageCode" : {
+            "maxLength" : 8,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "currentLevel", "nativeLanguage", "targetLanguage" ],
+        "required" : [ "currentLevel", "interests", "nativeLanguage", "targetLanguage" ],
         "type" : "object"
       },
       "SuggestVocabularyResponse" : {
@@ -3176,6 +3259,34 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseVocabularyExtractionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "ai-controller" ]
+      }
+    },
+    "/api/v1/ai/extract-words" : {
+      "post" : {
+        "operationId" : "extractWords",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ExtractWordsRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseExtractWordsResponse"
                 }
               }
             },

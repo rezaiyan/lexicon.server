@@ -6,7 +6,7 @@ import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import com.alirezaiyan.vokab.server.shared.PremiumRequiredException
-import com.alirezaiyan.vokab.server.shared.RateLimitExceededException
+import com.alirezaiyan.vokab.server.shared.consumeOrThrow
 import com.alirezaiyan.vokab.server.shared.ApiResponse
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import io.github.bucket4j.Bucket
@@ -184,10 +184,8 @@ class AiController(
         throw PremiumRequiredException(feature)
     }
 
-    /** Takes one token from [bucket], or throws [RateLimitExceededException] (429). */
+    /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */
     private fun consumeRateLimit(user: AuthUser, bucket: Bucket, endpoint: String) {
-        if (bucket.tryConsume(1)) return
-        logger.warn { "Rate limit exceeded for userId=${user.id} on $endpoint" }
-        throw RateLimitExceededException()
+        bucket.consumeOrThrow { logger.warn { "Rate limit exceeded for userId=${user.id} on $endpoint" } }
     }
 }

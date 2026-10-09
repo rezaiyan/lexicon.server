@@ -34,8 +34,10 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import java.time.Duration
 import java.time.Instant
 
 @WebMvcTest(AiController::class)
@@ -111,6 +113,7 @@ class AiControllerTest {
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(header().exists("Retry-After"))
     }
 
     @Test
@@ -214,6 +217,7 @@ class AiControllerTest {
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(header().exists("Retry-After"))
     }
 
     @Test
@@ -313,6 +317,7 @@ class AiControllerTest {
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(header().exists("Retry-After"))
     }
 
     @Test
@@ -371,6 +376,7 @@ class AiControllerTest {
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(header().exists("Retry-After"))
     }
 
     @Test
@@ -593,15 +599,11 @@ class AiControllerTest {
         nativeLanguage = nativeLanguage,
     )
 
-    private fun createAllowedBucket(): Bucket {
-        val bucket = org.mockito.Mockito.mock(Bucket::class.java)
-        `when`(bucket.tryConsume(1)).thenReturn(true)
-        return bucket
-    }
+    private fun createAllowedBucket(): Bucket =
+        Bucket.builder().addLimit { it.capacity(100).refillIntervally(100, Duration.ofMinutes(5)) }.build()
 
-    private fun createRateLimitedBucket(): Bucket {
-        val bucket = org.mockito.Mockito.mock(Bucket::class.java)
-        `when`(bucket.tryConsume(1)).thenReturn(false)
-        return bucket
-    }
+    /** A real bucket already used up, so the rejection carries a real wait time. */
+    private fun createRateLimitedBucket(): Bucket =
+        Bucket.builder().addLimit { it.capacity(1).refillIntervally(1, Duration.ofMinutes(5)) }.build()
+            .also { it.tryConsume(1) }
 }

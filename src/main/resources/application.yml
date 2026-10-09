@@ -119,6 +119,12 @@ app:
       AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:1}
       TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
 
+  # Per-user call limits on the AI endpoints; each limit resets in full every window.
+  rate-limit:
+    window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
+    photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
+    ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.
     webhook-secret: ${REVENUECAT_WEBHOOK_SECRET:}

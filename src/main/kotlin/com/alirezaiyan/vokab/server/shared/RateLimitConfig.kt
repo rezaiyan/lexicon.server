@@ -7,35 +7,23 @@ import java.time.Duration
 import java.util.concurrent.ConcurrentHashMap
 
 @Configuration
-class RateLimitConfig {
-    
+class RateLimitConfig(private val appProperties: AppProperties) {
+
     private val cache: MutableMap<String, Bucket> = ConcurrentHashMap()
     
-    /**
-     * Get rate limit bucket for AI endpoints
-     * Limit: 10 requests per minute per user
-     */
-    fun getAiBucket(userId: String): Bucket {
-        return cache.computeIfAbsent(userId) {
-            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
-            Bucket.builder()
-                .addLimit(limit)
-                .build()
-        }
-    }
-    
-    /**
-     * Get rate limit bucket for image processing
-     * Limit: 5 images per minute per user (more restrictive due to higher cost)
-     */
-    fun getImageProcessingBucket(userId: String): Bucket {
-        val key = "image_$userId"
-        return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
-            Bucket.builder()
-                .addLimit(limit)
-                .build()
-        }
+    /** Text AI calls (insight, translation, suggestions) per user: `app.rate-limit.ai-calls` per window. */
+    fun getAiBucket(userId: String): Bucket =
+        cache.computeIfAbsent(userId) { windowBucket(appProperties.rateLimit.aiCalls) }
+
+    /** Photo extraction calls per user: `app.rate-limit.photo-calls` per window (each call costs more). */
+    fun getImageProcessingBucket(userId: String): Bucket =
+        cache.computeIfAbsent("image_$userId") { windowBucket(appProperties.rateLimit.photoCalls) }
+
+    /** [calls] tokens that all come back at once at the end of each `app.rate-limit.window-minutes`. */
+    private fun windowBucket(calls: Long): Bucket {
+        val window = Duration.ofMinutes(appProperties.rateLimit.windowMinutes)
+        val limit = Bandwidth.builder().capacity(calls).refillIntervally(calls, window).build()
+        return Bucket.builder().addLimit(limit).build()
     }
     
     /**
@@ -95,3 +83,17 @@ class RateLimitConfig {
     }
 }
 
+
+/**
+ * Takes one token, or calls [onRejected] and throws [RateLimitExceededException] saying how long
+ * until the next token.
+ */
+fun Bucket.consumeOrThrow(onRejected: () -> Unit = {}) {
+    val probe = tryConsumeAndReturnRemaining(1)
+    if (probe.isConsumed) return
+    onRejected()
+    val seconds = (probe.nanosToWaitForRefill + NANOS_PER_SECOND - 1) / NANOS_PER_SECOND
+    throw RateLimitExceededException.retryIn(seconds)
+}
+
+private const val NANOS_PER_SECOND = 1_000_000_000L

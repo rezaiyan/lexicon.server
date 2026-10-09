@@ -18,7 +18,8 @@ data class AppProperties(
     var vocabulary: VocabularyConfig = VocabularyConfig(),
     var ciAuth: CiAuthConfig = CiAuthConfig(),
     var notifications: NotificationsConfig = NotificationsConfig(),
-    var geolocation: GeoLocationConfig = GeoLocationConfig()
+    var geolocation: GeoLocationConfig = GeoLocationConfig(),
+    var rateLimit: RateLimitProperties = RateLimitProperties()
 )
 
 data class JwtConfig(
@@ -92,6 +93,16 @@ data class LoggingConfig(
  */
 data class VocabularyConfig(
     var suggestionCount: Int = 50
+)
+
+/**
+ * Per-user call limits for the paid AI endpoints. Each limit resets in full every [windowMinutes].
+ * Photo extraction has its own, smaller limit because each call costs more.
+ */
+data class RateLimitProperties(
+    var windowMinutes: Long = 5,
+    var photoCalls: Long = 20,
+    var aiCalls: Long = 50
 )
 
 data class CiAuthConfig(

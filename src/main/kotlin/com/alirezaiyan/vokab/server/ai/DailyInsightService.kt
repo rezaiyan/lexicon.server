@@ -17,7 +17,6 @@ import java.time.Instant
 import java.time.LocalDate
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
-import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 private val logger = KotlinLogging.logger {}
@@ -30,7 +29,6 @@ class DailyInsightService(
     private val aiService: AiService,
     private val userProgressService: UserProgressService,
     private val pushNotificationService: PushNotificationService,
-    private val featureAccessService: FeatureAccessService,
     private val learnerSignals: LearnerSignals,
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val userRepository: UserRepository,
@@ -69,23 +67,17 @@ class DailyInsightService(
     /**
      * Generate daily insight for a specific user.
      *
-     * Logic:
-     * 1. Gate on premium access.
-     * 2. Return existing insight if already generated today (idempotent).
-     * 3. Frequency cap: if the user has an active streak but hasn't reviewed yet,
+     * Logic (every user, free and premium alike):
+     * 1. Return existing insight if already generated today (idempotent).
+     * 2. Frequency cap: if the user has an active streak but hasn't reviewed yet,
      *    the 22:00 streak reminder will fire — skip the morning insight to avoid
      *    double-notifying, UNLESS the user's reminder time is ≥ 20:00 (in which
      *    case this insight IS their evening notification).
-     * 4. If the user already reviewed today → send a celebration insight.
+     * 3. If the user already reviewed today → send a celebration insight.
      *    Otherwise → send a motivational insight.
      */
     fun generateDailyInsightForUser(user: User): DailyInsight? {
         logger.info { "Generating daily insight for user ${user.id}" }
-
-        if (!featureAccessService.hasActivePremiumAccess(user)) {
-            logger.debug { "User ${user.id} lacks premium access, skipping insight" }
-            return null
-        }
 
         val today = LocalDate.now(clock).toString()
 

@@ -12,7 +12,6 @@ import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
-import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.words.WordService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
@@ -56,9 +55,6 @@ class AiControllerTest {
 
     @MockitoBean
     private lateinit var rateLimitConfig: RateLimitConfig
-
-    @MockitoBean
-    private lateinit var featureAccessService: FeatureAccessService
 
     /** Unstubbed, `spend` returns null (a free action), so the real [CreditCharger] runs the work. */
     @MockitoBean
@@ -192,21 +188,7 @@ class AiControllerTest {
     // ── GET /api/v1/ai/generate-insight ──────────────────────────────────────
 
     @Test
-    fun `GET generate-insight should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
-
-        mockMvc.perform(
-            get("/api/v1/ai/generate-insight")
-                .with(authentication(auth))
-        )
-            .andExpect(status().isPaymentRequired)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
-    }
-
-    @Test
     fun `GET generate-insight should return 429 when rate limit exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createRateLimitedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
@@ -221,8 +203,7 @@ class AiControllerTest {
     }
 
     @Test
-    fun `GET generate-insight should return 200 with today's insight`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
+    fun `GET generate-insight should return 200 with today's insight for any signed-in user`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
 
@@ -241,7 +222,6 @@ class AiControllerTest {
 
     @Test
     fun `GET generate-insight should return 500 when insight generation fails`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(dailyInsightService.getOrGenerateTodaysInsight(mockUser.requireId()))

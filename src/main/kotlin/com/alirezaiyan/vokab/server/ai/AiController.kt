@@ -5,10 +5,8 @@ import com.alirezaiyan.vokab.server.credits.CreditCharger
 import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
-import com.alirezaiyan.vokab.server.shared.PremiumRequiredException
 import com.alirezaiyan.vokab.server.shared.consumeOrThrow
 import com.alirezaiyan.vokab.server.shared.ApiResponse
-import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import io.github.bucket4j.Bucket
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.validation.Valid
@@ -20,15 +18,14 @@ private val logger = KotlinLogging.logger {}
 
 /**
  * AI features. Photo extraction, suggestions and translation spend credits (402
- * `INSUFFICIENT_CREDITS` when short; refunded when the call fails or yields nothing); the daily
- * insight is a premium perk (402 `PREMIUM_REQUIRED`). Rate limits apply on top of both.
+ * `INSUFFICIENT_CREDITS` when short; refunded when the call fails or yields nothing). The daily
+ * insight is free for everyone: one cached generation per user per day. Rate limits apply to all.
  */
 @RestController
 @RequestMapping("/api/v1/ai")
 class AiController(
     private val aiService: AiService,
     private val rateLimitConfig: RateLimitConfig,
-    private val featureAccessService: FeatureAccessService,
     private val appProperties: AppProperties,
     private val dailyInsightService: DailyInsightService,
     private val vocabularySuggestionService: VocabularySuggestionService,
@@ -91,7 +88,6 @@ class AiController(
     ): ResponseEntity<ApiResponse<InsightResponse>> {
         logger.info { "userId=${user.id} requesting daily insight (fallback)" }
 
-        requirePremium(user, "AI insights")
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "AI insight")
 
         val insight = dailyInsightService.getOrGenerateTodaysInsight(user.id)
@@ -175,13 +171,6 @@ class AiController(
                 )
             )
         )
-    }
-
-    /** Throws [PremiumRequiredException] (402) unless the user has premium access. */
-    private fun requirePremium(user: AuthUser, feature: String) {
-        if (featureAccessService.hasActivePremiumAccess(user.id)) return
-        logger.warn { "userId=${user.id} attempted $feature without premium access" }
-        throw PremiumRequiredException(feature)
     }
 
     /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */

@@ -31,7 +31,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.dao.DataIntegrityViolationException
 import java.time.Instant
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
-import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class DailyInsightServiceTest {
@@ -42,7 +41,6 @@ class DailyInsightServiceTest {
     private lateinit var aiService: AiService
     private lateinit var userProgressService: UserProgressService
     private lateinit var pushNotificationService: PushNotificationService
-    private lateinit var featureAccessService: FeatureAccessService
     private lateinit var learnerSignals: LearnerSignals
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
     private lateinit var userRepository: UserRepository
@@ -57,7 +55,6 @@ class DailyInsightServiceTest {
         aiService = mockk()
         userProgressService = mockk()
         pushNotificationService = mockk()
-        featureAccessService = mockk()
         learnerSignals = mockk()
         notificationScheduleRepository = mockk()
         userRepository = mockk()
@@ -69,7 +66,6 @@ class DailyInsightServiceTest {
             aiService = aiService,
             userProgressService = userProgressService,
             pushNotificationService = pushNotificationService,
-            featureAccessService = featureAccessService,
             learnerSignals = learnerSignals,
             notificationScheduleRepository = notificationScheduleRepository,
             userRepository = userRepository,
@@ -80,26 +76,11 @@ class DailyInsightServiceTest {
     // --- generateDailyInsightForUser ---
 
     @Test
-    fun `should return null when user lacks premium access`() {
-        // Arrange
-        val user = createUser()
-        every { featureAccessService.hasActivePremiumAccess(user) } returns false
-
-        // Act
-        val result = dailyInsightService.generateDailyInsightForUser(user)
-
-        // Assert
-        assertNull(result)
-        verify(exactly = 0) { dailyInsightRepository.findByUserAndDate(any(), any()) }
-    }
-
-    @Test
     fun `should return existing insight when already generated today`() {
         // Arrange
         val user = createUser()
         val today = TEST_TODAY.toString()
         val existing = createDailyInsight(user = user, date = today)
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns existing
 
         // Act
@@ -116,7 +97,6 @@ class DailyInsightServiceTest {
         val user = createUser(currentStreak = 5)
         val today = TEST_TODAY.toString()
         val settings = createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns settings
@@ -137,7 +117,6 @@ class DailyInsightServiceTest {
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Great work!")
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
@@ -161,7 +140,6 @@ class DailyInsightServiceTest {
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
@@ -189,7 +167,6 @@ class DailyInsightServiceTest {
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "20:00")
@@ -216,7 +193,6 @@ class DailyInsightServiceTest {
         val user = createUser(currentStreak = 3)
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
@@ -237,7 +213,6 @@ class DailyInsightServiceTest {
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val existingInsight = createDailyInsight(user = user, date = today)
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
@@ -330,9 +305,11 @@ class DailyInsightServiceTest {
 
     @Test
     fun `should do nothing when insight generation returns null`() {
-        // Arrange
-        val user = createUser()
-        every { featureAccessService.hasActivePremiumAccess(user) } returns false
+        // Arrange: streak at risk with an early reminder, so generation is skipped
+        val user = createUser(currentStreak = 5)
+        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns null
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
+        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
 
         // Act
         dailyInsightService.generateAndSendForUser(user)
@@ -356,7 +333,6 @@ class DailyInsightServiceTest {
         val today = TEST_TODAY.toString()
         val stats = createProgressStats()
         val unsent = createDailyInsight(user = user, date = today, sentViaPush = false)
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
         every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
@@ -394,7 +370,6 @@ class DailyInsightServiceTest {
         val user = createUser()
         val today = TEST_TODAY.toString()
         val alreadySent = createDailyInsight(user = user, date = today, sentViaPush = true)
-        every { featureAccessService.hasActivePremiumAccess(user) } returns true
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns alreadySent
 
         // Act

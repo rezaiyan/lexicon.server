@@ -12,7 +12,6 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
-import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.study.UserProgressService
 
@@ -23,7 +22,6 @@ class NotificationTypeSelector(
     private val dailyActivityRepository: DailyActivityRepository,
     private val userProgressService: UserProgressService,
     private val learnerSignals: LearnerSignals,
-    private val featureAccessService: FeatureAccessService,
     private val milestoneDetector: MilestoneDetector,
     private val clock: Clock
 ) {
@@ -47,8 +45,7 @@ class NotificationTypeSelector(
         if (hasReviewedToday) {
             return when {
                 milestoneDetector.hasPendingMilestone(user) -> NotificationType.PROGRESS_MILESTONE
-                featureAccessService.hasActivePremiumAccess(user) -> NotificationType.DAILY_INSIGHT
-                else -> NotificationType.NONE
+                else -> NotificationType.DAILY_INSIGHT
             }
         }
 
@@ -76,8 +73,7 @@ class NotificationTypeSelector(
         }
         if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
-        return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
-        else NotificationType.NONE
+        return NotificationType.DAILY_INSIGHT
     }
 
     /**
@@ -95,7 +91,6 @@ class NotificationTypeSelector(
         }
         if (comebackWord != null) return NotificationType.COMEBACK_ALERT
 
-        return if (featureAccessService.hasActivePremiumAccess(user)) NotificationType.DAILY_INSIGHT
-        else NotificationType.DUE_CARDS
+        return NotificationType.DAILY_INSIGHT
     }
 }

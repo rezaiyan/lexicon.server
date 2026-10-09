@@ -5,7 +5,6 @@ package com.alirezaiyan.vokab.server.shared
  * so the strings are part of the API contract: add new ones freely, never rename.
  */
 object ApiErrorCode {
-    const val PREMIUM_REQUIRED = "PREMIUM_REQUIRED"
     const val INSUFFICIENT_CREDITS = "INSUFFICIENT_CREDITS"
     const val RATE_LIMITED = "RATE_LIMITED"
     const val UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
@@ -18,17 +17,8 @@ object ApiErrorCode {
 class UpstreamServiceException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 /**
- * The feature needs an active premium subscription or grant. Mapped to 402 Payment Required.
- *
- * Deliberately not 403: the app treats 401/403 as "session invalid" and refreshes its tokens,
- * whereas this case should open the paywall.
- */
-class PremiumRequiredException(feature: String) :
-    RuntimeException("Premium subscription required to use $feature")
-
-/**
- * Not enough AI credits for the action. Mapped to 402 like [PremiumRequiredException], told apart
- * by its code: the app shows the balance and offers more credits instead of a plain paywall.
+ * Not enough AI credits for the action. Mapped to 402 Payment Required (not 403: the app
+ * treats 401/403 as "session invalid"); the app shows the balance and offers more credits.
  */
 class InsufficientCreditsException(action: String, val required: Int, val available: Int) :
     RuntimeException("Not enough credits for $action: needs $required, has $available")

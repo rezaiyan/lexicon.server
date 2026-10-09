@@ -25,6 +25,22 @@ class UpstreamServiceException(message: String, cause: Throwable? = null) : Runt
 class PremiumRequiredException(feature: String) :
     RuntimeException("Premium subscription required to use $feature")
 
-/** The caller exhausted a rate-limit bucket. Mapped to 429. */
-class RateLimitExceededException(message: String = "Rate limit exceeded. Please try again later.") :
-    RuntimeException(message)
+/**
+ * The caller exhausted a rate-limit bucket. Mapped to 429, with a `Retry-After` header when
+ * [retryAfterSeconds] is known.
+ */
+class RateLimitExceededException(
+    message: String = "Rate limit exceeded. Please try again later.",
+    val retryAfterSeconds: Long? = null,
+) : RuntimeException(message) {
+    companion object {
+        /** A rejection that resets in [seconds]; the message rounds up to whole minutes. */
+        fun retryIn(seconds: Long): RateLimitExceededException {
+            val minutes = maxOf(1, (seconds + SECONDS_PER_MINUTE - 1) / SECONDS_PER_MINUTE)
+            val unit = if (minutes == 1L) "minute" else "minutes"
+            return RateLimitExceededException("Too many requests. Try again in $minutes $unit.", seconds)
+        }
+
+        private const val SECONDS_PER_MINUTE = 60L
+    }
+}

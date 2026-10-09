@@ -107,6 +107,12 @@ app:
     # Can be overridden via VOCABULARY_SUGGESTION_COUNT in the environment.
     suggestionCount: ${VOCABULARY_SUGGESTION_COUNT:50}
 
+  # Per-user call limits on the AI endpoints; each limit resets in full every window.
+  rate-limit:
+    window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
+    photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
+    ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.
     webhook-secret: ${REVENUECAT_WEBHOOK_SECRET:}

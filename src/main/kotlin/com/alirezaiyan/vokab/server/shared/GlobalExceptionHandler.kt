@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.shared
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.authentication.BadCredentialsException
@@ -46,9 +47,9 @@ class GlobalExceptionHandler {
     @ExceptionHandler(RateLimitExceededException::class)
     fun handleRateLimitExceededException(ex: RateLimitExceededException): ResponseEntity<ApiResponse<Unit>> {
         logger.warn { "RateLimitExceededException: ${ex.message}" }
-        return ResponseEntity
-            .status(HttpStatus.TOO_MANY_REQUESTS)
-            .body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.RATE_LIMITED))
+        val response = ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        ex.retryAfterSeconds?.let { response.header(HttpHeaders.RETRY_AFTER, it.toString()) }
+        return response.body(ApiResponse(success = false, message = ex.message, code = ApiErrorCode.RATE_LIMITED))
     }
 
     @ExceptionHandler(UpstreamServiceException::class)

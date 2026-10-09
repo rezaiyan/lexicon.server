@@ -6,6 +6,7 @@ package com.alirezaiyan.vokab.server.shared
  */
 object ApiErrorCode {
     const val PREMIUM_REQUIRED = "PREMIUM_REQUIRED"
+    const val INSUFFICIENT_CREDITS = "INSUFFICIENT_CREDITS"
     const val RATE_LIMITED = "RATE_LIMITED"
     const val UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
 }
@@ -24,6 +25,13 @@ class UpstreamServiceException(message: String, cause: Throwable? = null) : Runt
  */
 class PremiumRequiredException(feature: String) :
     RuntimeException("Premium subscription required to use $feature")
+
+/**
+ * Not enough AI credits for the action. Mapped to 402 like [PremiumRequiredException], told apart
+ * by its code: the app shows the balance and offers more credits instead of a plain paywall.
+ */
+class InsufficientCreditsException(action: String, val required: Int, val available: Int) :
+    RuntimeException("Not enough credits for $action: needs $required, has $available")
 
 /**
  * The caller exhausted a rate-limit bucket. Mapped to 429, with a `Retry-After` header when

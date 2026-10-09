@@ -332,6 +332,54 @@ class FeatureAccessServiceTest {
         assertThrows(NoSuchElementException::class.java) { featureAccessService.getFeatureAccess(404L) }
     }
 
+    // --- accessLevel ---
+
+    @Test
+    fun `accessLevel is FREE without a subscription or grant`() {
+        assertEquals(AccessLevel.FREE, accessLevelOf(createUser()))
+    }
+
+    @Test
+    fun `accessLevel is FREE once the store subscription has expired`() {
+        val user = createUser(subscriptionStatus = SubscriptionStatus.ACTIVE, subscriptionExpiresAt = TEST_NOW.minusSeconds(1))
+        assertEquals(AccessLevel.FREE, accessLevelOf(user))
+    }
+
+    @Test
+    fun `accessLevel is TRIAL during a store trial`() {
+        val user = createUser(subscriptionStatus = SubscriptionStatus.TRIAL, subscriptionExpiresAt = TEST_NOW.plusSeconds(86400))
+        assertEquals(AccessLevel.TRIAL, accessLevelOf(user))
+    }
+
+    @Test
+    fun `accessLevel is PREMIUM for a paid subscription, including a cancelled one still in its period`() {
+        val active = createUser(subscriptionStatus = SubscriptionStatus.ACTIVE, subscriptionExpiresAt = TEST_NOW.plusSeconds(86400))
+        val cancelled = createUser(subscriptionStatus = SubscriptionStatus.CANCELLED, subscriptionExpiresAt = TEST_NOW.plusSeconds(86400))
+        assertEquals(AccessLevel.PREMIUM, accessLevelOf(active))
+        assertEquals(AccessLevel.PREMIUM, accessLevelOf(cancelled))
+    }
+
+    @Test
+    fun `accessLevel is PREMIUM for a grant, even during a store trial`() {
+        val user = createUser(
+            subscriptionStatus = SubscriptionStatus.TRIAL,
+            subscriptionExpiresAt = TEST_NOW.plusSeconds(86400),
+            premiumGrantUntil = TEST_NOW.plusSeconds(86400),
+        )
+        assertEquals(AccessLevel.PREMIUM, accessLevelOf(user))
+    }
+
+    @Test
+    fun `accessLevel is FREE for an unknown user`() {
+        every { userRepository.findById(404L) } returns Optional.empty()
+        assertEquals(AccessLevel.FREE, featureAccessService.accessLevel(404L))
+    }
+
+    private fun accessLevelOf(user: User): AccessLevel {
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        return featureAccessService.accessLevel(1L)
+    }
+
     // --- Factory functions ---
 
     private fun createUser(

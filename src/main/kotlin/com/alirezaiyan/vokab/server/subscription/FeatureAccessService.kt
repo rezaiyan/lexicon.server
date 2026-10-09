@@ -54,6 +54,21 @@ class FeatureAccessService(
     }
 
     /**
+     * Coarse access level for usage quotas (AI credits). A grant counts as full premium even during
+     * a store trial: grants are comps and test users. An unknown user is FREE.
+     */
+    fun accessLevel(userId: Long): AccessLevel {
+        val user = userRepository.findById(userId).orElse(null) ?: return AccessLevel.FREE
+        val now = Instant.now(clock)
+        return when {
+            hasActiveGrant(user, now) -> AccessLevel.PREMIUM
+            !hasActiveStoreSubscription(user, now) -> AccessLevel.FREE
+            user.subscriptionStatus == SubscriptionStatus.TRIAL -> AccessLevel.TRIAL
+            else -> AccessLevel.PREMIUM
+        }
+    }
+
+    /**
      * Flags plus the user's access, read from the database so a subscription change made
      * earlier in the same request (e.g. a store sync) is reflected.
      */
@@ -108,6 +123,9 @@ data class ClientFeatureFlags(
 )
 
 enum class PremiumSource { STORE, GRANT, NONE }
+
+/** What the user pays for, ordered from least to most; drives quotas such as AI credits. */
+enum class AccessLevel { FREE, TRIAL, PREMIUM }
 
 /**
  * User's personal feature access status.

@@ -107,6 +107,18 @@ app:
     # Can be overridden via VOCABULARY_SUGGESTION_COUNT in the environment.
     suggestionCount: ${VOCABULARY_SUGGESTION_COUNT:50}
 
+  # AI credits (see CreditService). Allowances reset monthly per tier and never roll over; the
+  # signup bonus never expires. The app reads costs and allowances from GET /api/v1/credits.
+  credits:
+    signup-bonus: ${CREDITS_SIGNUP_BONUS:15}
+    free-monthly-allowance: ${CREDITS_FREE_MONTHLY:5}
+    trial-monthly-allowance: ${CREDITS_TRIAL_MONTHLY:30}
+    premium-monthly-allowance: ${CREDITS_PREMIUM_MONTHLY:300}
+    costs:
+      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:3}
+      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:1}
+      TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
+
   # Per-user call limits on the AI endpoints; each limit resets in full every window.
   rate-limit:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}

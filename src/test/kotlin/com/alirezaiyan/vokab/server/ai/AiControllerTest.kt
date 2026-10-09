@@ -1,6 +1,11 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.credits.CreditAction
+import com.alirezaiyan.vokab.server.credits.CreditCharger
+import com.alirezaiyan.vokab.server.credits.CreditService
+import com.alirezaiyan.vokab.server.credits.CreditSpend
 import com.alirezaiyan.vokab.server.shared.ControllerTestSecurityConfig
+import com.alirezaiyan.vokab.server.shared.InsufficientCreditsException
 import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
@@ -12,6 +17,11 @@ import com.alirezaiyan.vokab.server.words.WordService
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import org.junit.jupiter.api.Test
+import org.mockito.ArgumentMatchers.anyBoolean
+import org.mockito.ArgumentMatchers.anyList
+import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -32,7 +42,7 @@ import java.time.Instant
 
 @WebMvcTest(AiController::class)
 @ActiveProfiles("test")
-@Import(ControllerTestSecurityConfig::class, VocabularySuggestionService::class)
+@Import(ControllerTestSecurityConfig::class, VocabularySuggestionService::class, CreditCharger::class)
 class AiControllerTest {
 
     @Autowired
@@ -50,6 +60,10 @@ class AiControllerTest {
     @MockitoBean
     private lateinit var featureAccessService: FeatureAccessService
 
+    /** Unstubbed, `spend` returns null (a free action), so the real [CreditCharger] runs the work. */
+    @MockitoBean
+    private lateinit var creditService: CreditService
+
 
     @MockitoBean
     private lateinit var dailyInsightService: DailyInsightService
@@ -63,8 +77,11 @@ class AiControllerTest {
     // ── POST /api/v1/ai/extract-vocabulary ────────────────────────────────────
 
     @Test
-    fun `POST extract-vocabulary should return 402 PREMIUM_REQUIRED when user lacks premium access`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
+    fun `POST extract-vocabulary should return 402 INSUFFICIENT_CREDITS when credits run out`() {
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION))
+            .thenThrow(InsufficientCreditsException("PHOTO_EXTRACTION", required = 3, available = 1))
 
         val request = createExtractVocabularyRequest()
 
@@ -75,13 +92,13 @@ class AiControllerTest {
                 .content(objectMapper.writeValueAsString(request))
         )
             .andExpect(status().isPaymentRequired)
-            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
             .andExpect(jsonPath("$.success").value(false))
+        verify(aiService, never()).extractVocabularyFromImage(anyString(), anyString(), anyBoolean(), anyBoolean())
     }
 
     @Test
     fun `POST extract-vocabulary should return 429 when rate limit exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createRateLimitedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
 
@@ -100,8 +117,7 @@ class AiControllerTest {
     }
 
     @Test
-    fun `POST extract-vocabulary should return 200 with extracted text when premium user and rate not exceeded`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
+    fun `POST extract-vocabulary should return 200 with extracted text when credits suffice and rate not exceeded`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(aiService.extractVocabularyFromImage(
@@ -127,7 +143,6 @@ class AiControllerTest {
 
     @Test
     fun `POST extract-vocabulary should return 500 when extraction throws exception`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(aiService.extractVocabularyFromImage(
@@ -150,8 +165,9 @@ class AiControllerTest {
     }
 
     @Test
-    fun `POST extract-vocabulary should return 502 UPSTREAM_UNAVAILABLE when OpenRouter fails`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
+    fun `POST extract-vocabulary should return 502 UPSTREAM_UNAVAILABLE and refund when OpenRouter fails`() {
+        val spend = CreditSpend(transactionId = 7, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION)).thenReturn(spend)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(aiService.extractVocabularyFromImage(
@@ -170,6 +186,7 @@ class AiControllerTest {
             .andExpect(status().isBadGateway)
             .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"))
             .andExpect(jsonPath("$.message").value("A service we depend on is unavailable. Please try again shortly."))
+        verify(creditService).refund(spend)
     }
 
     // ── GET /api/v1/ai/generate-insight ──────────────────────────────────────
@@ -363,6 +380,42 @@ class AiControllerTest {
     }
 
     @Test
+    fun `POST suggest-vocabulary should return 402 INSUFFICIENT_CREDITS without calling the AI`() {
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.AI_SUGGESTION))
+            .thenThrow(InsufficientCreditsException("AI_SUGGESTION", required = 1, available = 0))
+
+        mockMvc.perform(
+            post("/api/v1/ai/suggest-vocabulary")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSuggestVocabularyRequest()))
+        )
+            .andExpect(status().isPaymentRequired)
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
+        verify(aiService, never()).generateVocabularyFromPreferences(anyString(), anyString(), anyString(), anyList())
+    }
+
+    @Test
+    fun `POST translate-text should return 402 INSUFFICIENT_CREDITS without calling the AI`() {
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.TEXT_TRANSLATION))
+            .thenThrow(InsufficientCreditsException("TEXT_TRANSLATION", required = 1, available = 0))
+
+        mockMvc.perform(
+            post("/api/v1/ai/translate-text")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"text":"Hallo","targetLanguage":"English"}""")
+        )
+            .andExpect(status().isPaymentRequired)
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
+        verify(aiService, never()).translateText(anyString(), anyString())
+    }
+
+    @Test
     fun `POST suggest-vocabulary should return 200 with de-duplicated suggestions`() {
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(bucket)
@@ -458,8 +511,11 @@ class AiControllerTest {
     // ── POST /api/v1/ai/extract-words (v2) ────────────────────────────────────
 
     @Test
-    fun `POST extract-words returns 402 when user lacks premium access`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(false)
+    fun `POST extract-words returns 402 INSUFFICIENT_CREDITS when credits run out, whatever the plan`() {
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION))
+            .thenThrow(InsufficientCreditsException("PHOTO_EXTRACTION", required = 3, available = 0))
 
         mockMvc.perform(
             post("/api/v1/ai/extract-words")
@@ -468,12 +524,30 @@ class AiControllerTest {
                 .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
         )
             .andExpect(status().isPaymentRequired)
-            .andExpect(jsonPath("$.code").value("PREMIUM_REQUIRED"))
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
+    }
+
+    @Test
+    fun `POST extract-words refunds when nothing is recognised`() {
+        val spend = CreditSpend(transactionId = 8, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION)).thenReturn(spend)
+        val bucket = createAllowedBucket()
+        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
+        `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false)).thenReturn(emptyList())
+
+        mockMvc.perform(
+            post("/api/v1/ai/extract-words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.items.length()").value(0))
+        verify(creditService).refund(spend)
     }
 
     @Test
     fun `POST extract-words returns structured items`() {
-        `when`(featureAccessService.hasActivePremiumAccess(mockUser.requireId())).thenReturn(true)
         val bucket = createAllowedBucket()
         `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
         `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false))

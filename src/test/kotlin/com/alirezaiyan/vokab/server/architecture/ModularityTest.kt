@@ -21,9 +21,11 @@ class ModularityTest {
 
     private val allowedDependencies = mapOf(
         "admin" to setOf(),
-        "ai" to setOf("analytics", "notification", "study", "subscription", "user", "words"),
+        "ai" to setOf("analytics", "credits", "notification", "study", "subscription", "user", "words"),
         "analytics" to setOf("subscription", "user"),
         "auth" to setOf("admin", "notification", "subscription", "user"),
+        // Reads the access level to size the monthly allowance
+        "credits" to setOf("subscription"),
         "email" to setOf(),
         "notification" to setOf("ai", "analytics", "study", "subscription", "user"),
         "shared" to setOf(),

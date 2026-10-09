@@ -155,6 +155,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseCreditBalanceResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/CreditBalanceResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseEmailPreferenceDto" : {
         "properties" : {
           "code" : {
@@ -1346,6 +1368,48 @@
           }
         },
         "required" : [ "name" ],
+        "type" : "object"
+      },
+      "CreditBalanceResponse" : {
+        "properties" : {
+          "allowanceRemaining" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "balance" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "bonusBalance" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "costs" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "monthlyAllowance" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "monthlyAllowances" : {
+            "additionalProperties" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "periodEndsAt" : {
+            "type" : "string"
+          },
+          "tier" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "allowanceRemaining", "balance", "bonusBalance", "costs", "monthlyAllowance", "monthlyAllowances", "periodEndsAt", "tier" ],
         "type" : "object"
       },
       "DailyStatsResponse" : {
@@ -3184,6 +3248,48 @@
         "tags" : [ "app-config-admin-controller" ]
       }
     },
+    "/admin/credits/grant" : {
+      "post" : {
+        "operationId" : "grant",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "amount",
+          "required" : true,
+          "schema" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "note",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCreditBalanceResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "credit-admin-controller" ]
+      }
+    },
     "/admin/notifications/stats" : {
       "get" : {
         "operationId" : "getStats",
@@ -4030,6 +4136,24 @@
           }
         },
         "tags" : [ "auth-controller" ]
+      }
+    },
+    "/api/v1/credits" : {
+      "get" : {
+        "operationId" : "balance",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseCreditBalanceResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "credit-controller" ]
       }
     },
     "/api/v1/email/preferences" : {

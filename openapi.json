@@ -4947,7 +4947,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                  "$ref" : "#/components/schemas/ApiResponseListWordDto"
                 }
               }
             },

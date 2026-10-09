@@ -38,18 +38,20 @@ class WordService(
     }
 
     @Transactional
-    fun upsert(userId: Long, words: List<WordDto>) {
+    /** Saves [words] (matched by id or content) and returns them as stored, with their server ids. */
+    fun upsert(userId: Long, words: List<WordDto>): List<WordDto> {
         val user = userRepository.getReferenceById(userId)
-        if (words.isEmpty()) return
+        if (words.isEmpty()) return emptyList()
 
         val entities = wordUpsertPreparer.prepareUpsertEntities(user, words)
         val hasNewWords = entities.any { it.id == null }
-        wordRepository.saveAll(entities)
+        val saved = wordRepository.saveAll(entities)
 
         if (hasNewWords && user.firstWordAddedAt == null) {
             user.firstWordAddedAt = Instant.now(clock)
             userRepository.save(user)
         }
+        return saved.map { it.toDto() }
     }
 
     @Transactional

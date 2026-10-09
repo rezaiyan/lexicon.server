@@ -95,6 +95,21 @@ class WordUpsertPreparerTest {
     }
 
     @Test
+    fun `prepareUpsertEntities with ids the user does not own matches by content instead of duplicating`() {
+        val user = createUser()
+        val existing = createWord(id = 42L, user = user, originalWord = "apple", translation = "Apfel")
+        // A device-local id that is not this user's server id.
+        val dto = createWordDto(id = 7L, originalWord = "apple", translation = "Apfel", level = 2)
+        every { wordRepository.findAllByUserAndIdIn(user, listOf(7L)) } returns emptyList()
+        every { wordRepository.findAllByUser(user) } returns listOf(existing)
+
+        val result = wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto))
+
+        assertEquals(42L, result.single().id)
+        assertEquals(2, result.single().level)
+    }
+
+    @Test
     fun `prepareUpsertEntities should handle duplicate keys by using last write`() {
         val user = createUser()
         val dto1 = createWordDto(originalWord = "apple", translation = "Apfel", level = 1)

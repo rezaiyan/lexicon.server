@@ -18,13 +18,10 @@ class WordUpsertPreparer(
 
     private fun loadExistingByKey(user: User, words: List<WordDto>): Map<WordKey, Word> {
         val knownIds = words.mapNotNull { it.id }
-        val existing = if (knownIds.size == words.size) {
-            // All words have IDs: fetch only those rows
-            wordRepository.findAllByUserAndIdIn(user, knownIds)
-        } else {
-            // Some words are new (no ID): must full-scan to detect duplicates by content
-            wordRepository.findAllByUser(user)
-        }
+        val byId = if (knownIds.size == words.size) wordRepository.findAllByUserAndIdIn(user, knownIds) else null
+        // Full scan to match by content when some words are new, or when an id isn't this user's
+        // (a device-local id): matching only by id would store a duplicate.
+        val existing = byId?.takeIf { it.size == knownIds.distinct().size } ?: wordRepository.findAllByUser(user)
         return existing.associateBy { WordKey.of(it.originalWord, it.translation, it.targetLanguage) }
     }
 

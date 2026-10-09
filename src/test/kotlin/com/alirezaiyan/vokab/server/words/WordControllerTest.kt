@@ -101,7 +101,7 @@ class WordControllerTest {
     @Test
     fun `POST words upsert should return 200 when successful`() {
         val request = UpsertWordsRequest(words = listOf(createWordDto()))
-        `when`(wordService.upsert(mockUser.requireId(), request.words)).then { }
+        `when`(wordService.upsert(mockUser.requireId(), request.words)).thenReturn(listOf(createWordDto(id = 99L)))
 
         mockMvc.perform(
             post("/api/v1/words")
@@ -112,6 +112,8 @@ class WordControllerTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.message").value("Upserted"))
+            // Clients map their local rows to these ids so later edits/deletes hit the right word.
+            .andExpect(jsonPath("$.data[0].id").value(99))
     }
 
     @Test

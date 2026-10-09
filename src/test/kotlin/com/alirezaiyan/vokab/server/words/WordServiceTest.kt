@@ -89,6 +89,20 @@ class WordServiceTest {
     }
 
     @Test
+    fun `upsert returns the saved words with their server ids`() {
+        val user = createUser(firstWordAddedAt = TEST_NOW)
+        val dto = createWordDto()
+        val prepared = createWord(id = null, user = user)
+        val saved = createWord(id = 99L, user = user)
+        every { wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)) } returns listOf(prepared)
+        every { wordRepository.saveAll(any<Collection<Word>>()) } returns listOf(saved)
+
+        val result = wordService.upsert(user.requireId(), listOf(dto))
+
+        assertEquals(listOf(99L), result.map { it.id })
+    }
+
+    @Test
     fun `upsert should update firstWordAddedAt when new words added and firstWordAddedAt is null`() {
         val user = createUser(firstWordAddedAt = null)
         val dto = createWordDto()

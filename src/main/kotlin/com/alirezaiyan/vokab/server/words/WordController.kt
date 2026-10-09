@@ -27,9 +27,9 @@ class WordController(
     fun upsert(
         @AuthenticationPrincipal user: AuthUser,
         @Valid @RequestBody req: UpsertWordsRequest,
-    ): ResponseEntity<ApiResponse<Unit>> {
-        wordService.upsert(user.id, req.words)
-        return ResponseEntity.ok(ApiResponse(success = true, message = "Upserted"))
+    ): ResponseEntity<ApiResponse<List<WordDto>>> {
+        val saved = wordService.upsert(user.id, req.words)
+        return ResponseEntity.ok(ApiResponse(success = true, data = saved, message = "Upserted"))
     }
 
     @PatchMapping("/{id}")

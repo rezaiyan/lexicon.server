@@ -59,5 +59,24 @@ interface PushTokenRepository : JpaRepository<PushToken, Long> {
     @Modifying
     @Query("UPDATE PushToken p SET p.active = false WHERE p.user = :user")
     fun deactivateAllByUser(user: User): Int
-}
 
+    /** Returns [platform, count] for active tokens, for the admin dashboard. */
+    @Query("SELECT p.platform, COUNT(p) FROM PushToken p WHERE p.active = true GROUP BY p.platform")
+    fun countActiveByPlatform(): List<Array<Any>>
+
+    /** Active accounts with at least one active token: everyone a push can reach. */
+    @Query("SELECT DISTINCT p.user.id FROM PushToken p WHERE p.active = true AND p.user.active = true")
+    fun findReachableUserIds(): List<Long>
+
+    /** Reachable users who switched notifications off in their settings. */
+    @Query("""
+        SELECT COUNT(DISTINCT p.user.id) FROM PushToken p
+        WHERE p.active = true AND p.user.active = true
+          AND EXISTS (
+            SELECT us FROM UserSettings us
+            WHERE us.user = p.user
+              AND (us.notificationsEnabled = false OR us.notificationFrequency = 'OFF')
+          )
+    """)
+    fun countReachableOptedOutUsers(): Long
+}

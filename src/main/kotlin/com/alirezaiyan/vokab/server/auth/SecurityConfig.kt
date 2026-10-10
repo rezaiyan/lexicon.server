@@ -41,6 +41,8 @@ class SecurityConfig(
                         "/api/v1/users/feature-flags",
                         "/api/v1/onboarding/**",
                         "/h2-console/**",
+                        // Static admin dashboard shell; its API calls carry X-Admin-Key to /admin/**
+                        "/admin-ui/**",
                         // Only served on the internal management port (management.server.port)
                         "/actuator/**",
                         "/error"

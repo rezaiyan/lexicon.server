@@ -685,6 +685,27 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListString" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListStudySessionResponse" : {
         "properties" : {
           "code" : {
@@ -769,6 +790,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseManualPushResultDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/ManualPushResultDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseMapStringString" : {
         "properties" : {
           "code" : {
@@ -798,6 +841,94 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/NotificationAdminStatsDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseNotificationAudienceDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationAudienceDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseNotificationJobRunDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationJobRunDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseNotificationLogPageDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationLogPageDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseNotificationUserDetailDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationUserDetailDto"
             }, {
               "type" : "null"
             } ]
@@ -2081,6 +2212,116 @@
         "required" : [ "reviewsNeeded", "section" ],
         "type" : "object"
       },
+      "ManualPushRecipientDto" : {
+        "properties" : {
+          "devicesReached" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "error" : {
+            "type" : [ "string", "null" ]
+          },
+          "outcome" : {
+            "enum" : [ "SENT", "WOULD_SEND", "FAILED", "NO_TOKENS", "OPTED_OUT", "NOT_FOUND" ],
+            "type" : "string"
+          },
+          "target" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          }
+        },
+        "required" : [ "devicesReached", "outcome", "target" ],
+        "type" : "object"
+      },
+      "ManualPushRequest" : {
+        "properties" : {
+          "audience" : {
+            "enum" : [ "USERS", "ALL" ],
+            "type" : "string"
+          },
+          "body" : {
+            "maxLength" : 1000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "data" : {
+            "additionalProperties" : {
+              "type" : "string"
+            },
+            "type" : "object"
+          },
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "emails" : {
+            "items" : {
+              "type" : "string"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "imageUrl" : {
+            "type" : [ "string", "null" ]
+          },
+          "respectOptOut" : {
+            "type" : "boolean"
+          },
+          "title" : {
+            "maxLength" : 200,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "userIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "audience", "body", "data", "dryRun", "emails", "respectOptOut", "title", "userIds" ],
+        "type" : "object"
+      },
+      "ManualPushResultDto" : {
+        "properties" : {
+          "dryRun" : {
+            "type" : "boolean"
+          },
+          "failed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "recipients" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ManualPushRecipientDto"
+            },
+            "type" : "array"
+          },
+          "recipientsTruncated" : {
+            "type" : "boolean"
+          },
+          "sent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "skipped" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "targeted" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "dryRun", "failed", "recipients", "recipientsTruncated", "sent", "skipped", "targeted" ],
+        "type" : "object"
+      },
       "MasteredWordResponse" : {
         "properties" : {
           "masteredAt" : {
@@ -2200,6 +2441,111 @@
         "required" : [ "last7Days", "suppressedUsers", "totalActiveSchedules" ],
         "type" : "object"
       },
+      "NotificationAudienceDto" : {
+        "properties" : {
+          "activeTokens" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "activeTokensByPlatform" : {
+            "additionalProperties" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "object"
+          },
+          "optedOutUsers" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reachableUsers" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "activeTokens", "activeTokensByPlatform", "optedOutUsers", "reachableUsers" ],
+        "type" : "object"
+      },
+      "NotificationJobRunDto" : {
+        "properties" : {
+          "durationMs" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "job" : {
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "type" : "string"
+          },
+          "startedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "durationMs", "job", "startedAt" ],
+        "type" : "object"
+      },
+      "NotificationLogDto" : {
+        "properties" : {
+          "body" : {
+            "type" : [ "string", "null" ]
+          },
+          "dataPayload" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "notificationType" : {
+            "type" : "string"
+          },
+          "openedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "title" : {
+            "type" : [ "string", "null" ]
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id", "notificationType", "sentAt", "userId" ],
+        "type" : "object"
+      },
+      "NotificationLogPageDto" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationLogDto"
+            },
+            "type" : "array"
+          },
+          "page" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "size" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "totalItems" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "totalPages" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "items", "page", "size", "totalItems", "totalPages" ],
+        "type" : "object"
+      },
       "NotificationResponse" : {
         "properties" : {
           "error" : {
@@ -2213,6 +2559,127 @@
           }
         },
         "required" : [ "success" ],
+        "type" : "object"
+      },
+      "NotificationScheduleAdminDto" : {
+        "properties" : {
+          "aiAction" : {
+            "type" : [ "string", "null" ]
+          },
+          "aiContentHint" : {
+            "type" : [ "string", "null" ]
+          },
+          "aiIntervalDays" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "consecutiveIgnores" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "engagementSegment" : {
+            "type" : "string"
+          },
+          "lastSentDate" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "lastSentType" : {
+            "type" : [ "string", "null" ]
+          },
+          "optimalSendHour" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "suppressedUntil" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "timezoneOffsetHrs" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "consecutiveIgnores", "engagementSegment", "optimalSendHour", "timezoneOffsetHrs" ],
+        "type" : "object"
+      },
+      "NotificationSettingsAdminDto" : {
+        "properties" : {
+          "notificationFrequency" : {
+            "type" : "string"
+          },
+          "notificationsEnabled" : {
+            "type" : "boolean"
+          },
+          "reviewRemindersEnabled" : {
+            "type" : "boolean"
+          },
+          "timezone" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "notificationFrequency", "notificationsEnabled", "reviewRemindersEnabled" ],
+        "type" : "object"
+      },
+      "NotificationUserDetailDto" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "email" : {
+            "type" : "string"
+          },
+          "last30DaysOpened" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "last30DaysSent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "lastLoginAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "recentLogs" : {
+            "items" : {
+              "$ref" : "#/components/schemas/NotificationLogDto"
+            },
+            "type" : "array"
+          },
+          "schedule" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationScheduleAdminDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "settings" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/NotificationSettingsAdminDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "tokens" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PushTokenAdminDto"
+            },
+            "type" : "array"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "active", "currentStreak", "email", "last30DaysOpened", "last30DaysSent", "name", "recentLogs", "tokens", "userId" ],
         "type" : "object"
       },
       "OnboardingPreferencesRequest" : {
@@ -2266,6 +2733,37 @@
           }
         },
         "required" : [ "currentStreak", "languages", "longestStreak", "memberSince", "weeklyActivity" ],
+        "type" : "object"
+      },
+      "PushTokenAdminDto" : {
+        "properties" : {
+          "active" : {
+            "type" : "boolean"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "deviceId" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "platform" : {
+            "enum" : [ "ANDROID", "IOS", "WEB" ],
+            "type" : "string"
+          },
+          "tokenPreview" : {
+            "type" : "string"
+          },
+          "updatedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          }
+        },
+        "required" : [ "active", "createdAt", "id", "platform", "tokenPreview", "updatedAt" ],
         "type" : "object"
       },
       "ReconcileReport" : {
@@ -3845,6 +4343,149 @@
         "tags" : [ "credit-admin-controller" ]
       }
     },
+    "/admin/notifications/audience" : {
+      "get" : {
+        "operationId" : "getAudience",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationAudienceDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/jobs/{job}/run" : {
+      "post" : {
+        "operationId" : "runJob",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "job",
+          "required" : true,
+          "schema" : {
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationJobRunDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/logs" : {
+      "get" : {
+        "operationId" : "getLogs",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "userId",
+          "required" : false,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "type",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "page",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        }, {
+          "in" : "query",
+          "name" : "size",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationLogPageDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/logs/types" : {
+      "get" : {
+        "operationId" : "getLogTypes",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListString"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/send" : {
+      "post" : {
+        "operationId" : "sendManual",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ManualPushRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseManualPushResultDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
     "/admin/notifications/stats" : {
       "get" : {
         "operationId" : "getStats",
@@ -3854,6 +4495,59 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseNotificationAdminStatsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/users/lookup" : {
+      "get" : {
+        "operationId" : "lookupUser",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationUserDetailDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/notifications/users/{userId}/clear-suppression" : {
+      "post" : {
+        "operationId" : "clearSuppression",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "userId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseNotificationUserDetailDto"
                 }
               }
             },

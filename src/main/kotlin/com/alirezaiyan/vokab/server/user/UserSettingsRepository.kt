@@ -9,6 +9,11 @@ interface UserSettingsRepository : JpaRepository<UserSettings, Long> {
 
     @Query("SELECT s FROM UserSettings s JOIN FETCH s.user WHERE s.notificationsEnabled = true")
     fun findAllWithNotificationsEnabled(): List<UserSettings>
+
+    /** Users who switched notifications off; manual admin pushes skip them by default. */
+    @Query(
+        "SELECT s.user.id FROM UserSettings s " +
+            "WHERE s.notificationsEnabled = false OR s.notificationFrequency = 'OFF'"
+    )
+    fun findNotificationOptedOutUserIds(): Set<Long>
 }
-
-

@@ -226,3 +226,12 @@ Note: earlier docs listed `/suggest-vocabulary` and `/import-vocabulary` here â€
 | Method | Path | Description |
 |---|---|---|
 | GET | `/stats` | Push notification engagement stats |
+| GET | `/audience` | Active devices by platform, reachable and opted-out user counts |
+| GET | `/logs?userId=&type=&page=&size=` | Paged notification_log history, newest first |
+| GET | `/logs/types` | Distinct notification types seen in the log |
+| GET | `/users/lookup?query=` | One user's devices, settings, schedule and last 30 days (id or email) |
+| POST | `/users/{userId}/clear-suppression` | Reset ignore backoff for a user |
+| POST | `/send` | Manual push (`ManualPushRequest`): `audience` USERS (ids/emails) or ALL, `dryRun`, `respectOptOut`. Logged as type `MANUAL` with open tracking |
+| POST | `/jobs/{job}/run` | Run a scheduled job now: SMART_DISPATCH, STREAK_SAVERS, REVIEW_REMINDERS, REFRESH_SCHEDULES, REFRESH_SEGMENTS |
+
+Dashboard UI: `GET /admin-ui/notifications` serves a static page (public shell, no data) that asks for the admin key and calls the endpoints above with `X-Admin-Key`.

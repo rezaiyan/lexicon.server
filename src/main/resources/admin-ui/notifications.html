@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Push Notifications Admin</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --surface: #ffffff; --surface-2: #f0f2f5; --border: #dfe3e8;
+    --text: #1b1f24; --muted: #5d6673; --accent: #2f6fed; --accent-text: #ffffff;
+    --ok: #1a7f4b; --ok-bg: #e3f5ea; --warn: #9a6200; --warn-bg: #fff3d6;
+    --err: #b42318; --err-bg: #fde8e6; --radius: 10px;
+    --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216; --surface: #171b21; --surface-2: #1f252d; --border: #2c333d;
+      --text: #e6e9ee; --muted: #9aa4b2; --accent: #6b9bff; --accent-text: #0f1216;
+      --ok: #5fd39a; --ok-bg: #12301f; --warn: #f0c060; --warn-bg: #33270d;
+      --err: #ff8a80; --err-bg: #3a1714; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1216; --surface: #171b21; --surface-2: #1f252d; --border: #2c333d;
+    --text: #e6e9ee; --muted: #9aa4b2; --accent: #6b9bff; --accent-text: #0f1216;
+    --ok: #5fd39a; --ok-bg: #12301f; --warn: #f0c060; --warn-bg: #33270d;
+    --err: #ff8a80; --err-bg: #3a1714; color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 var(--font); }
+  header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 12px 16px;
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 16px; margin: 0; }
+  main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+  nav { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 16px; }
+  nav button { background: transparent; color: var(--muted); border: 1px solid transparent; }
+  nav button[aria-selected="true"] { background: var(--surface); color: var(--text); border-color: var(--border); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .stat { background: var(--surface-2); border-radius: 8px; padding: 12px; }
+  .stat .label { color: var(--muted); font-size: 12px; }
+  .stat .value { font-size: 22px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .row > * { flex: 1 1 180px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  input, select, textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text); font: inherit; }
+  textarea { min-height: 80px; resize: vertical; }
+  button { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface-2);
+    color: var(--text); font: inherit; cursor: pointer; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  button.danger { color: var(--err); }
+  button:disabled { opacity: .5; cursor: progress; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; white-space: nowrap; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; background: var(--surface-2); }
+  .pill.ok { background: var(--ok-bg); color: var(--ok); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.err { background: var(--err-bg); color: var(--err); }
+  .muted { color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .banner { padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; }
+  .banner.err { background: var(--err-bg); color: var(--err); }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  .hidden { display: none !important; }
+  .kv { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; }
+  .preview { background: var(--surface-2); border-radius: 14px; padding: 12px 14px; max-width: 380px; }
+  .preview .app { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .preview .t { font-weight: 600; margin-top: 2px; } .preview .b { white-space: pre-wrap; }
+  .data-row { display: flex; gap: 8px; margin-bottom: 8px; } .data-row input { flex: 1; }
+  .data-row button { flex: 0 0 auto; }
+  .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; min-width: 60px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .check { display: flex; gap: 8px; align-items: center; color: var(--text); font-size: 14px; }
+  .check input { width: auto; }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: var(--surface); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-text); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Push Notifications Admin</h1>
+  <form id="keyForm" class="row" style="flex: 0 1 520px; align-items: center" autocomplete="off">
+    <input id="adminKey" type="password" placeholder="Admin API key (X-Admin-Key)" aria-label="Admin API key">
+    <button type="submit" class="primary" style="flex: 0 0 auto">Connect</button>
+    <button type="button" id="forgetKey" style="flex: 0 0 auto">Forget</button>
+  </form>
+</header>
+
+<main>
+  <div id="globalMsg" class="banner hidden" role="status"></div>
+
+  <nav role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="send">Send push</button>
+    <button role="tab" data-tab="history">History</button>
+    <button role="tab" data-tab="user">User lookup</button>
+    <button role="tab" data-tab="jobs">Jobs</button>
+  </nav>
+
+  <!-- Overview -->
+  <section data-panel="overview">
+    <div class="card">
+      <div class="row" style="justify-content: space-between; align-items: center">
+        <h2 style="margin: 0">Reach</h2>
+        <button id="refreshOverview" style="flex: 0 0 auto">Refresh</button>
+      </div>
+      <div class="grid" id="audienceStats" style="margin-top: 12px"></div>
+    </div>
+    <div class="card">
+      <h2>Last 7 days</h2>
+      <div class="grid" id="weekStats"></div>
+    </div>
+    <div class="card">
+      <h2>By notification type (7 days)</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Type</th><th class="num">Sent</th><th class="num">Opened</th><th class="num">Open rate</th><th></th></tr></thead>
+        <tbody id="typeTable"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Backoff (users currently suppressed after ignored pushes)</h2>
+      <div class="grid" id="suppressionStats"></div>
+    </div>
+  </section>
+
+  <!-- Send -->
+  <section data-panel="send" class="hidden">
+    <div class="card">
+      <h2>Compose</h2>
+      <form id="sendForm">
+        <div style="margin-bottom: 12px">
+          <label>Audience</label>
+          <div class="seg" id="audienceSeg">
+            <button type="button" data-audience="USERS" aria-pressed="true">Specific users</button>
+            <button type="button" data-audience="ALL" aria-pressed="false">Everyone reachable</button>
+          </div>
+        </div>
+        <div id="targetsBox" style="margin-bottom: 12px">
+          <label for="targets">User ids or emails (comma, space or newline separated)</label>
+          <textarea id="targets" placeholder="42, 1337&#10;someone@example.com"></textarea>
+        </div>
+        <div class="row" style="margin-bottom: 12px">
+          <div><label for="title">Title</label><input id="title" maxlength="200" required></div>
+          <div><label for="imageUrl">Image URL (optional)</label><input id="imageUrl" type="url" placeholder="https://…"></div>
+        </div>
+        <div style="margin-bottom: 12px">
+          <label for="body">Body</label>
+          <textarea id="body" maxlength="1000" required></textarea>
+          <div class="muted" style="font-size: 12px"><span id="bodyCount">0</span>/1000</div>
+        </div>
+        <div style="margin-bottom: 12px">
+          <label>Data payload (optional, e.g. a deep-link key the app routes on)</label>
+          <div id="dataRows"></div>
+          <button type="button" id="addData">+ Add key</button>
+        </div>
+        <div style="margin-bottom: 16px">
+          <label class="check"><input type="checkbox" id="respectOptOut" checked> Skip users who turned notifications off</label>
+        </div>
+        <div class="row" style="align-items: center">
+          <button type="button" id="dryRunBtn" style="flex: 0 0 auto">Preview recipients (dry run)</button>
+          <button type="submit" class="primary" id="sendBtn" style="flex: 0 0 auto">Send push</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Preview</h2>
+      <div class="preview">
+        <div class="app">Lexicon · now</div>
+        <div class="t" id="pvTitle">Title</div>
+        <div class="b" id="pvBody">Body</div>
+      </div>
+    </div>
+    <div class="card hidden" id="sendResultCard">
+      <h2 id="sendResultTitle">Result</h2>
+      <div class="grid" id="sendResultStats" style="margin-bottom: 12px"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Target</th><th>User</th><th>Outcome</th><th class="num">Devices</th><th>Error</th></tr></thead>
+        <tbody id="sendResultTable"></tbody>
+      </table></div>
+      <p class="muted hidden" id="sendResultTrunc">Only the first 200 recipients are listed.</p>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section data-panel="history" class="hidden">
+    <div class="card">
+      <form id="historyForm" class="row">
+        <div><label for="hUser">User id</label><input id="hUser" inputmode="numeric" placeholder="any"></div>
+        <div><label for="hType">Type</label><select id="hType"><option value="">Any</option></select></div>
+        <div><label for="hSize">Page size</label>
+          <select id="hSize"><option>25</option><option selected>50</option><option>100</option><option>200</option></select></div>
+        <div style="flex: 0 0 auto"><button type="submit" class="primary">Search</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Sent</th><th>User</th><th>Type</th><th>Title / body</th><th>Opened</th></tr></thead>
+        <tbody id="historyTable"></tbody>
+      </table></div>
+      <div class="row" style="margin-top: 12px; align-items: center">
+        <button id="hPrev" style="flex: 0 0 auto">← Newer</button>
+        <span class="muted" id="hPageInfo" style="flex: 1 1 auto; text-align: center"></span>
+        <button id="hNext" style="flex: 0 0 auto">Older →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- User -->
+  <section data-panel="user" class="hidden">
+    <div class="card">
+      <form id="userForm" class="row">
+        <div><label for="uQuery">User id or email</label><input id="uQuery" required></div>
+        <div style="flex: 0 0 auto"><button type="submit" class="primary">Look up</button></div>
+      </form>
+    </div>
+    <div id="userDetail" class="hidden">
+      <div class="card">
+        <div class="row" style="justify-content: space-between; align-items: center">
+          <h2 style="margin: 0" id="uHeading"></h2>
+          <div style="flex: 0 0 auto; display: flex; gap: 8px; flex-wrap: wrap">
+            <button id="uTestPush">Send a push to this user</button>
+            <button id="uHistory">Full history</button>
+            <button id="uClear" class="danger">Clear suppression</button>
+          </div>
+        </div>
+        <div class="grid" id="uStats" style="margin-top: 12px"></div>
+      </div>
+      <div class="card"><h2>Settings &amp; schedule</h2><dl class="kv" id="uKv"></dl></div>
+      <div class="card">
+        <h2>Devices</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Platform</th><th>Status</th><th>Token</th><th>Device</th><th>Updated</th></tr></thead>
+          <tbody id="uTokens"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h2>Last 30 days</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Sent</th><th>Type</th><th>Title / body</th><th>Opened</th></tr></thead>
+          <tbody id="uLogs"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Jobs -->
+  <section data-panel="jobs" class="hidden">
+    <div class="card">
+      <h2>Run a scheduled job now</h2>
+      <p class="muted">Dispatch jobs keep their once-a-day guards: a manual run only reaches users due this UTC hour who haven't had today's push.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Job</th><th>Schedule</th><th>What it does</th><th></th></tr></thead>
+        <tbody id="jobsTable"></tbody>
+      </table></div>
+      <div id="jobMsg" class="banner hidden" style="margin-top: 12px"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  "use strict";
+  const KEY_STORE = "lexicon.adminKey";
+  const API = "/admin/notifications";
+  const $ = (id) => document.getElementById(id);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmtNum = (n) => Number(n ?? 0).toLocaleString();
+  const fmtTime = (iso) => iso ? new Date(iso).toLocaleString() : "—";
+
+  const store = {
+    get() { try { return sessionStorage.getItem(KEY_STORE) || ""; } catch { return ""; } },
+    set(v) { try { sessionStorage.setItem(KEY_STORE, v); } catch { /* private mode */ } },
+    clear() { try { sessionStorage.removeItem(KEY_STORE); } catch { /* ignore */ } },
+  };
+  let adminKey = store.get();
+
+  function flash(msg, kind = "err", el = $("globalMsg")) {
+    el.textContent = msg;
+    el.className = "banner " + kind;
+    if (kind !== "err") setTimeout(() => el.classList.add("hidden"), 6000);
+  }
+  function clearFlash() { $("globalMsg").classList.add("hidden"); }
+
+  async function api(path, opts = {}) {
+    if (!adminKey) throw new Error("Enter the admin API key first.");
+    const res = await fetch(API + path, {
+      ...opts,
+      headers: { "X-Admin-Key": adminKey, "Content-Type": "application/json", ...(opts.headers || {}) },
+    });
+    let json = null;
+    try { json = await res.json(); } catch { /* non-JSON error */ }
+    if (res.status === 401 || res.status === 403) throw new Error("The admin key was rejected.");
+    if (!res.ok || (json && json.success === false)) {
+      throw new Error((json && (json.message || json.error)) || `Request failed (${res.status})`);
+    }
+    return json ? json.data : null;
+  }
+
+  async function withBusy(btn, fn) {
+    const prev = btn.disabled; btn.disabled = true;
+    try { return await fn(); } catch (e) { flash(e.message); } finally { btn.disabled = prev; }
+  }
+
+  // ── Tabs ──
+  const tabs = document.querySelectorAll("nav [role=tab]");
+  function showTab(name) {
+    tabs.forEach((t) => t.setAttribute("aria-selected", String(t.dataset.tab === name)));
+    document.querySelectorAll("[data-panel]").forEach((p) => p.classList.toggle("hidden", p.dataset.panel !== name));
+    try { localStorage.setItem("lexicon.adminTab", name); } catch { /* ignore */ }
+    if (name === "history" && !historyLoaded && adminKey) loadHistory(0).catch((e) => flash(e.message));
+  }
+  tabs.forEach((t) => t.addEventListener("click", () => showTab(t.dataset.tab)));
+
+  // ── Key ──
+  $("adminKey").value = adminKey;
+  $("keyForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    adminKey = $("adminKey").value.trim();
+    store.set(adminKey);
+    clearFlash();
+    loadAll();
+  });
+  $("forgetKey").addEventListener("click", () => { adminKey = ""; store.clear(); $("adminKey").value = ""; });
+
+  // ── Overview ──
+  const stat = (label, value, sub) =>
+    `<div class="stat"><div class="label">${esc(label)}</div><div class="value">${esc(value)}</div>${sub ? `<div class="muted" style="font-size:12px">${esc(sub)}</div>` : ""}</div>`;
+
+  async function loadOverview() {
+    const [aud, stats] = await Promise.all([api("/audience"), api("/stats")]);
+    const plat = Object.entries(aud.activeTokensByPlatform || {}).map(([k, v]) => `${k} ${fmtNum(v)}`).join(" · ");
+    $("audienceStats").innerHTML =
+      stat("Reachable users", fmtNum(aud.reachableUsers), "active account + active device") +
+      stat("Opted out", fmtNum(aud.optedOutUsers), "of reachable users") +
+      stat("Active devices", fmtNum(aud.activeTokens), plat || "none") +
+      stat("Smart schedules", fmtNum(stats.totalActiveSchedules));
+    const w = stats.last7Days;
+    $("weekStats").innerHTML =
+      stat("Sent", fmtNum(w.totalSent)) + stat("Opened", fmtNum(w.totalOpened)) + stat("Open rate", w.openRatePercent + "%");
+    const rows = Object.entries(w.typeBreakdown || {}).sort((a, b) => b[1].sent - a[1].sent);
+    $("typeTable").innerHTML = rows.length ? rows.map(([type, s]) =>
+      `<tr><td>${esc(type)}</td><td class="num">${fmtNum(s.sent)}</td><td class="num">${fmtNum(s.opened)}</td>
+       <td class="num">${s.openRate}%</td><td style="width:30%"><div class="bar"><span style="width:${Math.min(100, s.openRate)}%"></span></div></td></tr>`
+    ).join("") : `<tr><td colspan="5" class="muted">No notifications in the last 7 days.</td></tr>`;
+    const sp = stats.suppressedUsers;
+    $("suppressionStats").innerHTML =
+      stat("3-day backoff", fmtNum(sp["3day"]), "3–5 ignores") + stat("7-day backoff", fmtNum(sp["7day"]), "6–9 ignores") +
+      stat("14-day backoff", fmtNum(sp["14day"]), "10–14 ignores") + stat("30-day backoff", fmtNum(sp["30day"]), "15+ ignores");
+  }
+  $("refreshOverview").addEventListener("click", (e) => withBusy(e.currentTarget, loadOverview));
+
+  // ── Send ──
+  let audience = "USERS";
+  document.querySelectorAll("#audienceSeg button").forEach((b) => b.addEventListener("click", () => {
+    audience = b.dataset.audience;
+    document.querySelectorAll("#audienceSeg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    $("targetsBox").classList.toggle("hidden", audience === "ALL");
+  }));
+  function addDataRow(k = "", v = "") {
+    const row = document.createElement("div");
+    row.className = "data-row";
+    row.innerHTML = `<input placeholder="key" class="dk"><input placeholder="value" class="dv"><button type="button" aria-label="Remove">✕</button>`;
+    row.querySelector(".dk").value = k; row.querySelector(".dv").value = v;
+    row.querySelector("button").addEventListener("click", () => row.remove());
+    $("dataRows").appendChild(row);
+  }
+  $("addData").addEventListener("click", () => addDataRow());
+  function updatePreview() {
+    $("pvTitle").textContent = $("title").value || "Title";
+    $("pvBody").textContent = $("body").value || "Body";
+    $("bodyCount").textContent = $("body").value.length;
+  }
+  $("title").addEventListener("input", updatePreview);
+  $("body").addEventListener("input", updatePreview);
+
+  function buildRequest(dryRun) {
+    const title = $("title").value.trim(), body = $("body").value.trim();
+    if (!title || !body) throw new Error("Title and body are required.");
+    const data = {};
+    document.querySelectorAll("#dataRows .data-row").forEach((r) => {
+      const k = r.querySelector(".dk").value.trim();
+      if (k) data[k] = r.querySelector(".dv").value;
+    });
+    const req = { audience, title, body, data, respectOptOut: $("respectOptOut").checked, dryRun,
+      imageUrl: $("imageUrl").value.trim() || null, userIds: [], emails: [] };
+    if (audience === "USERS") {
+      const tokens = $("targets").value.split(/[\s,;]+/).map((s) => s.trim()).filter(Boolean);
+      for (const t of tokens) {
+        if (/^\d+$/.test(t)) req.userIds.push(Number(t));
+        else if (t.includes("@")) req.emails.push(t);
+        else throw new Error(`"${t}" is neither a user id nor an email.`);
+      }
+      if (!req.userIds.length && !req.emails.length) throw new Error("Add at least one user id or email.");
+    }
+    return req;
+  }
+
+  const outcomePill = (o) => {
+    const cls = { SENT: "ok", WOULD_SEND: "ok", FAILED: "err", NOT_FOUND: "err", NO_TOKENS: "warn", OPTED_OUT: "warn" }[o] || "";
+    return `<span class="pill ${cls}">${esc(o.replace("_", " ").toLowerCase())}</span>`;
+  };
+  function renderSendResult(r) {
+    $("sendResultCard").classList.remove("hidden");
+    $("sendResultTitle").textContent = r.dryRun ? "Dry run — nothing was sent" : "Sent";
+    $("sendResultStats").innerHTML =
+      stat("Targeted", fmtNum(r.targeted)) + stat(r.dryRun ? "Would receive" : "Delivered", fmtNum(r.sent)) +
+      stat("Failed", fmtNum(r.failed)) + stat("Skipped", fmtNum(r.skipped), "no device, opted out, unknown");
+    $("sendResultTable").innerHTML = r.recipients.length ? r.recipients.map((x) =>
+      `<tr><td>${esc(x.target)}</td><td>${x.userId != null ? `<a href="#" data-user="${esc(x.userId)}">${esc(x.userId)}</a>` : "—"}</td>
+       <td>${outcomePill(x.outcome)}</td><td class="num">${x.devicesReached || ""}</td><td class="muted">${esc(x.error || "")}</td></tr>`
+    ).join("") : `<tr><td colspan="5" class="muted">Nobody to send to.</td></tr>`;
+    $("sendResultTrunc").classList.toggle("hidden", !r.recipientsTruncated);
+    $("sendResultCard").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  $("dryRunBtn").addEventListener("click", (e) => withBusy(e.currentTarget, async () => {
+    renderSendResult(await api("/send", { method: "POST", body: JSON.stringify(buildRequest(true)) }));
+  }));
+  $("sendForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    withBusy($("sendBtn"), async () => {
+      const req = buildRequest(false);
+      // Always show the real recipient count before a send goes out
+      const preview = await api("/send", { method: "POST", body: JSON.stringify({ ...req, dryRun: true }) });
+      if (preview.sent === 0) { renderSendResult(preview); throw new Error("No recipient can receive this push."); }
+      const who = audience === "ALL" ? "EVERY reachable user" : "the selected users";
+      if (!confirm(`Send "${req.title}" to ${who}?\n\n${preview.sent} user(s) will receive it, ${preview.skipped} skipped.`)) return;
+      const result = await api("/send", { method: "POST", body: JSON.stringify(req) });
+      renderSendResult(result);
+      flash(`Push delivered to ${result.sent} user(s)${result.failed ? `, ${result.failed} failed` : ""}.`, result.failed ? "warn" : "ok");
+    });
+  });
+
+  // ── History ──
+  let historyPage = 0, historyLoaded = false;
+  async function loadTypes() {
+    const types = await api("/logs/types");
+    const sel = $("hType"), cur = sel.value;
+    sel.innerHTML = `<option value="">Any</option>` + types.map((t) => `<option>${esc(t)}</option>`).join("");
+    sel.value = cur;
+  }
+  const opened = (iso) => iso ? `<span class="pill ok" title="${esc(fmtTime(iso))}">opened</span>` : `<span class="muted">—</span>`;
+  const msgCell = (l) => `<div><strong>${esc(l.title || "")}</strong></div><div class="muted">${esc(l.body || "")}</div>`;
+  async function loadHistory(page) {
+    const params = new URLSearchParams({ page, size: $("hSize").value });
+    const uid = $("hUser").value.trim();
+    if (uid) params.set("userId", uid);
+    if ($("hType").value) params.set("type", $("hType").value);
+    const r = await api("/logs?" + params);
+    historyPage = r.page; historyLoaded = true;
+    $("historyTable").innerHTML = r.items.length ? r.items.map((l) =>
+      `<tr><td style="white-space:nowrap">${esc(fmtTime(l.sentAt))}</td>
+       <td><a href="#" data-user="${esc(l.userId)}">${esc(l.userId)}</a></td>
+       <td><span class="pill">${esc(l.notificationType)}</span></td><td>${msgCell(l)}</td><td>${opened(l.openedAt)}</td></tr>`
+    ).join("") : `<tr><td colspan="5" class="muted">No notifications match.</td></tr>`;
+    $("hPageInfo").textContent = `Page ${r.totalPages ? r.page + 1 : 0} of ${r.totalPages} · ${fmtNum(r.totalItems)} total`;
+    $("hPrev").disabled = r.page <= 0;
+    $("hNext").disabled = r.page + 1 >= r.totalPages;
+  }
+  $("historyForm").addEventListener("submit", (e) => { e.preventDefault(); withBusy(e.submitter || $("hPrev"), () => loadHistory(0)); });
+  $("hPrev").addEventListener("click", (e) => withBusy(e.currentTarget, () => loadHistory(historyPage - 1)));
+  $("hNext").addEventListener("click", (e) => withBusy(e.currentTarget, () => loadHistory(historyPage + 1)));
+
+  // ── User ──
+  let currentUser = null;
+  function renderUser(u) {
+    currentUser = u;
+    $("userDetail").classList.remove("hidden");
+    $("uHeading").textContent = `${u.name} · #${u.userId} · ${u.email}`;
+    const activeTokens = u.tokens.filter((t) => t.active).length;
+    const rate = u.last30DaysSent ? Math.round((u.last30DaysOpened / u.last30DaysSent) * 100) : 0;
+    $("uStats").innerHTML =
+      stat("Account", u.active ? "active" : "inactive") + stat("Active devices", fmtNum(activeTokens)) +
+      stat("Sent (30d)", fmtNum(u.last30DaysSent)) + stat("Open rate (30d)", rate + "%") + stat("Streak", fmtNum(u.currentStreak));
+    const s = u.settings, sc = u.schedule;
+    const kv = [
+      ["Notifications", s ? (s.notificationsEnabled ? "on" : "off") : "no settings row"],
+      ["Frequency", s ? s.notificationFrequency : "—"],
+      ["Review reminders", s ? (s.reviewRemindersEnabled ? "on" : "off") : "—"],
+      ["Timezone", s && s.timezone ? s.timezone : "—"],
+      ["Send hour (UTC)", sc ? `${sc.optimalSendHour}:00 (offset ${sc.timezoneOffsetHrs >= 0 ? "+" : ""}${sc.timezoneOffsetHrs}h)` : "no schedule yet"],
+      ["Segment", sc ? sc.engagementSegment : "—"],
+      ["Consecutive ignores", sc ? sc.consecutiveIgnores : "—"],
+      ["Suppressed until", sc && sc.suppressedUntil ? sc.suppressedUntil : "not suppressed"],
+      ["Last sent", sc && sc.lastSentDate ? `${sc.lastSentDate} (${sc.lastSentType || "?"})` : "—"],
+      ["AI advice", sc && sc.aiAction ? `${sc.aiAction}${sc.aiIntervalDays ? `, every ${sc.aiIntervalDays}d` : ""}${sc.aiContentHint ? ` — ${sc.aiContentHint}` : ""}` : "—"],
+      ["Last login", fmtTime(u.lastLoginAt)],
+    ];
+    $("uKv").innerHTML = kv.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+    $("uClear").disabled = !(sc && (sc.suppressedUntil || sc.consecutiveIgnores));
+    $("uTokens").innerHTML = u.tokens.length ? u.tokens.map((t) =>
+      `<tr><td>${esc(t.platform)}</td><td>${t.active ? '<span class="pill ok">active</span>' : '<span class="pill">inactive</span>'}</td>
+       <td class="mono">${esc(t.tokenPreview)}</td><td class="mono">${esc(t.deviceId || "—")}</td><td>${esc(fmtTime(t.updatedAt))}</td></tr>`
+    ).join("") : `<tr><td colspan="5" class="muted">No devices registered.</td></tr>`;
+    $("uLogs").innerHTML = u.recentLogs.length ? u.recentLogs.map((l) =>
+      `<tr><td style="white-space:nowrap">${esc(fmtTime(l.sentAt))}</td><td><span class="pill">${esc(l.notificationType)}</span></td>
+       <td>${msgCell(l)}</td><td>${opened(l.openedAt)}</td></tr>`
+    ).join("") : `<tr><td colspan="4" class="muted">Nothing sent in the last 30 days.</td></tr>`;
+  }
+  async function lookupUser(q) {
+    renderUser(await api("/users/lookup?query=" + encodeURIComponent(q)));
+  }
+  $("userForm").addEventListener("submit", (e) => { e.preventDefault(); withBusy(e.submitter || $("uClear"), () => lookupUser($("uQuery").value)); });
+  $("uClear").addEventListener("click", (e) => {
+    if (!currentUser || !confirm(`Clear backoff for user #${currentUser.userId}? The smart dispatcher will consider them again from their next send hour.`)) return;
+    withBusy(e.currentTarget, async () => {
+      renderUser(await api(`/users/${currentUser.userId}/clear-suppression`, { method: "POST" }));
+      flash("Suppression cleared.", "ok");
+    });
+  });
+  $("uTestPush").addEventListener("click", () => {
+    if (!currentUser) return;
+    document.querySelector('#audienceSeg [data-audience="USERS"]').click();
+    $("targets").value = String(currentUser.userId);
+    showTab("send");
+    $("title").focus();
+  });
+  $("uHistory").addEventListener("click", () => {
+    if (!currentUser) return;
+    $("hUser").value = currentUser.userId; $("hType").value = "";
+    showTab("history");
+    withBusy($("hPrev"), () => loadHistory(0));
+  });
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("a[data-user]");
+    if (!a) return;
+    e.preventDefault();
+    $("uQuery").value = a.dataset.user;
+    showTab("user");
+    withBusy($("uClear"), () => lookupUser(a.dataset.user));
+  });
+
+  // ── Jobs ──
+  const JOBS = [
+    ["SMART_DISPATCH", "every 30 min", "Sends the daily smart notification to users whose send hour is now."],
+    ["STREAK_SAVERS", "every 30 min", "Evening streak-at-risk push for streak holders who haven't studied today."],
+    ["REVIEW_REMINDERS", "every 30 min", "Review reminders for users who turned smart notifications off."],
+    ["REFRESH_SCHEDULES", "00:30 UTC", "Recomputes each user's best send hour and timezone offset."],
+    ["REFRESH_SEGMENTS", "01:00 UTC", "Recomputes engagement segments and AI advice for cold users."],
+  ];
+  $("jobsTable").innerHTML = JOBS.map(([id, when, what]) =>
+    `<tr><td class="mono">${id}</td><td style="white-space:nowrap">${when}</td><td>${what}</td>
+     <td><button data-job="${id}">Run now</button></td></tr>`).join("");
+  $("jobsTable").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-job]");
+    if (!b || !confirm(`Run ${b.dataset.job} now?`)) return;
+    withBusy(b, async () => {
+      const r = await api(`/jobs/${b.dataset.job}/run`, { method: "POST" });
+      flash(`${r.job} finished in ${fmtNum(r.durationMs)} ms. Check the server log for its counts.`, "ok", $("jobMsg"));
+    });
+  });
+
+  // ── Boot ──
+  async function loadAll() {
+    if (!adminKey) { flash("Enter the admin API key (app.security.admin-api-key) to connect.", "warn"); return; }
+    try {
+      await Promise.all([loadOverview(), loadTypes()]);
+      if (!document.querySelector('[data-panel="history"]').classList.contains("hidden")) await loadHistory(0);
+      else historyLoaded = false;
+    } catch (e) { flash(e.message); }
+  }
+  let startTab = "overview";
+  try { startTab = localStorage.getItem("lexicon.adminTab") || "overview"; } catch { /* ignore */ }
+  if (![...tabs].some((t) => t.dataset.tab === startTab)) startTab = "overview";
+  updatePreview();
+  addDataRow();
+  showTab(startTab);
+  loadAll();
+})();
+</script>
+</body>
+</html>

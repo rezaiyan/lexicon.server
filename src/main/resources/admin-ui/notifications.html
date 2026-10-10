@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Push Notifications Admin</title>
+<link rel="stylesheet" href="/admin-ui/notifications.css">
+</head>
+<body>
+<header>
+  <h1>Push Notifications Admin</h1>
+  <div id="sessionBar" class="session hidden">
+    <span class="muted" id="sessionInfo"></span>
+    <button type="button" id="signOut">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div id="globalMsg" class="banner hidden" role="status"></div>
+
+  <section id="signIn" class="card signin hidden">
+    <h2>Sign in</h2>
+    <p class="muted">Enter the server's admin key (<span class="mono">app.security.admin-api-key</span>).
+      It is exchanged for a 4-hour session cookie and is not stored in the browser.</p>
+    <form id="signInForm" autocomplete="off">
+      <label for="adminKey">Admin key</label>
+      <input id="adminKey" type="password" required autocomplete="current-password">
+      <button type="submit" class="primary mt12">Sign in</button>
+    </form>
+  </section>
+
+  <div id="app" class="hidden">
+
+  <nav role="tablist">
+    <button role="tab" data-tab="overview" aria-selected="true">Overview</button>
+    <button role="tab" data-tab="send">Send push</button>
+    <button role="tab" data-tab="history">History</button>
+    <button role="tab" data-tab="user">User lookup</button>
+    <button role="tab" data-tab="jobs">Jobs</button>
+  </nav>
+
+  <!-- Overview -->
+  <section data-panel="overview">
+    <div class="card">
+      <div class="between row">
+        <h2 class="m0">Reach</h2>
+        <button class="fixed" id="refreshOverview">Refresh</button>
+      </div>
+      <div class="mt12 grid" id="audienceStats"></div>
+    </div>
+    <div class="card">
+      <h2>Last 7 days</h2>
+      <div class="grid" id="weekStats"></div>
+    </div>
+    <div class="card">
+      <h2>By notification type (7 days)</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Type</th><th class="num">Sent</th><th class="num">Opened</th><th class="num">Open rate</th><th></th></tr></thead>
+        <tbody id="typeTable"></tbody>
+      </table></div>
+    </div>
+    <div class="card">
+      <h2>Backoff (users currently suppressed after ignored pushes)</h2>
+      <div class="grid" id="suppressionStats"></div>
+    </div>
+  </section>
+
+  <!-- Send -->
+  <section data-panel="send" class="hidden">
+    <div class="card">
+      <h2>Compose</h2>
+      <form id="sendForm">
+        <div class="mb12">
+          <label>Audience</label>
+          <div class="seg" id="audienceSeg">
+            <button type="button" data-audience="USERS" aria-pressed="true">Specific users</button>
+            <button type="button" data-audience="ALL" aria-pressed="false">Everyone reachable</button>
+          </div>
+        </div>
+        <div class="mb12" id="targetsBox">
+          <label for="targets">User ids or emails (comma, space or newline separated)</label>
+          <textarea id="targets" placeholder="42, 1337&#10;someone@example.com"></textarea>
+        </div>
+        <div class="mb12 row">
+          <div><label for="title">Title</label><input id="title" maxlength="200" required></div>
+          <div><label for="imageUrl">Image URL (optional)</label><input id="imageUrl" type="url" placeholder="https://…"></div>
+        </div>
+        <div class="mb12">
+          <label for="body">Body</label>
+          <textarea id="body" maxlength="1000" required></textarea>
+          <div class="small muted"><span id="bodyCount">0</span>/1000</div>
+        </div>
+        <div class="mb12">
+          <label>Data payload (optional, e.g. a deep-link key the app routes on)</label>
+          <div id="dataRows"></div>
+          <button type="button" id="addData">+ Add key</button>
+        </div>
+        <div class="mb16">
+          <label class="check"><input type="checkbox" id="respectOptOut" checked> Skip users who turned notifications off</label>
+        </div>
+        <div class="center row">
+          <button class="fixed" type="button" id="dryRunBtn">Preview recipients (dry run)</button>
+          <button type="submit" class="fixed primary" id="sendBtn">Send push</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Preview</h2>
+      <div class="preview">
+        <div class="app">Lexicon · now</div>
+        <div class="t" id="pvTitle">Title</div>
+        <div class="b" id="pvBody">Body</div>
+      </div>
+    </div>
+    <div class="card hidden" id="sendResultCard">
+      <h2 id="sendResultTitle">Result</h2>
+      <div class="mb12 grid" id="sendResultStats"></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Target</th><th>User</th><th>Outcome</th><th class="num">Devices</th><th>Error</th></tr></thead>
+        <tbody id="sendResultTable"></tbody>
+      </table></div>
+      <p class="muted hidden" id="sendResultTrunc">Only the first 200 recipients are listed.</p>
+    </div>
+  </section>
+
+  <!-- History -->
+  <section data-panel="history" class="hidden">
+    <div class="card">
+      <form id="historyForm" class="row">
+        <div><label for="hUser">User id</label><input id="hUser" inputmode="numeric" placeholder="any"></div>
+        <div><label for="hType">Type</label><select id="hType"><option value="">Any</option></select></div>
+        <div><label for="hSize">Page size</label>
+          <select id="hSize"><option>25</option><option selected>50</option><option>100</option><option>200</option></select></div>
+        <div class="fixed"><button type="submit" class="primary">Search</button></div>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table>
+        <thead><tr><th>Sent</th><th>User</th><th>Type</th><th>Title / body</th><th>Opened</th></tr></thead>
+        <tbody id="historyTable"></tbody>
+      </table></div>
+      <div class="mt12 center row">
+        <button class="fixed" id="hPrev">← Newer</button>
+        <span class="grow tc muted" id="hPageInfo"></span>
+        <button class="fixed" id="hNext">Older →</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- User -->
+  <section data-panel="user" class="hidden">
+    <div class="card">
+      <form id="userForm" class="row">
+        <div><label for="uQuery">User id or email</label><input id="uQuery" required></div>
+        <div class="fixed"><button type="submit" class="primary">Look up</button></div>
+      </form>
+    </div>
+    <div id="userDetail" class="hidden">
+      <div class="card">
+        <div class="between row">
+          <h2 class="m0" id="uHeading"></h2>
+          <div class="fixed actions">
+            <button id="uTestPush">Send a push to this user</button>
+            <button id="uHistory">Full history</button>
+            <button id="uClear" class="danger">Clear suppression</button>
+          </div>
+        </div>
+        <div class="mt12 grid" id="uStats"></div>
+      </div>
+      <div class="card"><h2>Settings &amp; schedule</h2><dl class="kv" id="uKv"></dl></div>
+      <div class="card">
+        <h2>Devices</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Platform</th><th>Status</th><th>Token</th><th>Device</th><th>Updated</th></tr></thead>
+          <tbody id="uTokens"></tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h2>Last 30 days</h2>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Sent</th><th>Type</th><th>Title / body</th><th>Opened</th></tr></thead>
+          <tbody id="uLogs"></tbody>
+        </table></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Jobs -->
+  <section data-panel="jobs" class="hidden">
+    <div class="card">
+      <h2>Run a scheduled job now</h2>
+      <p class="muted">Dispatch jobs keep their once-a-day guards: a manual run only reaches users due this UTC hour who haven't had today's push.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Job</th><th>Schedule</th><th>What it does</th><th></th></tr></thead>
+        <tbody id="jobsTable"></tbody>
+      </table></div>
+      <div id="jobMsg" class="mt12 banner hidden"></div>
+    </div>
+  </section>
+  </div>
+</main>
+
+<script src="/admin-ui/notifications.js"></script>
+</body>
+</html>

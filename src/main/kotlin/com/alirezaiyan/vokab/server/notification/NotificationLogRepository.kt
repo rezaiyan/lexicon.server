@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.notification
 
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Query
 import java.time.Instant
@@ -38,4 +40,16 @@ interface NotificationLogRepository : JpaRepository<NotificationLog, Long> {
         GROUP BY nl.notificationType
     """)
     fun findTypeBreakdownSince(since: Instant): List<Array<Any>>
+
+    /** Admin history view: newest first, each filter optional. */
+    @Query("""
+        SELECT nl FROM NotificationLog nl
+        WHERE (:userId IS NULL OR nl.userId = :userId)
+          AND (:type IS NULL OR nl.notificationType = :type)
+        ORDER BY nl.sentAt DESC
+    """)
+    fun search(userId: Long?, type: String?, pageable: Pageable): Page<NotificationLog>
+
+    @Query("SELECT DISTINCT nl.notificationType FROM NotificationLog nl ORDER BY nl.notificationType")
+    fun findDistinctTypes(): List<String>
 }

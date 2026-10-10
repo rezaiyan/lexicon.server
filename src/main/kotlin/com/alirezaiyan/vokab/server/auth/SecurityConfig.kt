@@ -17,6 +17,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 @EnableWebSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
+    private val adminAuthenticationFilter: AdminAuthenticationFilter,
     private val appProperties: AppProperties
 ) {
     
@@ -41,6 +42,9 @@ class SecurityConfig(
                         "/api/v1/users/feature-flags",
                         "/api/v1/onboarding/**",
                         "/h2-console/**",
+                        // Admin dashboard page and its sign-in; the data endpoints stay behind ROLE_ADMIN
+                        "/admin-ui/**",
+                        ADMIN_SESSION_PATH,
                         // Only served on the internal management port (management.server.port)
                         "/actuator/**",
                         "/error"
@@ -51,6 +55,7 @@ class SecurityConfig(
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
+            .addFilterBefore(adminAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
             // Allow H2 console
             .headers { it.frameOptions { frameOptions -> frameOptions.sameOrigin() } }
         

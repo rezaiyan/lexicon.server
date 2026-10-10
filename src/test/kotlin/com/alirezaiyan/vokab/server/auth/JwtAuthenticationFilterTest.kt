@@ -50,7 +50,7 @@ class JwtAuthenticationFilterTest {
         userRepository = mockk()
         appConfigService = mockk()
         every { appConfigService.getTestEmails() } returns emptySet()
-        filter = JwtAuthenticationFilter(jwtTokenProvider, appProperties, UserAccessCache(userRepository, appConfigService, clock))
+        filter = JwtAuthenticationFilter(jwtTokenProvider, UserAccessCache(userRepository, appConfigService, clock))
         SecurityContextHolder.clearContext()
     }
 
@@ -343,7 +343,7 @@ class JwtAuthenticationFilterTest {
         val configServiceForTest = mockk<AppConfigService>()
         every { configServiceForTest.getTestEmails() } returns setOf(testEmail)
         val filterForTest = JwtAuthenticationFilter(
-            providerForTest, propsWithTestEmail, UserAccessCache(userRepository, configServiceForTest, clock)
+            providerForTest, UserAccessCache(userRepository, configServiceForTest, clock)
         )
 
         val user = createUser(id = 7L, email = testEmail, active = false)

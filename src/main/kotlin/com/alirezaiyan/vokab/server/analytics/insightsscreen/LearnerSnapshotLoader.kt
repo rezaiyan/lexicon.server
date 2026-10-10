@@ -24,7 +24,7 @@ class LearnerSnapshotLoader(
     /** Must run inside a read-only transaction (lazy user reference). */
     fun load(userId: Long, zone: ZoneId): LearnerSnapshot {
         val user = userRepository.getReferenceById(userId)
-        val now = ZonedDateTime.now(clock.withZone(zone))
+        val now = ZonedDateTime.now(clock).withZoneSameInstant(zone)
         val sinceMs = now.toLocalDate().minusDays(LearnerSnapshot.HISTORY_DAYS - 1)
             .atStartOfDay(zone).toInstant().toEpochMilli()
 

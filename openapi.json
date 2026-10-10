@@ -265,6 +265,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseInsightsScreenResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/InsightsScreenResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseInteger" : {
         "properties" : {
           "code" : {
@@ -1356,6 +1378,20 @@
         "required" : [ "accuracyPercent", "cardsReviewed", "dayName" ],
         "type" : "object"
       },
+      "BestHourDto" : {
+        "properties" : {
+          "accuracyPct" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "hour" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPct", "hour" ],
+        "type" : "object"
+      },
       "ClientFeatureFlags" : {
         "properties" : {
           "pushNotificationsEnabled" : {
@@ -1363,6 +1399,64 @@
           }
         },
         "required" : [ "pushNotificationsEnabled" ],
+        "type" : "object"
+      },
+      "CoachActionDto" : {
+        "properties" : {
+          "hour" : {
+            "format" : "int32",
+            "type" : [ "integer", "null" ]
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "label" : {
+            "type" : [ "string", "null" ]
+          },
+          "wordIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "kind", "wordIds" ],
+        "type" : "object"
+      },
+      "CoachCardDto" : {
+        "properties" : {
+          "action" : {
+            "$ref" : "#/components/schemas/CoachActionDto"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "moreWordsCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "priority" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "type" : {
+            "type" : "string"
+          },
+          "words" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordChipDto"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "action", "body", "id", "moreWordsCount", "priority", "title", "type", "words" ],
         "type" : "object"
       },
       "ComebackWordResponse" : {
@@ -1486,6 +1580,19 @@
           }
         },
         "required" : [ "date", "reviewCount" ],
+        "type" : "object"
+      },
+      "DayCountDto" : {
+        "properties" : {
+          "date" : {
+            "type" : "string"
+          },
+          "reviews" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "date", "reviews" ],
         "type" : "object"
       },
       "DayOfWeekAccuracyResponse" : {
@@ -1673,6 +1780,34 @@
         "required" : [ "idToken" ],
         "type" : "object"
       },
+      "HabitsSectionDto" : {
+        "properties" : {
+          "bestHour" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/BestHourDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "caption" : {
+            "type" : "string"
+          },
+          "heatmap" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DayCountDto"
+            },
+            "type" : "array"
+          },
+          "weekdays" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WeekdayAccuracyDto"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "caption", "heatmap", "weekdays" ],
+        "type" : "object"
+      },
       "HeatmapDayResponse" : {
         "properties" : {
           "count" : {
@@ -1684,6 +1819,38 @@
           }
         },
         "required" : [ "count", "date" ],
+        "type" : "object"
+      },
+      "HeroDto" : {
+        "properties" : {
+          "accuracyPct" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/MetricDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "currentStreak" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "headline" : {
+            "type" : "string"
+          },
+          "leveledUp" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "reviews" : {
+            "$ref" : "#/components/schemas/MetricDto"
+          },
+          "week" : {
+            "items" : {
+              "$ref" : "#/components/schemas/DayCountDto"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "currentStreak", "headline", "leveledUp", "reviews", "week" ],
         "type" : "object"
       },
       "HourlyAccuracyResponse" : {
@@ -1718,6 +1885,37 @@
           }
         },
         "required" : [ "generatedAt", "insight" ],
+        "type" : "object"
+      },
+      "InsightsScreenResponse" : {
+        "properties" : {
+          "coach" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CoachCardDto"
+            },
+            "type" : "array"
+          },
+          "generatedAt" : {
+            "type" : "string"
+          },
+          "hero" : {
+            "$ref" : "#/components/schemas/HeroDto"
+          },
+          "locked" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LockedSectionDto"
+            },
+            "type" : "array"
+          },
+          "sections" : {
+            "$ref" : "#/components/schemas/SectionsDto"
+          },
+          "totalReviews" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "coach", "generatedAt", "hero", "locked", "sections", "totalReviews" ],
         "type" : "object"
       },
       "LanguagePair" : {
@@ -1838,6 +2036,20 @@
         "required" : [ "entries" ],
         "type" : "object"
       },
+      "LevelCountDto" : {
+        "properties" : {
+          "level" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "words" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "level", "words" ],
+        "type" : "object"
+      },
       "LevelTransitionResponse" : {
         "properties" : {
           "count" : {
@@ -1854,6 +2066,19 @@
           }
         },
         "required" : [ "count", "fromLevel", "toLevel" ],
+        "type" : "object"
+      },
+      "LockedSectionDto" : {
+        "properties" : {
+          "reviewsNeeded" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "section" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "reviewsNeeded", "section" ],
         "type" : "object"
       },
       "MasteredWordResponse" : {
@@ -1874,6 +2099,43 @@
           }
         },
         "required" : [ "masteredAt", "wordId", "wordText", "wordTranslation" ],
+        "type" : "object"
+      },
+      "MasterySectionDto" : {
+        "properties" : {
+          "caption" : {
+            "type" : "string"
+          },
+          "demotedThisWeek" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "levels" : {
+            "items" : {
+              "$ref" : "#/components/schemas/LevelCountDto"
+            },
+            "type" : "array"
+          },
+          "promotedThisWeek" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "caption", "demotedThisWeek", "levels", "promotedThisWeek" ],
+        "type" : "object"
+      },
+      "MetricDto" : {
+        "properties" : {
+          "previous" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "value" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "previous", "value" ],
         "type" : "object"
       },
       "MonthlyStatsResponse" : {
@@ -2091,6 +2353,39 @@
           }
         },
         "required" : [ "avgResponseTimeMs", "week", "year" ],
+        "type" : "object"
+      },
+      "SectionsDto" : {
+        "properties" : {
+          "habits" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/HabitsSectionDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "mastery" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/MasterySectionDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "wordRush" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/WordRushSectionDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "words" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/WordsSectionDto"
+            }, {
+              "type" : "null"
+            } ]
+          }
+        },
         "type" : "object"
       },
       "SendNotificationRequest" : {
@@ -2969,6 +3264,24 @@
         "required" : [ "extractedText", "wordCount" ],
         "type" : "object"
       },
+      "WeekdayAccuracyDto" : {
+        "properties" : {
+          "accuracyPct" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "isoDay" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "reviews" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "accuracyPct", "isoDay", "reviews" ],
+        "type" : "object"
+      },
       "WeeklyReportResponse" : {
         "properties" : {
           "accuracyPercent" : {
@@ -3014,6 +3327,36 @@
           }
         },
         "required" : [ "accuracyPercent", "cardsReviewed", "previousWeekCardsReviewed", "sessionsCount", "totalStudyTimeMs", "weekEndDate", "weekStartDate", "wordsMastered" ],
+        "type" : "object"
+      },
+      "WordAccuracyDto" : {
+        "properties" : {
+          "accuracyPct" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "accuracyPct", "id", "text" ],
+        "type" : "object"
+      },
+      "WordChipDto" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "text" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "text" ],
         "type" : "object"
       },
       "WordDto" : {
@@ -3163,6 +3506,51 @@
           }
         },
         "required" : [ "avgAccuracyPercent", "avgDurationMs", "avgResponseMs", "avgScore", "bestStreakEver", "completionRatePercent", "totalCompleted", "totalGames", "totalTimePlayedMs" ],
+        "type" : "object"
+      },
+      "WordRushSectionDto" : {
+        "properties" : {
+          "bestScore" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "caption" : {
+            "type" : "string"
+          },
+          "gamesPlayed" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "recentScores" : {
+            "items" : {
+              "format" : "int32",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "bestScore", "caption", "gamesPlayed", "recentScores" ],
+        "type" : "object"
+      },
+      "WordsSectionDto" : {
+        "properties" : {
+          "caption" : {
+            "type" : "string"
+          },
+          "comebacks" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordChipDto"
+            },
+            "type" : "array"
+          },
+          "hardest" : {
+            "items" : {
+              "$ref" : "#/components/schemas/WordAccuracyDto"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "caption", "comebacks", "hardest" ],
         "type" : "object"
       }
     }
@@ -3843,6 +4231,32 @@
           }
         },
         "tags" : [ "analytics-controller" ]
+      }
+    },
+    "/api/v1/analytics/insights-screen" : {
+      "get" : {
+        "operationId" : "getInsightsScreen",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "tz",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseInsightsScreenResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "insights-screen-controller" ]
       }
     },
     "/api/v1/analytics/language-stats" : {

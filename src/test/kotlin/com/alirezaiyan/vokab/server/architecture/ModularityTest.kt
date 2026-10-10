@@ -22,7 +22,8 @@ class ModularityTest {
     private val allowedDependencies = mapOf(
         "admin" to setOf(),
         "ai" to setOf("analytics", "credits", "notification", "study", "user", "words"),
-        "analytics" to setOf("subscription", "user"),
+        // Insights screen snapshot reads word stage counts and the Word Rush summary (read-only queries)
+        "analytics" to setOf("subscription", "user", "wordrush", "words"),
         "auth" to setOf("admin", "notification", "subscription", "user"),
         // Reads the access level to size the monthly allowance
         "credits" to setOf("subscription"),

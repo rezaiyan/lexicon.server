@@ -944,6 +944,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseSyncListeningResponse" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SyncListeningResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseSyncWordRushResponse" : {
         "properties" : {
           "code" : {
@@ -2347,6 +2369,138 @@
           }
         },
         "required" : [ "syncedSessionIds" ],
+        "type" : "object"
+      },
+      "SyncListeningRequest" : {
+        "properties" : {
+          "sessions" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SyncListeningSessionRequest"
+            },
+            "maxItems" : 100,
+            "minItems" : 0,
+            "type" : "array"
+          }
+        },
+        "required" : [ "sessions" ],
+        "type" : "object"
+      },
+      "SyncListeningResponse" : {
+        "properties" : {
+          "syncedSessionIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "syncedSessionIds" ],
+        "type" : "object"
+      },
+      "SyncListeningSessionRequest" : {
+        "properties" : {
+          "clientSessionId" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "completedNormally" : {
+            "type" : "boolean"
+          },
+          "durationMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "endedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "listeningMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "order" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "pauseCount" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "pauseMs" : {
+            "format" : "int64",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "plannedWords" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "repeatCount" : {
+            "format" : "int32",
+            "minimum" : 1,
+            "type" : "integer"
+          },
+          "source" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "sourceDetail" : {
+            "type" : [ "string", "null" ]
+          },
+          "speechRate" : {
+            "format" : "float",
+            "type" : "number"
+          },
+          "startedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "words" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SyncListeningWordRequest"
+            },
+            "maxItems" : 1000,
+            "minItems" : 0,
+            "type" : "array"
+          },
+          "wordsHeard" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "wordsSkipped" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          }
+        },
+        "required" : [ "clientSessionId", "completedNormally", "durationMs", "endedAt", "listeningMs", "order", "pauseCount", "pauseMs", "plannedWords", "repeatCount", "source", "speechRate", "startedAt", "words", "wordsHeard", "wordsSkipped" ],
+        "type" : "object"
+      },
+      "SyncListeningWordRequest" : {
+        "properties" : {
+          "heardAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sourceLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "targetLanguage" : {
+            "minLength" : 1,
+            "type" : "string"
+          },
+          "wordId" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "heardAt", "sourceLanguage", "targetLanguage", "wordId" ],
         "type" : "object"
       },
       "SyncReviewEventRequest" : {
@@ -4311,6 +4465,34 @@
           }
         },
         "tags" : [ "leaderboard-controller" ]
+      }
+    },
+    "/api/v1/listening/sync" : {
+      "post" : {
+        "operationId" : "syncSessions",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SyncListeningRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSyncListeningResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "listening-controller" ]
       }
     },
     "/api/v1/notifications/register-token" : {

@@ -27,6 +27,7 @@ class ModularityTest {
         // Reads the access level to size the monthly allowance
         "credits" to setOf("subscription"),
         "email" to setOf(),
+        "listening" to setOf("user"),
         "notification" to setOf("ai", "analytics", "study", "subscription", "user"),
         "shared" to setOf(),
         "study" to setOf("notification", "user", "words"),

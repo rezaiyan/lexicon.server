@@ -62,7 +62,8 @@ class UserDataPurgerTest {
 
     /** The tables [seedUserWithData] fills — fixed here, not derived from the code under test. */
     private fun ownedTables(): List<String> = listOf(
-        "review_events", "study_sessions", "words", "tags", "word_rush_games", "refresh_tokens",
+        "review_events", "study_sessions", "words", "tags", "word_rush_games", "listening_sessions",
+        "listening_session_words", "refresh_tokens",
         "push_tokens", "daily_insights", "daily_activities", "subscriptions", "user_settings",
         "user_platforms", "notification_schedule", "notification_log", "email_subscriptions",
         "credit_wallets", "credit_transactions",
@@ -95,6 +96,15 @@ class UserDataPurgerTest {
         )
 
         jdbc.update("INSERT INTO word_rush_games (user_id, client_game_id, played_at) VALUES (?, 'g1', 0)", id)
+        jdbc.update(
+            "INSERT INTO listening_sessions (user_id, client_session_id, source, word_order, started_at, ended_at) VALUES (?, 'l1', 'due', 'word_first', 0, 0)",
+            id,
+        )
+        val listeningId = jdbc.queryForObject("SELECT id FROM listening_sessions WHERE user_id = ?", Long::class.java, id)!!
+        jdbc.update(
+            "INSERT INTO listening_session_words (session_id, user_id, word_id, source_language, target_language, heard_at) VALUES (?, ?, ?, 'en', 'de', 0)",
+            listeningId, id, wordId,
+        )
         jdbc.update("INSERT INTO refresh_tokens (token_hash, user_id, expires_at) VALUES (?, ?, CURRENT_TIMESTAMP)", "hash-$email", id)
         jdbc.update("INSERT INTO push_tokens (user_id, token, platform) VALUES (?, ?, 'IOS')", id, "push-$email")
         jdbc.update("INSERT INTO daily_insights (user_id, insight_text, generated_at, date) VALUES (?, 'hi', CURRENT_TIMESTAMP, '2026-10-02')", id)

@@ -13,6 +13,9 @@ interface DailyActivityRepository : JpaRepository<DailyActivity, Long> {
     fun findByUserAndActivityDate(user: User, activityDate: LocalDate): Optional<DailyActivity>
 
     fun existsByUserAndActivityDate(user: User, activityDate: LocalDate): Boolean
+
+    /** Whether the user studied on [since] or any day after it. */
+    fun existsByUserIdAndActivityDateGreaterThanEqual(userId: Long, since: LocalDate): Boolean
     
     @Query("""
         SELECT da FROM DailyActivity da 

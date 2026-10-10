@@ -29,27 +29,29 @@ class NotificationTypeSelector(
         STREAK_RISK, PROGRESS_MILESTONE, WEEKLY_PREVIEW,
         DUE_CARDS, COMEBACK_ALERT, DAILY_INSIGHT, REVIEW_REMINDER,
         MOTIVATION,  // AI-advised re-engagement for COLD/DORMANT users
+        ADD_WORDS,   // Activation: the user has no words yet, so there is nothing to review
         NONE
     }
 
+    /**
+     * Picks the one push worth sending today, or [NotificationType.NONE].
+     *
+     * A user who already studied today only hears about something new to them (a milestone,
+     * the Monday recap); reminding them to do what they just did is noise. Generic content
+     * (insight, add-words nudge) never goes out twice in a row.
+     */
     @Transactional(readOnly = true)
     fun selectType(user: User, schedule: NotificationSchedule): NotificationType {
+        if (studiedToday(user)) {
+            return selectForActiveToday(user)
+        }
+
         // Re-engagement mode: user was suppressed (3+ ignores), use higher-value content
         if (schedule.consecutiveIgnores >= 3) {
-            return selectReEngagementType(user)
+            return selectReEngagementType(user).notRepeating(schedule)
         }
 
-        val today = LocalDate.now(clock)
-        val hasReviewedToday = dailyActivityRepository.existsByUserAndActivityDate(user, today)
-
-        if (hasReviewedToday) {
-            return when {
-                milestoneDetector.hasPendingMilestone(user) -> NotificationType.PROGRESS_MILESTONE
-                else -> NotificationType.DAILY_INSIGHT
-            }
-        }
-
-        // Streak risk: only when close to midnight in user's local time
+        // Streak risk: only when close to the end of the user's day
         val localHour = (LocalTime.now(clock).hour + schedule.timezoneOffsetHrs + 24) % 24
         if (user.currentStreak > 0 && localHour >= 20) {
             return NotificationType.STREAK_RISK
@@ -59,21 +61,33 @@ class NotificationTypeSelector(
             return NotificationType.PROGRESS_MILESTONE
         }
 
-        if (LocalDate.now(clock).dayOfWeek == DayOfWeek.MONDAY) {
-            bestEffort("Weekly report for user=${user.id}") { learnerSignals.weeklyReport(user.requireId()) }
-                ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }
-                ?.let { return NotificationType.WEEKLY_PREVIEW }
-        }
+        weeklyRecapIfDue(user)?.let { return it }
 
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
+        if (stats.totalWords == 0) return NotificationType.ADD_WORDS.notRepeating(schedule)
+        if (stats.dueCards >= MIN_DUE_CARDS) return NotificationType.DUE_CARDS
 
-        val comebackWord = bestEffort("Difficult word for user=${user.id}") {
-            learnerSignals.topDifficultWord(user.requireId())
-        }
-        if (comebackWord != null) return NotificationType.COMEBACK_ALERT
+        if (hasComebackWord(user)) return NotificationType.COMEBACK_ALERT
 
-        return NotificationType.DAILY_INSIGHT
+        return NotificationType.DAILY_INSIGHT.notRepeating(schedule)
+    }
+
+    /** Whether the user has studied in the current streak day (a UTC day, see StreakService). */
+    @Transactional(readOnly = true)
+    fun studiedToday(user: User): Boolean =
+        dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now(clock))
+
+    private fun selectForActiveToday(user: User): NotificationType = when {
+        milestoneDetector.hasPendingMilestone(user) -> NotificationType.PROGRESS_MILESTONE
+        else -> weeklyRecapIfDue(user) ?: NotificationType.NONE
+    }
+
+    /** Monday recap of last week, only when there was something to recap. */
+    private fun weeklyRecapIfDue(user: User): NotificationType? {
+        if (LocalDate.now(clock).dayOfWeek != DayOfWeek.MONDAY) return null
+        return bestEffort("Weekly report for user=${user.id}") { learnerSignals.weeklyReport(user.requireId()) }
+            ?.takeIf { it.sessionsCount > 0 || it.cardsReviewed > 0 }
+            ?.let { NotificationType.WEEKLY_PREVIEW }
     }
 
     /**
@@ -84,13 +98,23 @@ class NotificationTypeSelector(
         if (milestoneDetector.hasPendingMilestone(user)) return NotificationType.PROGRESS_MILESTONE
 
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        if (stats.dueCards >= 5) return NotificationType.DUE_CARDS
-
-        val comebackWord = bestEffort("Difficult word for user=${user.id}") {
-            learnerSignals.topDifficultWord(user.requireId())
+        return when {
+            stats.totalWords == 0 -> NotificationType.ADD_WORDS
+            stats.dueCards >= MIN_DUE_CARDS -> NotificationType.DUE_CARDS
+            hasComebackWord(user) -> NotificationType.COMEBACK_ALERT
+            else -> NotificationType.DAILY_INSIGHT
         }
-        if (comebackWord != null) return NotificationType.COMEBACK_ALERT
+    }
 
-        return NotificationType.DAILY_INSIGHT
+    private fun hasComebackWord(user: User): Boolean =
+        bestEffort("Difficult word for user=${user.id}") { learnerSignals.topDifficultWord(user.requireId()) } != null
+
+    /** Low-urgency content skips a day rather than repeating the previous push. */
+    private fun NotificationType.notRepeating(schedule: NotificationSchedule): NotificationType =
+        if (this in LOW_URGENCY_TYPES && schedule.lastSentType == name) NotificationType.NONE else this
+
+    companion object {
+        private const val MIN_DUE_CARDS = 5
+        private val LOW_URGENCY_TYPES = setOf(NotificationType.DAILY_INSIGHT, NotificationType.ADD_WORDS)
     }
 }

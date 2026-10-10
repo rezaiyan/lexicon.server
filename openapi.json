@@ -2447,6 +2447,9 @@
           },
           "themeMode" : {
             "type" : "string"
+          },
+          "timezone" : {
+            "type" : [ "string", "null" ]
           }
         },
         "required" : [ "dailyReminderTime", "languageCode", "notificationFrequency", "notificationsEnabled", "reviewRemindersEnabled", "themeMode" ],
@@ -3103,6 +3106,16 @@
             "type" : [ "string", "null" ]
           }
         },
+        "type" : "object"
+      },
+      "UpdateTimezoneRequest" : {
+        "properties" : {
+          "timezone" : {
+            "minLength" : 1,
+            "type" : "string"
+          }
+        },
+        "required" : [ "timezone" ],
         "type" : "object"
       },
       "UpdateWordRequest" : {
@@ -5115,6 +5128,34 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseSettingsDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "settings-controller" ]
+      }
+    },
+    "/api/v1/settings/timezone" : {
+      "put" : {
+        "operationId" : "updateTimezone",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/UpdateTimezoneRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
                 }
               }
             },

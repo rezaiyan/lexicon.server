@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.TEST_TODAY
+import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.notification.EngagementSegmentService.EngagementSegment
 import io.mockk.every
@@ -14,11 +16,28 @@ import java.time.temporal.ChronoUnit
 class EngagementSegmentServiceTest {
 
     private val notificationLogRepository: NotificationLogRepository = mockk()
+    private val dailyActivityRepository: DailyActivityRepository = mockk()
     private lateinit var service: EngagementSegmentService
 
     @BeforeEach
     fun setUp() {
-        service = EngagementSegmentService(notificationLogRepository, clock = fixedClock())
+        // Default: no recent study, so the segment rests on notification opens alone
+        every { dailyActivityRepository.existsByUserIdAndActivityDateGreaterThanEqual(any(), any()) } returns false
+        service = EngagementSegmentService(notificationLogRepository, dailyActivityRepository, clock = fixedClock())
+    }
+
+    // ── Recent study ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `should return WARM for a user who studied recently but opened none of the last 3`() {
+        every { notificationLogRepository.findTop3ByUserIdOrderBySentAtDesc(1L) } returns listOf(
+            log(openedAt = null),
+            log(openedAt = null),
+            log(openedAt = null)
+        )
+        every { dailyActivityRepository.existsByUserIdAndActivityDateGreaterThanEqual(1L, TEST_TODAY.minusDays(3)) } returns true
+
+        assertEquals(EngagementSegment.WARM, service.computeSegment(1L))
     }
 
     // ── HOT ──────────────────────────────────────────────────────────────────────

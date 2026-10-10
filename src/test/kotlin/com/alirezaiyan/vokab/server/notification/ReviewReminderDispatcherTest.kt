@@ -14,11 +14,15 @@ import io.mockk.verify
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
+import com.alirezaiyan.vokab.server.study.ProgressStatsDto
+import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class ReviewReminderDispatcherTest {
 
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
+    private lateinit var notificationTypeSelector: NotificationTypeSelector
     private lateinit var notificationContentBuilder: NotificationContentBuilder
+    private lateinit var userProgressService: UserProgressService
     private lateinit var pushNotificationService: PushNotificationService
 
     private lateinit var dispatcher: ReviewReminderDispatcher
@@ -27,12 +31,19 @@ class ReviewReminderDispatcherTest {
     @BeforeEach
     fun setUp() {
         notificationScheduleRepository = mockk()
+        notificationTypeSelector = mockk()
         notificationContentBuilder = mockk()
+        userProgressService = mockk()
         pushNotificationService = mockk()
+        // Default: a reminder is warranted — not studied today, cards are due
+        every { notificationTypeSelector.studiedToday(any()) } returns false
+        every { userProgressService.calculateProgressStats(any()) } returns createProgressStats(dueCards = 8)
 
         dispatcher = ReviewReminderDispatcher(
             notificationScheduleRepository,
+            notificationTypeSelector,
             notificationContentBuilder,
+            userProgressService,
             pushNotificationService,
             clock = fixedClock(),
             meterRegistry = meterRegistry,
@@ -74,12 +85,36 @@ class ReviewReminderDispatcherTest {
     }
 
     @Test
+    fun `should not remind a user who already studied today`() {
+        val user = createUser(id = 1L)
+        every { notificationScheduleRepository.findUsersForReviewReminders(any()) } returns listOf(createSchedule(user))
+        every { notificationTypeSelector.studiedToday(user) } returns true
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `should not remind a user with no cards due`() {
+        val user = createUser(id = 1L)
+        every { notificationScheduleRepository.findUsersForReviewReminders(any()) } returns listOf(createSchedule(user))
+        every { userProgressService.calculateProgressStats(1L) } returns createProgressStats(dueCards = 0)
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
     fun `dispatchForCurrentHour targets the UTC hour of the injected clock`() {
         val user = createUser(id = 1L)
         val schedule = createSchedule(user)
         val dispatcherAt18 = ReviewReminderDispatcher(
             notificationScheduleRepository,
+            notificationTypeSelector,
             notificationContentBuilder,
+            userProgressService,
             pushNotificationService,
             clock = fixedClock(Instant.parse("2026-06-17T18:05:00Z")),
             meterRegistry = meterRegistry,
@@ -226,6 +261,18 @@ class ReviewReminderDispatcherTest {
         user = user,
         optimalSendHour = 18,
         consecutiveIgnores = 0
+    )
+
+    private fun createProgressStats(dueCards: Int): ProgressStatsDto = ProgressStatsDto(
+        totalWords = 20,
+        dueCards = dueCards,
+        level0Count = 0,
+        level1Count = 0,
+        level2Count = 0,
+        level3Count = 0,
+        level4Count = 0,
+        level5Count = 0,
+        level6Count = 0
     )
 
     private fun createPayload(): NotificationPayload = NotificationPayload(

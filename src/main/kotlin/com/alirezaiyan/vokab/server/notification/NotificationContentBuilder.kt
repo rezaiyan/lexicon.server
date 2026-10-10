@@ -8,6 +8,11 @@ import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.Notifi
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType.*
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -29,7 +34,8 @@ class NotificationContentBuilder(
     private val userProgressService: UserProgressService,
     private val learnerSignals: LearnerSignals,
     private val dailyInsightService: DailyInsightService,
-    private val milestoneDetector: MilestoneDetector
+    private val milestoneDetector: MilestoneDetector,
+    private val clock: Clock,
 ) {
     fun build(user: User, type: NotificationType, contentHint: String? = null): NotificationPayload {
         return when (type) {
@@ -41,17 +47,20 @@ class NotificationContentBuilder(
             DAILY_INSIGHT      -> buildDailyInsight(user)
             REVIEW_REMINDER    -> buildReviewReminder(user)
             MOTIVATION         -> buildMotivation(user, contentHint)
+            ADD_WORDS          -> buildAddWords()
             NONE               -> error("Should not build payload for NONE type")
         }
     }
 
     private fun buildStreakRisk(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        val body = aiCopyOr("Your ${user.currentStreak}-day streak ends at midnight. Keep it alive! 🔥") {
+        val deadline = streakDeadline()
+        val fallback = "Your ${user.currentStreak}-day streak resets $deadline. One short review keeps it alive! 🔥"
+        val body = aiCopyOr(fallback) {
             aiService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
         }
         return NotificationPayload(
-            title = "Your ${user.currentStreak}-day streak ends at midnight 🔥",
+            title = "Your ${user.currentStreak}-day streak resets $deadline 🔥",
             body = body,
             data = mapOf(
                 "type" to "streak_risk",
@@ -61,6 +70,29 @@ class NotificationContentBuilder(
             type = STREAK_RISK
         )
     }
+
+    /**
+     * Streak days are UTC days (see StreakService), so the user's local midnight is not the
+     * deadline; say how long is left instead.
+     */
+    private fun streakDeadline(): String {
+        val now = Instant.now(clock)
+        val nextUtcMidnight = LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1)
+            .atStartOfDay().toInstant(ZoneOffset.UTC)
+        val hoursLeft = Duration.between(now, nextUtcMidnight).toHours()
+        return if (hoursLeft < 1) "within the hour" else "in ${hoursLeft}h"
+    }
+
+    private fun buildAddWords(): NotificationPayload =
+        NotificationPayload(
+            title = "Start your word list ✨",
+            body = "Add a few words you want to learn, or snap a photo of a text and let Lexicon pick them out.",
+            data = mapOf(
+                "type" to "add_words",
+                "deep_link" to "vokab://words/add"
+            ),
+            type = ADD_WORDS
+        )
 
     private fun buildDueCards(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())

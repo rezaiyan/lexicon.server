@@ -33,10 +33,12 @@ class NotificationScheduleRepositoryFetchTest {
     private val hour = 7
     private lateinit var user: User
 
-    private fun seed(settings: UserSettings.() -> Unit) {
-        user = userRepository.save(User(email = "fetch-${System.nanoTime()}@example.com", name = "Fetch User"))
+    private fun seed(streak: Int = 0, offsetHrs: Int = 0, settings: UserSettings.() -> Unit) {
+        user = userRepository.save(
+            User(email = "fetch-${System.nanoTime()}@example.com", name = "Fetch User", currentStreak = streak)
+        )
         settingsRepository.save(UserSettings(user = user).apply(settings))
-        scheduleRepository.save(NotificationSchedule(user = user, optimalSendHour = hour))
+        scheduleRepository.save(NotificationSchedule(user = user, optimalSendHour = hour, timezoneOffsetHrs = offsetHrs))
     }
 
     @AfterEach
@@ -75,5 +77,17 @@ class NotificationScheduleRepositoryFetchTest {
 
         assertTrue(Hibernate.isInitialized(schedule.user))
         assertEquals("Fetch User", schedule.user.name)
+    }
+
+    @Test
+    fun `streak saver candidates are matched by offset and streak, with their user loaded`() {
+        seed(streak = 4, offsetHrs = 8) { notificationsEnabled = true; notificationFrequency = "DAILY" }
+
+        val schedule = scheduleRepository.findStreakSaverCandidates(listOf(8), minStreak = 2)
+            .single { it.user.id == user.id }
+
+        assertTrue(Hibernate.isInitialized(schedule.user))
+        assertTrue(scheduleRepository.findStreakSaverCandidates(listOf(7), minStreak = 2).none { it.user.id == user.id })
+        assertTrue(scheduleRepository.findStreakSaverCandidates(listOf(8), minStreak = 5).none { it.user.id == user.id })
     }
 }

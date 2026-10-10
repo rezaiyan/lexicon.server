@@ -1,15 +1,12 @@
 package com.alirezaiyan.vokab.server.notification
 
-import com.alirezaiyan.vokab.server.user.requireId
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
-import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
@@ -18,10 +15,11 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import java.time.Instant
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
-import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class SmartNotificationDispatcherTest {
 
@@ -30,28 +28,29 @@ class SmartNotificationDispatcherTest {
     private val notificationContentBuilder: NotificationContentBuilder = mockk()
     private val pushNotificationService: com.alirezaiyan.vokab.server.notification.PushNotificationService = mockk()
     private val milestoneDetector: MilestoneDetector = mockk()
-    private val userProgressService: UserProgressService = mockk()
     private val notificationEngagementService: NotificationEngagementService = mockk()
-    private val objectMapper: ObjectMapper = ObjectMapper()
+    private val dailyInsightService: com.alirezaiyan.vokab.server.ai.DailyInsightService = mockk(relaxed = true)
     private val meterRegistry = SimpleMeterRegistry()
 
     private lateinit var dispatcher: SmartNotificationDispatcher
 
     @BeforeEach
     fun setUp() {
-        dispatcher = SmartNotificationDispatcher(
-            notificationScheduleRepository,
-            notificationTypeSelector,
-            notificationContentBuilder,
-            pushNotificationService,
-            milestoneDetector,
-            userProgressService,
-            notificationEngagementService,
-            objectMapper,
-            clock = fixedClock(),
-            meterRegistry = meterRegistry,
-        )
+        every { notificationTypeSelector.studiedToday(any()) } returns false
+        dispatcher = dispatcherAt(TEST_NOW)
     }
+
+    private fun dispatcherAt(now: Instant) = SmartNotificationDispatcher(
+        notificationScheduleRepository,
+        notificationTypeSelector,
+        notificationContentBuilder,
+        pushNotificationService,
+        milestoneDetector,
+        notificationEngagementService,
+        dailyInsightService,
+        clock = fixedClock(now),
+        meterRegistry = meterRegistry,
+    )
 
     // ── HOT/WARM — rule-based path ────────────────────────────────────────────────
 
@@ -131,7 +130,6 @@ class SmartNotificationDispatcherTest {
         val user     = testUser(id = 5L)
         val schedule = testSchedule(user)
         val payload  = testPayload(type = NotificationType.PROGRESS_MILESTONE)
-        val stats    = testProgressStats()
 
         every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
         every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.PROGRESS_MILESTONE
@@ -141,12 +139,11 @@ class SmartNotificationDispatcherTest {
         )
         justRun { notificationEngagementService.recordSend(any(), any(), any()) }
         every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        justRun { milestoneDetector.recordMilestoneSnapshot(user, stats) }
+        justRun { milestoneDetector.recordMilestoneSnapshot(user) }
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 1) { milestoneDetector.recordMilestoneSnapshot(user, stats) }
+        verify(exactly = 1) { milestoneDetector.recordMilestoneSnapshot(user) }
     }
 
     @Test
@@ -166,8 +163,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any(), any()) }
-        verify(exactly = 0) { userProgressService.calculateProgressStats(any()) }
+        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any()) }
     }
 
     @Test
@@ -298,6 +294,106 @@ class SmartNotificationDispatcherTest {
         assert(schedule.suppressedUntil == expectedDate)
     }
 
+    @Test
+    fun `should skip the AI pause for a COLD user who came back and studied today`() {
+        val user     = testUser(id = 15L)
+        val schedule = testSchedule(user, segment = "COLD", aiAction = "pause", aiIntervalDays = 5)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.NONE
+
+        dispatcher.dispatchForCurrentHour()
+
+        assertEquals(null, schedule.suppressedUntil)
+        verify(exactly = 1) { notificationTypeSelector.selectType(user, schedule) }
+    }
+
+    @Test
+    fun `should refresh the insight silently for an active learner with nothing to notify`() {
+        val user     = testUser(id = 16L)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.NONE
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 1) { dailyInsightService.refreshInsightSilently(user) }
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    // ── Streak saver ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `streak saver sends STREAK_RISK to a streak holder who has not studied today`() {
+        val user     = testUser(id = 20L, currentStreak = 6)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.STREAK_RISK)
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), SmartNotificationDispatcher.MIN_STREAK_TO_SAVE) } returns listOf(schedule)
+        every { notificationContentBuilder.build(user, NotificationType.STREAK_RISK, null) } returns payload
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+        every { pushNotificationService.sendNotificationToUser(userId = 20L, title = any(), body = any(), data = any()) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(schedule, NotificationType.STREAK_RISK.name, 77L) }
+
+        dispatcherAt(Instant.parse("2026-06-17T20:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.STREAK_RISK.name, 77L) }
+    }
+
+    @Test
+    fun `streak saver targets the timezones whose evening slot is the current UTC hour`() {
+        val offsets = slot<Collection<Int>>()
+        every { notificationScheduleRepository.findStreakSaverCandidates(capture(offsets), any()) } returns emptyList()
+
+        dispatcherAt(Instant.parse("2026-06-17T13:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        // 13:00 UTC is 21:00 at UTC+8 — the latest daytime hour before the UTC streak day ends
+        assertEquals(listOf(8), offsets.captured.toList())
+    }
+
+    @Test
+    fun `streak saver skips a user who already studied today`() {
+        val user     = testUser(id = 21L, currentStreak = 6)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+
+        dispatcherAt(Instant.parse("2026-06-17T20:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `streak saver does not warn twice in one day`() {
+        val user     = testUser(id = 22L, currentStreak = 6)
+        val schedule = testSchedule(user).apply {
+            lastSentDate = TEST_TODAY
+            lastSentType = NotificationType.STREAK_RISK.name
+        }
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), any()) } returns listOf(schedule)
+
+        dispatcherAt(Instant.parse("2026-06-17T20:30:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `every timezone gets a daytime streak saver slot`() {
+        for (offset in -12..14) {
+            val utcHour = SmartNotificationDispatcher.streakSaverUtcHour(offset)
+            assertNotNull(utcHour, "offset $offset has no slot")
+            val localHour = (utcHour!! + offset + 24) % 24
+            assert(localHour in 8..21) { "offset $offset lands at local $localHour" }
+        }
+    }
+
     // ── Open tracking ─────────────────────────────────────────────────────────────
 
     @Test
@@ -416,17 +512,5 @@ class SmartNotificationDispatcherTest {
         body  = body,
         data  = mapOf("type" to type.name.lowercase(), "deep_link" to "vokab://review"),
         type  = type
-    )
-
-    private fun testProgressStats() = ProgressStatsDto(
-        totalWords  = 50,
-        dueCards    = 5,
-        level0Count = 0,
-        level1Count = 5,
-        level2Count = 10,
-        level3Count = 10,
-        level4Count = 10,
-        level5Count = 10,
-        level6Count = 5
     )
 }

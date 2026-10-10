@@ -31,7 +31,11 @@ class UserSettings(
     var dailyReminderTime: String = "18:00",
 
     @Column(nullable = false)
-    var notificationFrequency: String = "DAILY"
+    var notificationFrequency: String = "DAILY",
+
+    /** IANA zone id from the device; null until a client reports it. */
+    @Column(length = 64)
+    var timezone: String? = null
 ) : JpaEntity<Long>()
 
 

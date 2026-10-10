@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.notification
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
 import io.github.oshai.kotlinlogging.KotlinLogging
+import com.alirezaiyan.vokab.server.study.UserProgressService
 import java.time.Clock
 import org.springframework.stereotype.Service
 import java.time.LocalDate
@@ -14,7 +15,9 @@ private val REVIEW_REMINDER = NotificationType.REVIEW_REMINDER.name
 @Service
 class ReviewReminderDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
+    private val notificationTypeSelector: NotificationTypeSelector,
     private val notificationContentBuilder: NotificationContentBuilder,
+    private val userProgressService: UserProgressService,
     private val pushNotificationService: PushNotificationService,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
@@ -32,6 +35,10 @@ class ReviewReminderDispatcher(
     private fun dispatchForUser(schedule: NotificationSchedule) {
         val user = schedule.user
         val userId = user.id ?: error("User id is null for schedule=${schedule.id}")
+        // A review reminder with nothing to review, or after today's review, is pure noise
+        if (notificationTypeSelector.studiedToday(user)) return
+        if (userProgressService.calculateProgressStats(userId).dueCards == 0) return
+
         val payload = notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER)
         val results = pushNotificationService.sendNotificationToUser(
             userId = userId,

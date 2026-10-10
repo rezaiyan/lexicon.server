@@ -28,6 +28,30 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
     // JOIN FETCH: the dispatchers run without a transaction and read the user after this returns
     fun findUsersToNotifyAtHour(hour: Int): List<NotificationSchedule>
 
+    /**
+     * Streak holders in the given UTC offsets who may get a push today. Unlike
+     * [findUsersToNotifyAtHour] it ignores lastSentDate: an earlier push today doesn't rule out
+     * the evening streak saver. The caller still checks today's activity.
+     */
+    @Query("""
+        SELECT ns FROM NotificationSchedule ns JOIN FETCH ns.user u
+        WHERE ns.timezoneOffsetHrs IN :offsets
+          AND u.active = true
+          AND u.currentStreak >= :minStreak
+          AND (ns.suppressedUntil IS NULL OR ns.suppressedUntil < CURRENT_DATE)
+          AND EXISTS (
+            SELECT us FROM UserSettings us
+            WHERE us.user = ns.user
+              AND us.notificationsEnabled = true
+              AND us.notificationFrequency <> 'OFF'
+          )
+    """)
+    // JOIN FETCH: see findUsersToNotifyAtHour
+    fun findStreakSaverCandidates(
+        @Param("offsets") offsets: Collection<Int>,
+        @Param("minStreak") minStreak: Int,
+    ): List<NotificationSchedule>
+
     @Query("SELECT COUNT(ns) FROM NotificationSchedule ns WHERE ns.suppressedUntil >= CURRENT_DATE AND ns.consecutiveIgnores BETWEEN 3 AND 5")
     fun countSuppressed3Day(): Long
 

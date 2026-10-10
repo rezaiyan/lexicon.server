@@ -1,14 +1,38 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen.rules
 
-import com.alirezaiyan.vokab.server.analytics.insightsscreen.*
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachActionDto
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachActionKind
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachCardDto
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachRule
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.LearnerSnapshot
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.MASTERED_LEVEL
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.MAX_ACTION_WORDS
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.WordRef
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.card
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.gatedAccuracyPct
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.lastDays
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.plural
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.reviewsIn
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.stageBuckets
+import kotlin.math.roundToInt
 import org.springframework.stereotype.Component
 
 private const val RECENT_DAYS = 7L
 private const val MIN_WORDS = 3
 
-private fun reviewWords(words: List<WordRef>) =
-    CoachActionDto(CoachActionKind.REVIEW_WORDS, label = "Review ${plural(words.size, "word")}", wordIds = words.map { it.id })
+private fun reviewWords(words: List<WordRef>): CoachActionDto {
+    val capped = words.take(MAX_ACTION_WORDS)
+    return CoachActionDto(
+        CoachActionKind.REVIEW_WORDS,
+        label = "Review ${plural(capped.size, "word")}",
+        wordIds = capped.map { it.id },
+    )
+}
 
+/**
+ * Words whose latest review in the last 7 days was a demotion. Words that dropped and then recovered
+ * within the window are excluded on purpose: they no longer need a refresh.
+ */
 @Component
 class SlippingWordsRule : CoachRule {
     override val type = "SLIPPING_WORDS"
@@ -69,9 +93,10 @@ class LevelBottleneckRule : CoachRule {
             .toMap()
         if (rates.size < MIN_STAGES) return null
         val (stage, rate) = rates.minBy { it.value }
-        val others = rates.filterKeys { it != stage }.values.average().toInt()
+        val others = rates.filterKeys { it != stage }.values.average().roundToInt()
         if (others - rate < MIN_GAP_POINTS) return null
         val words = snapshot.stageBuckets().getValue(stage)
+            .filter { !it.correct }
             .sortedByDescending { it.reviewedAt }
             .distinctBy { it.wordId }
             .map { WordRef(it.wordId, it.wordText) }

@@ -11,7 +11,8 @@ data class InsightsScreenResponse(
     val locked: List<LockedSectionDto>,
 )
 
-data class MetricDto(val value: Int, val previous: Int)
+/** [previous] is last week's value; null when it is not meaningful (e.g. accuracy below the sample gate). */
+data class MetricDto(val value: Int, val previous: Int?)
 
 data class DayCountDto(val date: String, val reviews: Int)
 

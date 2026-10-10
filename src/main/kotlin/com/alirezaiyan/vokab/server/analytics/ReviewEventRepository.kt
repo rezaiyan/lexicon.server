@@ -19,7 +19,10 @@ interface ReviewEventRepository : JpaRepository<ReviewEvent, Long> {
            WHERE e.user.id = :userId AND e.reviewedAt >= :sinceMs
            ORDER BY e.reviewedAt"""
     )
-    fun findFactsByUserIdSince(@Param("userId") userId: Long, @Param("sinceMs") sinceMs: Long): List<ReviewFactProjection>
+    fun findFactsByUserIdSince(
+        @Param("userId") userId: Long,
+        @Param("sinceMs") sinceMs: Long,
+    ): List<ReviewFactProjection>
 
     fun findByUser(user: User): List<ReviewEvent>
 

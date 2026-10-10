@@ -13,7 +13,7 @@ object HeroBuilder {
         return HeroDto(
             headline = headline(snapshot, thisWeek.size, lastWeek.size),
             reviews = MetricDto(thisWeek.size, lastWeek.size),
-            accuracyPct = currentAccuracy?.let { MetricDto(it, lastWeek.accuracyPct() ?: 0) },
+            accuracyPct = currentAccuracy?.let { MetricDto(it, lastWeek.gatedAccuracyPct()) },
             leveledUp = MetricDto(thisWeek.leveledUpWordCount(), lastWeek.leveledUpWordCount()),
             currentStreak = snapshot.currentStreak,
             week = (0L..6L).map { offset ->
@@ -29,8 +29,10 @@ object HeroBuilder {
             val start = snapshot.weekStart.minusWeeks(back)
             snapshot.reviewsIn(Period(start, start.plusDays(6))).size
         }
+        val hasHistory = pastWeeks.any { it > 0 }
         return when {
-            thisWeek > pastWeeks.max() -> "Your best week in $HISTORY_WEEKS weeks"
+            hasHistory && thisWeek > pastWeeks.max() -> "Your best week in $HISTORY_WEEKS weeks"
+            !hasHistory && lastWeek == 0 -> "Great start to your week"
             thisWeek > lastWeek -> "Ahead of last week"
             else -> "Keep the rhythm going"
         }

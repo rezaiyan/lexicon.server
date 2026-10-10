@@ -26,6 +26,13 @@ class SectionBuildersTest {
     }
 
     @Test
+    fun `weekday below the bucket gate is excluded`() {
+        val facts = reviews("2026-06-16T09:00", 30, 27) + reviews("2026-06-11T09:00", 25, 15, firstWordId = 500)
+        val habits = SectionBuilders.build(snapshot(reviews = facts)).sections.habits
+        assertEquals(listOf(2), habits!!.weekdays.map { it.isoDay })
+    }
+
+    @Test
     fun `mastery lists all seven stages and weekly movement`() {
         val facts = listOf(review("2026-06-16T09:00", wordId = 1, correct = true))
         val mastery = SectionBuilders.build(snapshot(reviews = facts, wordsPerLevel = mapOf(0 to 4L, 6 to 2L))).sections.mastery

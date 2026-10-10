@@ -8,6 +8,7 @@ import com.alirezaiyan.vokab.server.wordrush.WordRushGameRepository
 import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Component
 import java.time.Clock
+import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.math.roundToInt
@@ -29,7 +30,17 @@ class LearnerSnapshotLoader(
             .atStartOfDay(zone).toInstant().toEpochMilli()
 
         val reviews = reviewEventRepository.findFactsByUserIdSince(userId, sinceMs).map {
-            ReviewFact(it.wordId, it.wordText, it.rating >= 1, it.previousLevel, it.newLevel, it.reviewedAt)
+            val local = Instant.ofEpochMilli(it.reviewedAt).atZone(zone)
+            ReviewFact(
+                wordId = it.wordId,
+                wordText = it.wordText,
+                correct = it.rating >= 1,
+                previousLevel = it.previousLevel,
+                newLevel = it.newLevel,
+                reviewedAt = it.reviewedAt,
+                localDate = local.toLocalDate(),
+                localHour = local.hour,
+            )
         }
         val wordsPerLevel = wordRepository.findProgressRowsByUserId(userId, now.toInstant().toEpochMilli())
             .associate { it.getLevel() to it.getWordCount() }
@@ -39,7 +50,9 @@ class LearnerSnapshotLoader(
                 val accuracy = ((it.total - it.errors) * 100.0 / it.total).roundToInt()
                 WordAccuracy(it.wordId, it.wordText, accuracy, it.total.toInt())
             }
-        val comebacks = reviewEventRepository.findComebackWords(user).map { WordRef(it.wordId, it.wordText) }
+        val comebacks = reviewEventRepository.findComebackWords(user)
+            .take(MAX_COMEBACK_WORDS)
+            .map { WordRef(it.wordId, it.wordText) }
         val gamesPlayed = wordRushGameRepository.countByUser(user)
         val wordRush = if (gamesPlayed == 0L) null else WordRushSummary(
             gamesPlayed = gamesPlayed,
@@ -67,5 +80,6 @@ class LearnerSnapshotLoader(
         const val DIFFICULT_MIN_REVIEWS = 3
         const val DIFFICULT_LIMIT = 20
         const val RECENT_GAMES = 5
+        const val MAX_COMEBACK_WORDS = 20
     }
 }

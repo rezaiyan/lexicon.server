@@ -23,13 +23,18 @@ fun LearnerSnapshot.lastWeek(): Period = Period(weekStart.minusWeeks(1), weekSta
 
 fun LearnerSnapshot.lastDays(days: Long): Period = Period(today.minusDays(days - 1), today)
 
-fun LearnerSnapshot.reviewsIn(period: Period): List<ReviewFact> = reviews.filter { localDate(it) in period }
+fun LearnerSnapshot.reviewsIn(period: Period): List<ReviewFact> = reviews.filter { it.localDate in period }
 
-fun LearnerSnapshot.reviewsByDate(): Map<LocalDate, Int> = reviews.groupingBy { localDate(it) }.eachCount()
+fun LearnerSnapshot.reviewsByDate(): Map<LocalDate, Int> = reviews.groupingBy { it.localDate }.eachCount()
 
-fun LearnerSnapshot.hourBuckets(): Map<Int, List<ReviewFact>> = reviews.groupBy { localHour(it) }
+fun LearnerSnapshot.hourBuckets(): Map<Int, List<ReviewFact>> = reviews.groupBy { it.localHour }
 
-fun LearnerSnapshot.weekdayBuckets(): Map<DayOfWeek, List<ReviewFact>> = reviews.groupBy { localDate(it).dayOfWeek }
+fun LearnerSnapshot.weekdayBuckets(): Map<DayOfWeek, List<ReviewFact>> = reviews.groupBy { it.localDate.dayOfWeek }
+
+/** (local hour, accuracy %) of the most accurate hour with at least [MIN_REVIEWS_PER_BUCKET] reviews. */
+fun LearnerSnapshot.bestHour(): Pair<Int, Int>? = hourBuckets()
+    .mapNotNull { (hour, facts) -> facts.gatedAccuracyPct(MIN_REVIEWS_PER_BUCKET)?.let { hour to it } }
+    .maxByOrNull { it.second }
 
 /** Reviews grouped by the stage the word was in when reviewed. */
 fun LearnerSnapshot.stageBuckets(): Map<Int, List<ReviewFact>> = reviews.groupBy { it.previousLevel }
@@ -40,9 +45,11 @@ fun List<ReviewFact>.accuracyPct(): Int? =
 fun List<ReviewFact>.gatedAccuracyPct(minReviews: Int = MIN_REVIEWS_FOR_PERCENT): Int? =
     if (size < minReviews) null else accuracyPct()
 
-fun List<ReviewFact>.leveledUpWordCount(): Int = filter { it.newLevel > it.previousLevel }.map { it.wordId }.distinct().size
+fun List<ReviewFact>.leveledUpWordCount(): Int =
+    filter { it.newLevel > it.previousLevel }.map { it.wordId }.distinct().size
 
-fun List<ReviewFact>.demotedWordCount(): Int = filter { it.newLevel < it.previousLevel }.map { it.wordId }.distinct().size
+fun List<ReviewFact>.demotedWordCount(): Int =
+    filter { it.newLevel < it.previousLevel }.map { it.wordId }.distinct().size
 
 fun nextMilestone(mastered: Long): Long =
     FIXED_MILESTONES.firstOrNull { it > mastered } ?: ((mastered / MILESTONE_STEP) + 1) * MILESTONE_STEP

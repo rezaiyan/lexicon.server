@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen
 
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 
 class CoachEngineTest {
@@ -14,6 +15,18 @@ class CoachEngineTest {
         override val type = "BOOM"
         override val priority = 1000
         override fun evaluate(snapshot: LearnerSnapshot): CoachCardDto? = error("broken rule")
+    }
+
+    private class ErrorRule : CoachRule {
+        override val type = "FATAL"
+        override val priority = 1000
+        override fun evaluate(snapshot: LearnerSnapshot): CoachCardDto? = throw NotImplementedError("vm-level error")
+    }
+
+    @Test
+    fun `an Error from a rule propagates`() {
+        val engine = CoachEngine(listOf(ErrorRule(), FixedRule("OK", 1)))
+        assertThrows(NotImplementedError::class.java) { engine.cardsFor(snapshot()) }
     }
 
     @Test

@@ -1,6 +1,11 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen.rules
 
-import com.alirezaiyan.vokab.server.analytics.insightsscreen.*
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachActionKind
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.TEST_LOCAL_NOW
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.review
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.reviews
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.reviewsAt
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.snapshot
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -60,5 +65,19 @@ class HabitRulesTest {
         val facts = reviews("2026-06-10T20:00", count = 29, correctCount = 29) +
             reviews("2026-06-11T09:00", count = 40, correctCount = 24, firstWordId = 500)
         assertNull(bestTime.evaluate(snapshot(reviews = facts)))
+    }
+
+    @Test
+    fun `best hour follows the requested zone for the same instants`() {
+        val morningUtc = java.time.Instant.parse("2026-06-10T00:00:00Z") // Tokyo 09h, Los Angeles 17h
+        val eveningUtc = java.time.Instant.parse("2026-06-10T12:00:00Z") // Tokyo 21h, Los Angeles 05h
+        fun bestHourIn(zone: java.time.ZoneId): Int? {
+            val facts = reviewsAt(morningUtc, zone, count = 30, correctCount = 28) +
+                reviewsAt(eveningUtc, zone, count = 30, correctCount = 18, firstWordId = 500)
+            val now = TEST_LOCAL_NOW.withZoneSameInstant(zone)
+            return bestTime.evaluate(snapshot(now = now, reviews = facts))?.action?.hour
+        }
+        assertEquals(9, bestHourIn(java.time.ZoneId.of("Asia/Tokyo")))
+        assertEquals(17, bestHourIn(java.time.ZoneId.of("America/Los_Angeles")))
     }
 }

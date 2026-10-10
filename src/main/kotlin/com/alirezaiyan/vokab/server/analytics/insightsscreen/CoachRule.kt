@@ -2,6 +2,9 @@ package com.alirezaiyan.vokab.server.analytics.insightsscreen
 
 private const val MAX_WORD_CHIPS = 5
 
+/** Upper bound on word ids in a REVIEW_WORDS action, so the payload and review session stay small. */
+const val MAX_ACTION_WORDS = 50
+
 /** One coaching insight. Implementations are stateless Spring beans; add a rule = add a class. */
 interface CoachRule {
     val type: String

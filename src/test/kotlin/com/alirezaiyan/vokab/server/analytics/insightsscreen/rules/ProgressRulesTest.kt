@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen.rules
 
-import com.alirezaiyan.vokab.server.analytics.insightsscreen.*
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.reviews
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.snapshot
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull

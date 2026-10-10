@@ -1,6 +1,14 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen.rules
 
-import com.alirezaiyan.vokab.server.analytics.insightsscreen.*
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachActionDto
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachActionKind
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachCardDto
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.CoachRule
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.LearnerSnapshot
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.card
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.gatedAccuracyPct
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.bestHour
+import com.alirezaiyan.vokab.server.analytics.insightsscreen.reviewsByDate
 import org.springframework.stereotype.Component
 
 @Component
@@ -35,10 +43,9 @@ class BestTimeRule : CoachRule {
     override fun evaluate(snapshot: LearnerSnapshot): CoachCardDto? {
         if (snapshot.remindersEnabled) return null
         val overall = snapshot.reviews.gatedAccuracyPct() ?: return null
-        val (hour, accuracy) = snapshot.hourBuckets()
-            .mapNotNull { (hour, facts) -> facts.gatedAccuracyPct(MIN_REVIEWS_PER_BUCKET)?.let { hour to it } }
-            .maxByOrNull { it.second } ?: return null
-        if (accuracy - overall < MIN_LIFT_POINTS) return null
+        val (hour, accuracy) = snapshot.bestHour()
+            ?.takeIf { (_, accuracy) -> accuracy - overall >= MIN_LIFT_POINTS }
+            ?: return null
         return card(
             snapshot,
             title = "Your sharpest study hour",

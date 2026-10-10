@@ -20,6 +20,16 @@ class HeroBuilderTest {
     }
 
     @Test
+    fun `accuracy previous is null when last week is below the gate`() {
+        val empty = HeroBuilder.build(snapshot(reviews = reviews("2026-06-16T09:00", 25, 20)))
+        assertEquals(MetricDto(80, null), empty.accuracyPct)
+        assertEquals(MetricDto(25, 0), empty.reviews)
+
+        val thin = reviews("2026-06-16T09:00", 25, 20) + reviews("2026-06-09T09:00", 5, 5, firstWordId = 500)
+        assertEquals(MetricDto(80, null), HeroBuilder.build(snapshot(reviews = thin)).accuracyPct)
+    }
+
+    @Test
     fun `accuracy is hidden below the sample gate`() {
         assertNull(HeroBuilder.build(snapshot(reviews = reviews("2026-06-16T09:00", 5, 5))).accuracyPct)
     }
@@ -29,5 +39,11 @@ class HeroBuilderTest {
         assertEquals("A fresh week to learn", HeroBuilder.build(snapshot()).headline)
         val best = reviews("2026-06-16T09:00", 30, 30) + reviews("2026-06-09T09:00", 10, 10, firstWordId = 500)
         assertEquals("Your best week in 12 weeks", HeroBuilder.build(snapshot(reviews = best)).headline)
+    }
+
+    @Test
+    fun `new user with no earlier weeks gets a great start headline`() {
+        val facts = reviews("2026-06-16T09:00", 5, 5)
+        assertEquals("Great start to your week", HeroBuilder.build(snapshot(reviews = facts)).headline)
     }
 }

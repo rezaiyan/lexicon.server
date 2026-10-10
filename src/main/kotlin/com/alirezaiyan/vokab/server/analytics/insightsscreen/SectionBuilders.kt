@@ -30,9 +30,14 @@ object SectionBuilders {
         )
     }
 
-    private fun <T> isolated(name: String, block: () -> T?): T? = runCatching(block)
-        .onFailure { logger.warn(it) { "Insights section $name failed; hiding it" } }
-        .getOrNull()
+    /** Hides a failing section; Errors (OOM, StackOverflow) still propagate. */
+    @Suppress("TooGenericExceptionCaught")
+    private fun <T> isolated(name: String, block: () -> T?): T? = try {
+        block()
+    } catch (e: Exception) {
+        logger.warn(e) { "Insights section $name failed; hiding it" }
+        null
+    }
 
     private fun mastery(snapshot: LearnerSnapshot): MasterySectionDto? {
         if (snapshot.wordsPerLevel.values.sum() == 0L) return null
@@ -53,13 +58,14 @@ object SectionBuilders {
     }
 
     private fun habits(snapshot: LearnerSnapshot): HabitsSectionDto {
-        val bestHour = snapshot.hourBuckets()
-            .mapNotNull { (hour, facts) -> facts.gatedAccuracyPct(MIN_REVIEWS_PER_BUCKET)?.let { BestHourDto(hour, it) } }
-            .maxByOrNull { it.accuracyPct }
+        val bestHour = snapshot.bestHour()?.let { (hour, accuracy) -> BestHourDto(hour, accuracy) }
         val weekdays = snapshot.weekdayBuckets()
-            .mapNotNull { (day, facts) -> facts.gatedAccuracyPct()?.let { WeekdayAccuracyDto(day.value, it, facts.size) } }
+            .mapNotNull { (day, facts) ->
+                facts.gatedAccuracyPct(MIN_REVIEWS_PER_BUCKET)?.let { WeekdayAccuracyDto(day.value, it, facts.size) }
+            }
             .sortedBy { it.isoDay }
-        val heatmap = snapshot.reviewsByDate().toSortedMap().map { (date, count) -> DayCountDto(date.toString(), count) }
+        val heatmap = snapshot.reviewsByDate().toSortedMap()
+            .map { (date, count) -> DayCountDto(date.toString(), count) }
         val caption = if (weekdays.size >= MIN_WEEKDAYS_FOR_CLAIM) {
             val best = DayOfWeek.of(weekdays.maxBy { it.accuracyPct }.isoDay)
             "You're sharpest on ${best.getDisplayName(TextStyle.FULL, Locale.ENGLISH)}s"

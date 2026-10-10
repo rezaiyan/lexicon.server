@@ -7,6 +7,7 @@ import java.time.ZonedDateTime
 val BERLIN: ZoneId = ZoneId.of("Europe/Berlin")
 val TEST_LOCAL_NOW: ZonedDateTime = ZonedDateTime.of(2026, 6, 17, 20, 0, 0, 0, BERLIN)
 
+@Suppress("LongParameterList") // test builder: every field has a default
 fun snapshot(
     now: ZonedDateTime = TEST_LOCAL_NOW,
     reviews: List<ReviewFact> = emptyList(),
@@ -41,17 +42,31 @@ fun review(
     newLevel: Int = if (correct) previousLevel + 1 else previousLevel - 1,
     zone: ZoneId = BERLIN,
     text: String = "word$wordId",
-) = ReviewFact(
-    wordId = wordId,
-    wordText = text,
-    correct = correct,
-    previousLevel = previousLevel,
-    newLevel = newLevel.coerceIn(0, MASTERED_LEVEL),
-    reviewedAt = java.time.LocalDateTime.parse(localDateTime).atZone(zone).toInstant().toEpochMilli(),
-)
+): ReviewFact {
+    val local = java.time.LocalDateTime.parse(localDateTime)
+    return ReviewFact(
+        wordId = wordId,
+        wordText = text,
+        correct = correct,
+        previousLevel = previousLevel,
+        newLevel = newLevel.coerceIn(0, MASTERED_LEVEL),
+        reviewedAt = local.atZone(zone).toInstant().toEpochMilli(),
+        localDate = local.toLocalDate(),
+        localHour = local.hour,
+    )
+}
 
 /** [count] reviews at [localDateTime], [correctCount] of them correct, distinct word ids from [firstWordId]. */
 fun reviews(localDateTime: String, count: Int, correctCount: Int, firstWordId: Long = 100, previousLevel: Int = 1): List<ReviewFact> =
     (0 until count).map { i ->
         review(localDateTime, wordId = firstWordId + i, correct = i < correctCount, previousLevel = previousLevel)
+    }
+
+/** [count] facts at the same [instant], [correctCount] correct, as seen from [zone]. */
+fun reviewsAt(instant: java.time.Instant, zone: ZoneId, count: Int, correctCount: Int, firstWordId: Long = 100): List<ReviewFact> =
+    (0 until count).map { i ->
+        review(
+            java.time.LocalDateTime.ofInstant(instant, zone).toString(),
+            wordId = firstWordId + i, correct = i < correctCount, zone = zone,
+        )
     }

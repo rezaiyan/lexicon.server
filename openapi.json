@@ -2128,14 +2128,14 @@
         "properties" : {
           "previous" : {
             "format" : "int32",
-            "type" : "integer"
+            "type" : [ "integer", "null" ]
           },
           "value" : {
             "format" : "int32",
             "type" : "integer"
           }
         },
-        "required" : [ "previous", "value" ],
+        "required" : [ "value" ],
         "type" : "object"
       },
       "MonthlyStatsResponse" : {

@@ -1,7 +1,6 @@
 package com.alirezaiyan.vokab.server.analytics.insightsscreen
 
 import java.time.DayOfWeek
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -16,6 +15,9 @@ data class ReviewFact(
     val previousLevel: Int,
     val newLevel: Int,
     val reviewedAt: Long,
+    /** [reviewedAt] in the snapshot zone, precomputed once at load time. */
+    val localDate: LocalDate,
+    val localHour: Int,
 )
 
 data class WordRef(val id: Long, val text: String)
@@ -41,9 +43,6 @@ data class LearnerSnapshot(
 ) {
     val today: LocalDate get() = now.toLocalDate()
     val weekStart: LocalDate get() = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-
-    fun localDate(fact: ReviewFact): LocalDate = Instant.ofEpochMilli(fact.reviewedAt).atZone(zone).toLocalDate()
-    fun localHour(fact: ReviewFact): Int = Instant.ofEpochMilli(fact.reviewedAt).atZone(zone).hour
 
     companion object {
         /** 12 weeks: the heatmap window and the history every rule reads from. */

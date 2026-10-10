@@ -1,17 +1,37 @@
 package com.alirezaiyan.vokab.server.analytics
 
+import com.alirezaiyan.vokab.server.listening.ListeningSessionRepository
+import com.alirezaiyan.vokab.server.wordrush.WordRushGameRepository
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import java.time.Instant
 
 class LearnerSignalsTest {
 
     private val studyActivityQueries: StudyActivityQueries = mockk()
     private val accuracyQueries: AccuracyQueries = mockk()
     private val wordProgressQueries: WordProgressQueries = mockk()
-    private val signals = LearnerSignals(studyActivityQueries, accuracyQueries, wordProgressQueries, mockk())
+    private val wordRushGameRepository: WordRushGameRepository = mockk()
+    private val listeningSessionRepository: ListeningSessionRepository = mockk()
+    private val signals = LearnerSignals(
+        studyActivityQueries, accuracyQueries, wordProgressQueries, mockk(), wordRushGameRepository, listeningSessionRepository,
+    )
+
+    @Test
+    fun `practice history maps last use and best score`() {
+        every { wordRushGameRepository.findLastPlayedAt(7L) } returns 1_700_000_000_000L
+        every { wordRushGameRepository.findBestScoreByUserId(7L) } returns 1240
+        every { listeningSessionRepository.findLastStartedAt(7L) } returns null
+
+        val history = signals.practiceHistory(7L)
+
+        assertEquals(Instant.ofEpochMilli(1_700_000_000_000L), history.lastWordRushAt)
+        assertEquals(1240, history.bestWordRushScore)
+        assertNull(history.lastListeningAt)
+    }
 
     @Test
     fun `top difficult word is the first word with at least 3 reviews`() {

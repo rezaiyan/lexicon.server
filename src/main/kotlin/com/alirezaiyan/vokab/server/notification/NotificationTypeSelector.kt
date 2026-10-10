@@ -23,6 +23,7 @@ class NotificationTypeSelector(
     private val userProgressService: UserProgressService,
     private val learnerSignals: LearnerSignals,
     private val milestoneDetector: MilestoneDetector,
+    private val practiceNudgePolicy: PracticeNudgePolicy,
     private val clock: Clock
 ) {
     enum class NotificationType {
@@ -30,6 +31,8 @@ class NotificationTypeSelector(
         DUE_CARDS, COMEBACK_ALERT, DAILY_INSIGHT, REVIEW_REMINDER,
         MOTIVATION,  // AI-advised re-engagement for COLD/DORMANT users
         ADD_WORDS,   // Activation: the user has no words yet, so there is nothing to review
+        WORD_RUSH,   // Practice nudges when nothing is due; see PracticeNudgePolicy
+        LISTENING,
         NONE
     }
 
@@ -37,8 +40,9 @@ class NotificationTypeSelector(
      * Picks the one push worth sending today, or [NotificationType.NONE].
      *
      * A user who already studied today only hears about something new to them (a milestone,
-     * the Monday recap); reminding them to do what they just did is noise. Generic content
-     * (insight, add-words nudge) never goes out twice in a row.
+     * the Monday recap); reminding them to do what they just did is noise. With little to review,
+     * a Word Rush or Listening nudge may take the slot (PracticeNudgePolicy decides). Generic
+     * content (insight, add-words nudge) never goes out twice in a row.
      */
     @Transactional(readOnly = true)
     fun selectType(user: User, schedule: NotificationSchedule): NotificationType {
@@ -48,7 +52,7 @@ class NotificationTypeSelector(
 
         // Re-engagement mode: user was suppressed (3+ ignores), use higher-value content
         if (schedule.consecutiveIgnores >= 3) {
-            return selectReEngagementType(user).notRepeating(schedule)
+            return selectReEngagementType(user, schedule).notRepeating(schedule)
         }
 
         // Streak risk: only when close to the end of the user's day
@@ -69,6 +73,7 @@ class NotificationTypeSelector(
 
         if (hasComebackWord(user)) return NotificationType.COMEBACK_ALERT
 
+        practiceNudgePolicy.pick(user, schedule, stats.totalWords)?.let { return it }
         return NotificationType.DAILY_INSIGHT.notRepeating(schedule)
     }
 
@@ -94,7 +99,7 @@ class NotificationTypeSelector(
      * Re-engagement priority for users who have been suppressed (3+ consecutive ignores).
      * Prefers high-value, actionable, or curiosity-triggering content.
      */
-    private fun selectReEngagementType(user: User): NotificationType {
+    private fun selectReEngagementType(user: User, schedule: NotificationSchedule): NotificationType {
         if (milestoneDetector.hasPendingMilestone(user)) return NotificationType.PROGRESS_MILESTONE
 
         val stats = userProgressService.calculateProgressStats(user.requireId())
@@ -102,7 +107,7 @@ class NotificationTypeSelector(
             stats.totalWords == 0 -> NotificationType.ADD_WORDS
             stats.dueCards >= MIN_DUE_CARDS -> NotificationType.DUE_CARDS
             hasComebackWord(user) -> NotificationType.COMEBACK_ALERT
-            else -> NotificationType.DAILY_INSIGHT
+            else -> practiceNudgePolicy.pick(user, schedule, stats.totalWords) ?: NotificationType.DAILY_INSIGHT
         }
     }
 

@@ -48,6 +48,8 @@ class NotificationContentBuilder(
             REVIEW_REMINDER    -> buildReviewReminder(user)
             MOTIVATION         -> buildMotivation(user, contentHint)
             ADD_WORDS          -> buildAddWords()
+            WORD_RUSH,
+            LISTENING          -> buildPracticeNudge(user, type)
             NONE               -> error("Should not build payload for NONE type")
         }
     }
@@ -93,6 +95,13 @@ class NotificationContentBuilder(
             ),
             type = ADD_WORDS
         )
+
+    private fun buildPracticeNudge(user: User, type: NotificationType): NotificationPayload {
+        val history = bestEffort("Practice history for user=${user.id}") {
+            learnerSignals.practiceHistory(user.requireId())
+        }
+        return practiceNudgePayload(type, history, Instant.now(clock))
+    }
 
     private fun buildDueCards(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())

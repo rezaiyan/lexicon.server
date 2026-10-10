@@ -37,6 +37,13 @@ interface WordRushGameRepository : JpaRepository<WordRushGame, Long> {
 
     @Query("SELECT COALESCE(MAX(g.score), 0) FROM WordRushGame g WHERE g.user = :user")
     fun findBestScore(@Param("user") user: User): Int
+
+    /** Epoch millis of the user's latest game, or null if they never played. */
+    @Query("SELECT MAX(g.playedAt) FROM WordRushGame g WHERE g.user.id = :userId")
+    fun findLastPlayedAt(@Param("userId") userId: Long): Long?
+
+    @Query("SELECT COALESCE(MAX(g.score), 0) FROM WordRushGame g WHERE g.user.id = :userId")
+    fun findBestScoreByUserId(@Param("userId") userId: Long): Int
 }
 
 interface WordRushInsightsProjection {

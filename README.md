@@ -101,12 +101,9 @@ All configuration is injected via environment variables. Copy `env.example` to `
 |---|---|---|
 | `FIREBASE_PROJECT_ID` | — | Required for Google Sign-In token verification |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | — | Path to service account JSON (enables push notifications) |
+| `FIREBASE_CREDENTIALS_JSON` | — | The service account JSON itself; takes precedence over the path |
 | `REVENUECAT_WEBHOOK_SECRET` | — | Webhook signature secret |
 | `REVENUECAT_API_KEY` | — | RevenueCat REST API key |
-| `GITHUB_TOKEN` | — | GitHub token for vocabulary collections (raises rate limit to 5000/hr) |
-| `PREMIUM_FEATURES_ENABLED` | `true` | Enable premium feature gate |
-| `AI_IMAGE_EXTRACTION_ENABLED` | `true` | Enable image OCR extraction |
-| `AI_DAILY_INSIGHT_ENABLED` | `true` | Enable AI daily push insights |
 | `PUSH_NOTIFICATIONS_ENABLED` | `true` | Enable push notifications |
 | `PORT` | `8080` | HTTP server port |
 

@@ -13,6 +13,8 @@ data class SettingsDto(
     val dailyReminderTime: String = "18:00",
     @field:Pattern(regexp = "^(DAILY|EVERY_OTHER_DAY|WEEKLY|OFF)$", message = "Must be one of: DAILY, EVERY_OTHER_DAY, WEEKLY, OFF")
     val notificationFrequency: String = "DAILY",
+    /** IANA zone id of the device, e.g. "Europe/Berlin". Omitted by older clients: the stored one is kept. */
+    val timezone: String? = null,
     @JsonInclude(JsonInclude.Include.NON_NULL)
     val optimalSendHour: Int? = null,
     @JsonInclude(JsonInclude.Include.NON_NULL)

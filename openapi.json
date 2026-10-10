@@ -2447,6 +2447,9 @@
           },
           "themeMode" : {
             "type" : "string"
+          },
+          "timezone" : {
+            "type" : [ "string", "null" ]
           }
         },
         "required" : [ "dailyReminderTime", "languageCode", "notificationFrequency", "notificationsEnabled", "reviewRemindersEnabled", "themeMode" ],

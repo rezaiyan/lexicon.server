@@ -471,6 +471,36 @@ class DailyInsightServiceTest {
         assertThrows<NoSuchElementException> { dailyInsightService.getOrGenerateTodaysInsight(404L) }
     }
 
+    // --- refreshInsightSilently ---
+
+    @Test
+    fun `refreshInsightSilently sends today's insight as a data-only push and marks it sent`() {
+        val user = createUser()
+        val insight = createDailyInsight(user = user, insightText = "Nice work today")
+        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns insight
+        val data = slot<Map<String, String>>()
+        every { pushNotificationService.sendSilentToUser(1L, capture(data)) } returns
+            listOf(NotificationResponse(success = true))
+        every { dailyInsightRepository.save(insight) } returns insight
+
+        dailyInsightService.refreshInsightSilently(user)
+
+        assertEquals("daily_insight", data.captured["type"])
+        assertEquals("Nice work today", data.captured["body"])
+        assertTrue(insight.sentViaPush)
+    }
+
+    @Test
+    fun `refreshInsightSilently does not resend an insight already delivered today`() {
+        val user = createUser()
+        val insight = createDailyInsight(user = user, sentViaPush = true)
+        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns insight
+
+        dailyInsightService.refreshInsightSilently(user)
+
+        verify(exactly = 0) { pushNotificationService.sendSilentToUser(any(), any()) }
+    }
+
     private fun createUser(
         id: Long = 1L,
         email: String = "test@example.com",

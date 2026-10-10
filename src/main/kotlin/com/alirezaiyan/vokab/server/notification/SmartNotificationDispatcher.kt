@@ -2,7 +2,6 @@ package com.alirezaiyan.vokab.server.notification
 
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
@@ -10,7 +9,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
-import com.alirezaiyan.vokab.server.study.UserProgressService
+import com.alirezaiyan.vokab.server.ai.DailyInsightService
 
 private val logger = KotlinLogging.logger {}
 
@@ -24,9 +23,8 @@ class SmartNotificationDispatcher(
     private val notificationContentBuilder: NotificationContentBuilder,
     private val pushNotificationService: PushNotificationService,
     private val milestoneDetector: MilestoneDetector,
-    private val userProgressService: UserProgressService,
     private val notificationEngagementService: NotificationEngagementService,
-    private val objectMapper: ObjectMapper,
+    private val dailyInsightService: DailyInsightService,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
 ) {
@@ -97,6 +95,9 @@ class SmartNotificationDispatcher(
         val type = notificationTypeSelector.selectType(user, schedule)
         if (type == NotificationType.NONE) {
             logger.debug { "No notification selected for user=$userId" }
+            // Nothing worth interrupting an active learner for, but keep their in-app insight
+            // card current without a visible push
+            if (notificationTypeSelector.studiedToday(user)) dailyInsightService.refreshInsightSilently(user)
             return
         }
 
@@ -121,10 +122,7 @@ class SmartNotificationDispatcher(
                 notificationType = type.name,
                 title            = payload.title,
                 body             = payload.body,
-                // Strip null bytes: PostgreSQL JSONB rejects U+0000 in string values
-                dataPayload      = objectMapper.writeValueAsString(
-                    payload.data.mapValues { (_, v) -> v.replace("\u0000", "") }
-                )
+                data             = payload.data,
             )
         }.onFailure { e ->
             logger.error(e) { "Notification log persist failed for user=$userId — sending without open tracking" }
@@ -146,8 +144,7 @@ class SmartNotificationDispatcher(
             meterRegistry.counter("notifications.sent", "type", type.name).increment()
 
             if (type == NotificationType.PROGRESS_MILESTONE) {
-                val stats = userProgressService.calculateProgressStats(user.requireId())
-                milestoneDetector.recordMilestoneSnapshot(user, stats)
+                milestoneDetector.recordMilestoneSnapshot(user)
             }
 
             logger.info { "Sent $type (segment=${ schedule.engagementSegment}) to user=$userId" }

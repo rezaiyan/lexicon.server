@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.notification
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
@@ -21,6 +22,7 @@ class NotificationEngagementService(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val userSettingsRepository: UserSettingsRepository,
     private val dailyActivityRepository: DailyActivityRepository,
+    private val objectMapper: ObjectMapper,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
 ) {
@@ -133,7 +135,7 @@ class NotificationEngagementService(
         notificationType: String,
         title: String?,
         body: String?,
-        dataPayload: String?
+        data: Map<String, String>,
     ): Long =
         notificationLogRepository.save(
             NotificationLog(
@@ -141,7 +143,8 @@ class NotificationEngagementService(
                 notificationType = notificationType,
                 title = title,
                 body = body,
-                dataPayload = dataPayload,
+                // Strip null bytes: PostgreSQL JSONB rejects U+0000 in string values
+                dataPayload = objectMapper.writeValueAsString(data.mapValues { (_, v) -> v.replace("\u0000", "") }),
                 sentAt = Instant.now(clock),
             )
         ).id

@@ -7,6 +7,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import com.alirezaiyan.vokab.server.notification.NotificationEngagementService
+import com.alirezaiyan.vokab.server.notification.NotificationTimingService
 
 private val logger = KotlinLogging.logger {}
 
@@ -16,6 +17,7 @@ class UserSettingsService(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val notificationEngagementService: NotificationEngagementService,
     private val userRepository: UserRepository,
+    private val notificationTimingService: NotificationTimingService,
 ) {
     @Transactional(readOnly = true)
     fun get(userId: Long): SettingsDto {
@@ -40,6 +42,12 @@ class UserSettingsService(
         current.reviewRemindersEnabled = dto.reviewRemindersEnabled
         current.dailyReminderTime = dto.dailyReminderTime
         current.notificationFrequency = dto.notificationFrequency
+        // Older clients don't send a timezone: keep the stored one. Unknown zone ids are ignored.
+        val timezone = dto.timezone?.takeIf { notificationTimingService.utcOffsetHours(it) != null }
+        if (timezone != null && timezone != current.timezone) {
+            current.timezone = timezone
+            notificationTimingService.applyTimezone(userId, timezone)
+        }
         return repo.save(current).toDto(null, null)
     }
 }
@@ -54,6 +62,7 @@ private fun UserSettings.toDto(
     reviewRemindersEnabled = reviewRemindersEnabled,
     dailyReminderTime = dailyReminderTime,
     notificationFrequency = notificationFrequency,
+    timezone = timezone,
     optimalSendHour = schedule?.optimalSendHour,
     dataConfidence = schedule?.dataConfidence,
     engagementStats = engagementStats?.let { stats ->

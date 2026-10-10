@@ -33,6 +33,8 @@ class NotificationTimingServiceTest {
         reviewEventRepository = mockk()
         userSettingsRepository = mockk()
         notificationScheduleRepository = mockk()
+        // Default: no settings stored (no reported timezone); tests override per user
+        every { userSettingsRepository.findByUserId(any()) } returns null
         notificationTimingService = NotificationTimingService(
             reviewEventRepository,
             userSettingsRepository,
@@ -350,6 +352,74 @@ class NotificationTimingServiceTest {
         verify(exactly = 0) { notificationScheduleRepository.save(any()) }
     }
 
+    // ── device timezone ───────────────────────────────────────────────────────
+
+    @Test
+    fun `utcOffsetHours resolves an IANA zone with DST at the clock's instant`() {
+        // TEST_NOW is in June: Berlin is on summer time (UTC+2)
+        assertEquals(2, notificationTimingService.utcOffsetHours("Europe/Berlin"))
+    }
+
+    @Test
+    fun `utcOffsetHours rounds half-hour zones down and ignores unknown ids`() {
+        assertEquals(5, notificationTimingService.utcOffsetHours("Asia/Kolkata"))
+        assertEquals(null, notificationTimingService.utcOffsetHours("Mars/Olympus"))
+        assertEquals(null, notificationTimingService.utcOffsetHours(null))
+    }
+
+    @Test
+    fun `fallback send hour converts the local reminder time to UTC with the reported zone`() {
+        every { reviewEventRepository.findReviewedAtByUserIdSince(1L, any()) } returns emptyList()
+        every { userSettingsRepository.findByUserId(1L) } returns
+            createUserSettings(dailyReminderTime = "19:00", timezone = "Asia/Tokyo")
+
+        val (hour, _) = notificationTimingService.computeOptimalHour(1L)
+
+        assertEquals(10, hour) // 19:00 in Tokyo (UTC+9)
+    }
+
+    @Test
+    fun `new schedule uses the reported zone offset instead of guessing from reviews`() {
+        val user = createUser(id = 1L)
+        every { reviewEventRepository.findReviewedAtByUserIdSince(1L, any()) } returns emptyList()
+        every { userSettingsRepository.findByUserId(1L) } returns createUserSettings(timezone = "America/New_York")
+        every { notificationScheduleRepository.findByUser(user) } returns null
+        val saved = slot<NotificationSchedule>()
+        every { notificationScheduleRepository.save(capture(saved)) } answers { firstArg() }
+
+        notificationTimingService.refreshSchedulesForAllUsers(listOf(user))
+
+        assertEquals(-4, saved.captured.timezoneOffsetHrs) // EDT in June
+    }
+
+    @Test
+    fun `a fresh schedule still follows a DST change of the reported zone`() {
+        val user = createUser(id = 1L)
+        val schedule = createNotificationSchedule(user, lastComputedAt = TEST_NOW.minus(2, ChronoUnit.DAYS))
+        schedule.timezoneOffsetHrs = 1
+        every { userSettingsRepository.findByUserId(1L) } returns createUserSettings(timezone = "Europe/Berlin")
+        every { notificationScheduleRepository.findByUser(user) } returns schedule
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+
+        notificationTimingService.refreshSchedulesForAllUsers(listOf(user))
+
+        assertEquals(2, schedule.timezoneOffsetHrs)
+        verify(exactly = 0) { reviewEventRepository.findReviewedAtByUserIdSince(any(), any()) }
+    }
+
+    @Test
+    fun `applyTimezone sets the offset and invalidates the cached send hour`() {
+        val user = createUser(id = 1L)
+        val schedule = createNotificationSchedule(user, lastComputedAt = TEST_NOW)
+        every { notificationScheduleRepository.findByUserId(1L) } returns schedule
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+
+        notificationTimingService.applyTimezone(1L, "Asia/Tokyo")
+
+        assertEquals(9, schedule.timezoneOffsetHrs)
+        assertEquals(null, schedule.lastComputedAt)
+    }
+
     // ── factory functions ─────────────────────────────────────────────────────
 
     private fun createUser(
@@ -367,10 +437,12 @@ class NotificationTimingServiceTest {
         userId: Long = 1L,
         dailyReminderTime: String = "18:00",
         notificationsEnabled: Boolean = true,
+        timezone: String? = null,
     ): UserSettings = UserSettings(
         id = userId,
         dailyReminderTime = dailyReminderTime,
         notificationsEnabled = notificationsEnabled,
+        timezone = timezone,
     )
 
     private fun createNotificationSchedule(

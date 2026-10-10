@@ -1,15 +1,12 @@
 package com.alirezaiyan.vokab.server.notification
 
-import com.alirezaiyan.vokab.server.user.requireId
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
-import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
-import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
@@ -23,7 +20,6 @@ import java.time.Instant
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
-import com.alirezaiyan.vokab.server.study.UserProgressService
 
 class SmartNotificationDispatcherTest {
 
@@ -32,9 +28,8 @@ class SmartNotificationDispatcherTest {
     private val notificationContentBuilder: NotificationContentBuilder = mockk()
     private val pushNotificationService: com.alirezaiyan.vokab.server.notification.PushNotificationService = mockk()
     private val milestoneDetector: MilestoneDetector = mockk()
-    private val userProgressService: UserProgressService = mockk()
     private val notificationEngagementService: NotificationEngagementService = mockk()
-    private val objectMapper: ObjectMapper = ObjectMapper()
+    private val dailyInsightService: com.alirezaiyan.vokab.server.ai.DailyInsightService = mockk(relaxed = true)
     private val meterRegistry = SimpleMeterRegistry()
 
     private lateinit var dispatcher: SmartNotificationDispatcher
@@ -51,9 +46,8 @@ class SmartNotificationDispatcherTest {
         notificationContentBuilder,
         pushNotificationService,
         milestoneDetector,
-        userProgressService,
         notificationEngagementService,
-        objectMapper,
+        dailyInsightService,
         clock = fixedClock(now),
         meterRegistry = meterRegistry,
     )
@@ -136,7 +130,6 @@ class SmartNotificationDispatcherTest {
         val user     = testUser(id = 5L)
         val schedule = testSchedule(user)
         val payload  = testPayload(type = NotificationType.PROGRESS_MILESTONE)
-        val stats    = testProgressStats()
 
         every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
         every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.PROGRESS_MILESTONE
@@ -146,12 +139,11 @@ class SmartNotificationDispatcherTest {
         )
         justRun { notificationEngagementService.recordSend(any(), any(), any()) }
         every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        justRun { milestoneDetector.recordMilestoneSnapshot(user, stats) }
+        justRun { milestoneDetector.recordMilestoneSnapshot(user) }
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 1) { milestoneDetector.recordMilestoneSnapshot(user, stats) }
+        verify(exactly = 1) { milestoneDetector.recordMilestoneSnapshot(user) }
     }
 
     @Test
@@ -171,8 +163,7 @@ class SmartNotificationDispatcherTest {
 
         dispatcher.dispatchForCurrentHour()
 
-        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any(), any()) }
-        verify(exactly = 0) { userProgressService.calculateProgressStats(any()) }
+        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any()) }
     }
 
     @Test
@@ -316,6 +307,21 @@ class SmartNotificationDispatcherTest {
 
         assertEquals(null, schedule.suppressedUntil)
         verify(exactly = 1) { notificationTypeSelector.selectType(user, schedule) }
+    }
+
+    @Test
+    fun `should refresh the insight silently for an active learner with nothing to notify`() {
+        val user     = testUser(id = 16L)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.NONE
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 1) { dailyInsightService.refreshInsightSilently(user) }
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
     }
 
     // ── Streak saver ──────────────────────────────────────────────────────────────
@@ -506,17 +512,5 @@ class SmartNotificationDispatcherTest {
         body  = body,
         data  = mapOf("type" to type.name.lowercase(), "deep_link" to "vokab://review"),
         type  = type
-    )
-
-    private fun testProgressStats() = ProgressStatsDto(
-        totalWords  = 50,
-        dueCards    = 5,
-        level0Count = 0,
-        level1Count = 5,
-        level2Count = 10,
-        level3Count = 10,
-        level4Count = 10,
-        level5Count = 10,
-        level6Count = 5
     )
 }

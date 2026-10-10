@@ -7,7 +7,9 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.DateTimeException
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import com.alirezaiyan.vokab.server.user.requireId
@@ -34,7 +36,8 @@ class NotificationTimingService(
      * 1. Load all ReviewEvent.reviewedAt timestamps from the past 90 days.
      * 2. Group by UTC hour → frequency histogram [0..23].
      * 3. If enough data: return the peak hour.
-     * 4. If sparse data: fall back to UserSettings.dailyReminderTime.
+     * 4. If sparse data: fall back to UserSettings.dailyReminderTime, a local time, converted
+     *    to UTC with the device timezone when the client reported one.
      * 5. Final fallback: 18 (6 PM UTC).
      *
      * Returns: Pair(hour: Int, confidence: Int 0–100)
@@ -96,11 +99,43 @@ class NotificationTimingService(
 
     private fun getFallbackHour(userId: Long): Int {
         val settings = userSettingsRepository.findByUserId(userId)
-        return settings?.dailyReminderTime
+        val localHour = settings?.dailyReminderTime
             ?.split(":")
             ?.firstOrNull()
             ?.toIntOrNull()
-            ?: 18
+            ?: return 18
+        val offset = utcOffsetHours(settings.timezone) ?: return localHour
+        return Math.floorMod(localHour - offset, 24)
+    }
+
+    /**
+     * Whole-hour UTC offset of an IANA zone right now (DST included), or null when the zone is
+     * missing or unknown. Half-hour zones round down (+05:30 → 5).
+     */
+    fun utcOffsetHours(timezone: String?): Int? {
+        if (timezone.isNullOrBlank()) return null
+        val zone = try {
+            ZoneId.of(timezone)
+        } catch (e: DateTimeException) {
+            logger.debug { "Ignoring unknown timezone '$timezone': ${e.message}" }
+            return null
+        }
+        val offsetSeconds = zone.rules.getOffset(Instant.now(clock)).totalSeconds
+        return Math.floorDiv(offsetSeconds, 3600)
+    }
+
+    /**
+     * The client reported a (new) device timezone: use its offset from now on, and have the
+     * nightly refresh recompute the send hour instead of waiting out its weekly cache.
+     */
+    @Transactional
+    fun applyTimezone(userId: Long, timezone: String) {
+        val offset = utcOffsetHours(timezone) ?: return
+        val schedule = notificationScheduleRepository.findByUserId(userId) ?: return
+        schedule.timezoneOffsetHrs = offset
+        schedule.lastComputedAt = null
+        schedule.updatedAt = Instant.now(clock)
+        notificationScheduleRepository.save(schedule)
     }
 
     /**
@@ -113,10 +148,19 @@ class NotificationTimingService(
         for (user in users) {
             runCatching {
                 val existing = notificationScheduleRepository.findByUser(user)
-                if (existing?.lastComputedAt?.isAfter(sevenDaysAgo) == true) return@runCatching
+                val reportedOffset = utcOffsetHours(userSettingsRepository.findByUserId(user.requireId())?.timezone)
+                if (existing?.lastComputedAt?.isAfter(sevenDaysAgo) == true) {
+                    // Send hour is still fresh, but follow DST shifts of a reported zone nightly
+                    if (reportedOffset != null && reportedOffset != existing.timezoneOffsetHrs) {
+                        existing.timezoneOffsetHrs = reportedOffset
+                        existing.updatedAt = Instant.now(clock)
+                        notificationScheduleRepository.save(existing)
+                    }
+                    return@runCatching
+                }
 
                 val (hour, confidence) = computeOptimalHour(user.requireId())
-                val offset = deriveTimezoneOffset(user.requireId())
+                val offset = reportedOffset ?: deriveTimezoneOffset(user.requireId())
 
                 val schedule = existing ?: NotificationSchedule(user = user)
                 schedule.optimalSendHour = hour

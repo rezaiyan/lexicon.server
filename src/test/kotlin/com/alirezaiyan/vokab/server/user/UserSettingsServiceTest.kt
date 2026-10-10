@@ -13,12 +13,15 @@ import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import java.time.Instant
 import com.alirezaiyan.vokab.server.notification.NotificationEngagementService
+import com.alirezaiyan.vokab.server.notification.NotificationTimingService
+import io.mockk.justRun
 
 class UserSettingsServiceTest {
 
     private lateinit var repo: UserSettingsRepository
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
     private lateinit var notificationEngagementService: NotificationEngagementService
+    private lateinit var notificationTimingService: NotificationTimingService
     private lateinit var userSettingsService: UserSettingsService
 
     @BeforeEach
@@ -26,7 +29,14 @@ class UserSettingsServiceTest {
         repo = mockk()
         notificationScheduleRepository = mockk()
         notificationEngagementService = mockk()
-        userSettingsService = UserSettingsService(repo, notificationScheduleRepository, notificationEngagementService, mockk<UserRepository>().answerReferences())
+        notificationTimingService = mockk()
+        userSettingsService = UserSettingsService(
+            repo,
+            notificationScheduleRepository,
+            notificationEngagementService,
+            mockk<UserRepository>().answerReferences(),
+            notificationTimingService,
+        )
     }
 
     // --- get ---
@@ -144,6 +154,48 @@ class UserSettingsServiceTest {
         assertEquals("DARK", result.themeMode)
         assertEquals(false, result.notificationsEnabled)
         verify(exactly = 1) { repo.save(existing) }
+    }
+
+    @Test
+    fun `update should store a reported timezone and apply it to the notification schedule`() {
+        val user = createUser()
+        val existing = createUserSettings(user = user)
+        every { repo.findByUser(user) } returns existing
+        every { repo.save(existing) } returns existing
+        every { notificationTimingService.utcOffsetHours("Europe/Berlin") } returns 2
+        justRun { notificationTimingService.applyTimezone(1L, "Europe/Berlin") }
+
+        val result = userSettingsService.update(user.requireId(), createSettingsDto(timezone = "Europe/Berlin"))
+
+        assertEquals("Europe/Berlin", result.timezone)
+        verify(exactly = 1) { notificationTimingService.applyTimezone(1L, "Europe/Berlin") }
+    }
+
+    @Test
+    fun `update should keep the stored timezone when the client omits it`() {
+        val user = createUser()
+        val existing = createUserSettings(user = user).apply { timezone = "Asia/Tokyo" }
+        every { repo.findByUser(user) } returns existing
+        every { repo.save(existing) } returns existing
+
+        val result = userSettingsService.update(user.requireId(), createSettingsDto(timezone = null))
+
+        assertEquals("Asia/Tokyo", result.timezone)
+        verify(exactly = 0) { notificationTimingService.applyTimezone(any(), any()) }
+    }
+
+    @Test
+    fun `update should ignore an unknown timezone id`() {
+        val user = createUser()
+        val existing = createUserSettings(user = user)
+        every { repo.findByUser(user) } returns existing
+        every { repo.save(existing) } returns existing
+        every { notificationTimingService.utcOffsetHours("Not/AZone") } returns null
+
+        val result = userSettingsService.update(user.requireId(), createSettingsDto(timezone = "Not/AZone"))
+
+        assertNull(result.timezone)
+        verify(exactly = 0) { notificationTimingService.applyTimezone(any(), any()) }
     }
 
     @Test
@@ -275,13 +327,15 @@ class UserSettingsServiceTest {
         notificationsEnabled: Boolean = true,
         dailyReminderTime: String = "18:00",
         notificationFrequency: String = "DAILY",
-        reviewRemindersEnabled: Boolean = true
+        reviewRemindersEnabled: Boolean = true,
+        timezone: String? = null
     ): SettingsDto = SettingsDto(
         languageCode = languageCode,
         themeMode = themeMode,
         notificationsEnabled = notificationsEnabled,
         dailyReminderTime = dailyReminderTime,
         notificationFrequency = notificationFrequency,
-        reviewRemindersEnabled = reviewRemindersEnabled
+        reviewRemindersEnabled = reviewRemindersEnabled,
+        timezone = timezone
     )
 }

@@ -73,6 +73,11 @@ class MilestoneDetector(
         return null
     }
 
+    /** Snapshots the user's current progress, so the milestone just announced isn't pending anymore. */
+    @Transactional
+    fun recordMilestoneSnapshot(user: User) =
+        recordMilestoneSnapshot(user, userProgressService.calculateProgressStats(user.requireId()))
+
     @Transactional
     fun recordMilestoneSnapshot(user: User, stats: ProgressStatsDto) {
         val schedule = notificationScheduleRepository.findByUser(user) ?: return

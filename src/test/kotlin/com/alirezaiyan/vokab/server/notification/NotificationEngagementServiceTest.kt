@@ -46,6 +46,7 @@ class NotificationEngagementServiceTest {
             notificationScheduleRepository,
             userSettingsRepository,
             dailyActivityRepository,
+            com.fasterxml.jackson.databind.ObjectMapper(),
             clock = fixedClock(),
             meterRegistry = meterRegistry,
         )
@@ -453,11 +454,20 @@ class NotificationEngagementServiceTest {
         every { notificationLogRepository.save(any()) } returns savedLog
 
         // Act
-        val id = notificationEngagementService.saveLog(5L, "DAILY_INSIGHT", "Title", "Body", """{"type":"daily_insight"}""")
+        val id = notificationEngagementService.saveLog(5L, "DAILY_INSIGHT", "Title", "Body", mapOf("type" to "daily_insight"))
 
         // Assert
         assertEquals(1L, id)
         verify(exactly = 1) { notificationLogRepository.save(match { it.sentAt == TEST_NOW }) }
+    }
+
+    @Test
+    fun `saveLog should strip null bytes from the stored data payload`() {
+        every { notificationLogRepository.save(any()) } answers { firstArg() }
+
+        notificationEngagementService.saveLog(5L, "COMEBACK_ALERT", "T", "B", mapOf("word_text" to "a\u0000b"))
+
+        verify { notificationLogRepository.save(match { it.dataPayload == """{"word_text":"ab"}""" }) }
     }
 
     // --- getEngagementStats ---

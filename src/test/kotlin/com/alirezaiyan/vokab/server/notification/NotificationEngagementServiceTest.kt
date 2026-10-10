@@ -8,6 +8,7 @@ import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserSettings
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
+import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -27,6 +28,7 @@ class NotificationEngagementServiceTest {
     private lateinit var notificationLogRepository: NotificationLogRepository
     private lateinit var notificationScheduleRepository: NotificationScheduleRepository
     private lateinit var userSettingsRepository: UserSettingsRepository
+    private lateinit var dailyActivityRepository: DailyActivityRepository
 
     private lateinit var notificationEngagementService: NotificationEngagementService
     private val meterRegistry = SimpleMeterRegistry()
@@ -36,10 +38,14 @@ class NotificationEngagementServiceTest {
         notificationLogRepository = mockk()
         notificationScheduleRepository = mockk()
         userSettingsRepository = mockk()
+        dailyActivityRepository = mockk()
+        // Default: the user has not studied since the previous push
+        every { dailyActivityRepository.existsByUserIdAndActivityDateGreaterThanEqual(any(), any()) } returns false
         notificationEngagementService = NotificationEngagementService(
             notificationLogRepository,
             notificationScheduleRepository,
             userSettingsRepository,
+            dailyActivityRepository,
             clock = fixedClock(),
             meterRegistry = meterRegistry,
         )
@@ -198,6 +204,22 @@ class NotificationEngagementServiceTest {
 
         // Assert
         assertEquals(1, schedule.consecutiveIgnores)
+    }
+
+    @Test
+    fun `recordSend treats studying after an unopened push as engagement, not an ignore`() {
+        val user = createUser(id = 1L)
+        val schedule = createSchedule(user, consecutiveIgnores = 4, lastSentDate = TEST_TODAY.minusDays(1))
+        val previousLog = createNotificationLog(userId = 1L, openedAt = null, sentAt = TEST_NOW.minusSeconds(86_400))
+        every { notificationLogRepository.findTopByUserIdOrderBySentAtDesc(1L) } returns previousLog
+        every { dailyActivityRepository.existsByUserIdAndActivityDateGreaterThanEqual(1L, TEST_TODAY.minusDays(1)) } returns true
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+        every { userSettingsRepository.findByUserId(1L) } returns null
+
+        notificationEngagementService.recordSend(schedule, "DUE_CARDS")
+
+        assertEquals(0, schedule.consecutiveIgnores)
+        assertNull(schedule.suppressedUntil)
     }
 
     @Test
@@ -615,13 +637,15 @@ class NotificationEngagementServiceTest {
         id: Long = 0L,
         userId: Long = 1L,
         notificationType: String = "DAILY_INSIGHT",
-        openedAt: Instant? = null
+        openedAt: Instant? = null,
+        sentAt: Instant = TEST_NOW,
     ): NotificationLog = NotificationLog(
         id = id,
         userId = userId,
         notificationType = notificationType,
         title = "Test Title",
         body = "Test Body",
+        sentAt = sentAt,
         openedAt = openedAt
     )
 

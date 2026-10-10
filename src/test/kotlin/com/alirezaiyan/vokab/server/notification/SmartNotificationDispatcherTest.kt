@@ -18,6 +18,8 @@ import io.mockk.verify
 import io.mockk.verifyOrder
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotNull
+import java.time.Instant
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -39,19 +41,22 @@ class SmartNotificationDispatcherTest {
 
     @BeforeEach
     fun setUp() {
-        dispatcher = SmartNotificationDispatcher(
-            notificationScheduleRepository,
-            notificationTypeSelector,
-            notificationContentBuilder,
-            pushNotificationService,
-            milestoneDetector,
-            userProgressService,
-            notificationEngagementService,
-            objectMapper,
-            clock = fixedClock(),
-            meterRegistry = meterRegistry,
-        )
+        every { notificationTypeSelector.studiedToday(any()) } returns false
+        dispatcher = dispatcherAt(TEST_NOW)
     }
+
+    private fun dispatcherAt(now: Instant) = SmartNotificationDispatcher(
+        notificationScheduleRepository,
+        notificationTypeSelector,
+        notificationContentBuilder,
+        pushNotificationService,
+        milestoneDetector,
+        userProgressService,
+        notificationEngagementService,
+        objectMapper,
+        clock = fixedClock(now),
+        meterRegistry = meterRegistry,
+    )
 
     // ── HOT/WARM — rule-based path ────────────────────────────────────────────────
 
@@ -296,6 +301,91 @@ class SmartNotificationDispatcherTest {
 
         val expectedDate = TEST_TODAY.plusDays(3)
         assert(schedule.suppressedUntil == expectedDate)
+    }
+
+    @Test
+    fun `should skip the AI pause for a COLD user who came back and studied today`() {
+        val user     = testUser(id = 15L)
+        val schedule = testSchedule(user, segment = "COLD", aiAction = "pause", aiIntervalDays = 5)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.NONE
+
+        dispatcher.dispatchForCurrentHour()
+
+        assertEquals(null, schedule.suppressedUntil)
+        verify(exactly = 1) { notificationTypeSelector.selectType(user, schedule) }
+    }
+
+    // ── Streak saver ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `streak saver sends STREAK_RISK to a streak holder who has not studied today`() {
+        val user     = testUser(id = 20L, currentStreak = 6)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.STREAK_RISK)
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), SmartNotificationDispatcher.MIN_STREAK_TO_SAVE) } returns listOf(schedule)
+        every { notificationContentBuilder.build(user, NotificationType.STREAK_RISK, null) } returns payload
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+        every { pushNotificationService.sendNotificationToUser(userId = 20L, title = any(), body = any(), data = any()) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(schedule, NotificationType.STREAK_RISK.name, 77L) }
+
+        dispatcherAt(Instant.parse("2026-06-17T20:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.STREAK_RISK.name, 77L) }
+    }
+
+    @Test
+    fun `streak saver targets the timezones whose evening slot is the current UTC hour`() {
+        val offsets = slot<Collection<Int>>()
+        every { notificationScheduleRepository.findStreakSaverCandidates(capture(offsets), any()) } returns emptyList()
+
+        dispatcherAt(Instant.parse("2026-06-17T13:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        // 13:00 UTC is 21:00 at UTC+8 — the latest daytime hour before the UTC streak day ends
+        assertEquals(listOf(8), offsets.captured.toList())
+    }
+
+    @Test
+    fun `streak saver skips a user who already studied today`() {
+        val user     = testUser(id = 21L, currentStreak = 6)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+
+        dispatcherAt(Instant.parse("2026-06-17T20:00:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `streak saver does not warn twice in one day`() {
+        val user     = testUser(id = 22L, currentStreak = 6)
+        val schedule = testSchedule(user).apply {
+            lastSentDate = TEST_TODAY
+            lastSentType = NotificationType.STREAK_RISK.name
+        }
+
+        every { notificationScheduleRepository.findStreakSaverCandidates(any(), any()) } returns listOf(schedule)
+
+        dispatcherAt(Instant.parse("2026-06-17T20:30:00Z")).dispatchStreakSaversForCurrentHour()
+
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `every timezone gets a daytime streak saver slot`() {
+        for (offset in -12..14) {
+            val utcHour = SmartNotificationDispatcher.streakSaverUtcHour(offset)
+            assertNotNull(utcHour, "offset $offset has no slot")
+            val localHour = (utcHour!! + offset + 24) % 24
+            assert(localHour in 8..21) { "offset $offset lands at local $localHour" }
+        }
     }
 
     // ── Open tracking ─────────────────────────────────────────────────────────────

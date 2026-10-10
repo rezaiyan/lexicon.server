@@ -41,6 +41,31 @@ class SmartNotificationDispatcher(
         }
     }
 
+    /**
+     * Evening streak saver: one push to streak holders who haven't studied yet today, sent at
+     * the latest daytime hour for them that still leaves time before the streak day ends.
+     * Runs alongside [dispatchForCurrentHour] and doesn't count against its one-a-day limit:
+     * for a user with a streak at stake this is the push most worth getting.
+     */
+    fun dispatchStreakSaversForCurrentHour() {
+        val hour = LocalTime.now(clock).hour
+        val offsets = TIMEZONE_OFFSETS.filter { streakSaverUtcHour(it) == hour }
+        if (offsets.isEmpty()) return
+
+        val today = LocalDate.now(clock)
+        val schedules = notificationScheduleRepository.findStreakSaverCandidates(offsets, MIN_STREAK_TO_SAVE)
+        logger.info { "Streak saver dispatch: hour=$hour, offsets=$offsets, candidates=${schedules.size}" }
+
+        for (schedule in schedules) {
+            runCatching {
+                val alreadyWarned = schedule.lastSentDate == today &&
+                    schedule.lastSentType == NotificationType.STREAK_RISK.name
+                if (alreadyWarned || notificationTypeSelector.studiedToday(schedule.user)) return@runCatching
+                sendAndRecord(schedule, NotificationType.STREAK_RISK, contentHint = null)
+            }.onFailure { logger.error(it) { "Streak saver failed for user=${schedule.user.id}" } }
+        }
+    }
+
     private fun dispatchForUser(schedule: NotificationSchedule) {
         val user   = schedule.user
         val userId = user.id ?: error("User id is null for schedule=${schedule.id}")
@@ -48,8 +73,9 @@ class SmartNotificationDispatcher(
         val segment        = schedule.engagementSegment
         val isColdOrDormant = segment == "COLD" || segment == "DORMANT"
 
-        // COLD/DORMANT users: honour AI decision first
-        if (isColdOrDormant) {
+        // COLD/DORMANT users: honour AI decision first — unless they came back today on their
+        // own, when a "come back" push would be wrong (the selector handles them instead)
+        if (isColdOrDormant && !notificationTypeSelector.studiedToday(user)) {
             when (schedule.aiAction) {
                 "pause" -> {
                     val pauseDays = schedule.aiIntervalDays?.toLong() ?: 3L
@@ -137,5 +163,25 @@ class SmartNotificationDispatcher(
         if (logId == null) return
         runCatching { notificationEngagementService.deleteLog(logId) }
             .onFailure { e -> logger.error(e) { "Failed to discard notification log=$logId" } }
+    }
+
+    companion object {
+        /** Streaks of a single day aren't worth an extra evening interruption. */
+        const val MIN_STREAK_TO_SAVE = 2
+
+        private val TIMEZONE_OFFSETS = -12..14
+        private const val EARLIEST_UTC_HOUR = 10
+        /** Dispatch runs at :00 and :30, so this leaves 3.5–4 hours before the streak day ends. */
+        private const val LATEST_UTC_HOUR = 20
+        private val DAYTIME_LOCAL_HOURS = 8..21
+
+        /**
+         * The UTC hour users at [offsetHrs] get the streak saver: the latest hour of the UTC
+         * streak day that is still daytime for them, or null when none is.
+         */
+        fun streakSaverUtcHour(offsetHrs: Int): Int? =
+            (LATEST_UTC_HOUR downTo EARLIEST_UTC_HOUR).firstOrNull { utcHour ->
+                (utcHour + offsetHrs + 24) % 24 in DAYTIME_LOCAL_HOURS
+            }
     }
 }

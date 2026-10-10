@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import java.time.Instant
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -49,7 +50,8 @@ class NotificationContentBuilderTest {
             userProgressService,
             learnerSignals,
             dailyInsightService,
-            milestoneDetector
+            milestoneDetector,
+            fixedClock(),
         )
     }
 
@@ -91,7 +93,8 @@ class NotificationContentBuilderTest {
 
         // Assert
         assertEquals(NotificationType.STREAK_RISK, result.type)
-        assertTrue(result.body.contains("ends at midnight"))
+        // TEST_NOW is 10:00 UTC; streak days end at UTC midnight
+        assertTrue(result.body.contains("resets in 14h"))
         assertTrue(result.body.contains("3"))
     }
 
@@ -111,6 +114,32 @@ class NotificationContentBuilderTest {
         // Assert
         assertEquals("streak_risk", result.data["type"])
         assertEquals("vokab://review", result.data["deep_link"])
+    }
+
+    @Test
+    fun `should say the streak resets within the hour late in the UTC day`() {
+        val builder = NotificationContentBuilder(
+            aiService, userProgressService, learnerSignals, dailyInsightService, milestoneDetector,
+            fixedClock(Instant.parse("2026-06-17T23:30:00Z")),
+        )
+        val user = createUser(currentStreak = 4)
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats()
+        every { aiService.generateStreakReminderMessage(any(), any(), any()) } returns "Go!"
+
+        val result = builder.build(user, NotificationType.STREAK_RISK)
+
+        assertTrue(result.title.contains("resets within the hour"))
+    }
+
+    // ── ADD_WORDS ─────────────────────────────────────────────────────────────
+
+    @Test
+    fun `should return ADD_WORDS payload pointing to the add-words screen`() {
+        val result = notificationContentBuilder.build(createUser(), NotificationType.ADD_WORDS)
+
+        assertEquals(NotificationType.ADD_WORDS, result.type)
+        assertEquals("add_words", result.data["type"])
+        assertEquals("vokab://words/add", result.data["deep_link"])
     }
 
     // ── DUE_CARDS ─────────────────────────────────────────────────────────────

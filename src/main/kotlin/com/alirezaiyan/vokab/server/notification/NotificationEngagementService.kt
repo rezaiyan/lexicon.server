@@ -2,12 +2,14 @@ package com.alirezaiyan.vokab.server.notification
 
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
+import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import com.alirezaiyan.vokab.server.user.requireId
 
@@ -18,6 +20,7 @@ class NotificationEngagementService(
     private val notificationLogRepository: NotificationLogRepository,
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val userSettingsRepository: UserSettingsRepository,
+    private val dailyActivityRepository: DailyActivityRepository,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
 ) {
@@ -76,8 +79,9 @@ class NotificationEngagementService(
     ) {
         val userId = schedule.user.requireId()
 
-        // Increment ignore counter if a notification was previously sent and the user didn't open it.
-        // Uses lastSentDate as the "sent-before" signal so suppression works even when saveLog fails.
+        // Increment ignore counter if a notification was previously sent and the user neither
+        // opened it nor studied since. Uses lastSentDate as the "sent-before" signal so
+        // suppression works even when saveLog fails.
         // If a log record IS present and was opened, recordOpen() already reset the counter.
         // The log for this send already exists (its id travels in the push payload) — skip it.
         val previousLog = if (currentLogId != null) {
@@ -86,10 +90,18 @@ class NotificationEngagementService(
             notificationLogRepository.findTopByUserIdOrderBySentAtDesc(userId)
         }
         val wasOpened = previousLog?.openedAt != null
-        if (!wasOpened && schedule.lastSentDate != null) {
-            val ignoreCount = schedule.consecutiveIgnores + 1
-            schedule.consecutiveIgnores = ignoreCount
-            schedule.suppressedUntil = computeSuppressedUntil(ignoreCount)
+        val previousSentDate = schedule.lastSentDate
+        if (!wasOpened && previousSentDate != null) {
+            val sentDate = previousLog?.sentAt?.let { LocalDate.ofInstant(it, ZoneOffset.UTC) } ?: previousSentDate
+            // Many learners read the push and open the app from its icon: the reminder worked
+            // even though no tap was reported, so it must not push them into backoff.
+            if (dailyActivityRepository.existsByUserIdAndActivityDateGreaterThanEqual(userId, sentDate)) {
+                schedule.consecutiveIgnores = 0
+            } else {
+                val ignoreCount = schedule.consecutiveIgnores + 1
+                schedule.consecutiveIgnores = ignoreCount
+                schedule.suppressedUntil = computeSuppressedUntil(ignoreCount)
+            }
         }
 
         // Apply frequency-based minimum cadence if not already suppressed longer

@@ -35,6 +35,8 @@ class NotificationTypeSelectorTest {
         userProgressService = mockk()
         learnerSignals = mockk()
         milestoneDetector = mockk()
+        // Default: not studied today; tests about active users override this
+        every { dailyActivityRepository.existsByUserAndActivityDate(any(), any()) } returns false
         notificationTypeSelector = NotificationTypeSelector(
             dailyActivityRepository,
             userProgressService,
@@ -106,7 +108,7 @@ class NotificationTypeSelectorTest {
     }
 
     @Test
-    fun `selectType should return DAILY_INSIGHT when user reviewed today and no milestone`() {
+    fun `selectType should return NONE when user reviewed today and no milestone`() {
         // Arrange
         val user = createUser()
         val schedule = createSchedule(user, consecutiveIgnores = 0)
@@ -118,7 +120,7 @@ class NotificationTypeSelectorTest {
         val result = notificationTypeSelector.selectType(user, schedule)
 
         // Assert
-        assertEquals(NotificationTypeSelector.NotificationType.DAILY_INSIGHT, result)
+        assertEquals(NotificationTypeSelector.NotificationType.NONE, result)
     }
 
     @Test
@@ -260,6 +262,67 @@ class NotificationTypeSelectorTest {
         assertEquals(expected, result)
     }
 
+    @Test
+    fun `selectType should not send a streak holder a reminder after they studied today`() {
+        val user = createUser(currentStreak = 9)
+        val schedule = createSchedule(user)
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.NONE, result)
+    }
+
+    @Test
+    fun `selectType should not use re-engagement content for a suppressed user who studied today`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, consecutiveIgnores = 4)
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.NONE, result)
+    }
+
+    @Test
+    fun `selectType should return ADD_WORDS when the user has no words yet`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, timezoneOffsetHrs = -4)
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(totalWords = 0)
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.ADD_WORDS, result)
+    }
+
+    @Test
+    fun `selectType should not send DAILY_INSIGHT twice in a row`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, timezoneOffsetHrs = -4, lastSentType = "DAILY_INSIGHT")
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.NONE, result)
+    }
+
+    @Test
+    fun `selectType should still send DUE_CARDS on consecutive days`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, timezoneOffsetHrs = -4, lastSentType = "DUE_CARDS")
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 12)
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.DUE_CARDS, result)
+    }
+
     // --- Factory functions ---
 
     private fun createUser(
@@ -283,16 +346,18 @@ class NotificationTypeSelectorTest {
     private fun createSchedule(
         user: User,
         consecutiveIgnores: Int = 0,
-        timezoneOffsetHrs: Int = 0
+        timezoneOffsetHrs: Int = 0,
+        lastSentType: String? = null
     ): NotificationSchedule = NotificationSchedule(
         id = 1L,
         user = user,
         consecutiveIgnores = consecutiveIgnores,
-        timezoneOffsetHrs = timezoneOffsetHrs
+        timezoneOffsetHrs = timezoneOffsetHrs,
+        lastSentType = lastSentType
     )
 
     private fun createProgressStats(
-        totalWords: Int = 0,
+        totalWords: Int = 20,
         dueCards: Int = 0,
         level6Count: Int = 0
     ): ProgressStatsDto = ProgressStatsDto(

@@ -48,6 +48,15 @@ class NotificationScheduledTasks(
     }
 
     @Scheduled(cron = "0 0/30 * * * *")        // every 30 minutes
+    fun dispatchStreakSavers() {
+        try {
+            smartNotificationDispatcher.dispatchStreakSaversForCurrentHour()
+        } catch (e: Exception) {
+            logger.error(e) { "Error in streak saver dispatch" }
+        }
+    }
+
+    @Scheduled(cron = "0 0/30 * * * *")        // every 30 minutes
     fun dispatchReviewReminders() {
         try {
             reviewReminderDispatcher.dispatchForCurrentHour()

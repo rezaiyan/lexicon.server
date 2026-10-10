@@ -477,6 +477,7 @@ class DailyInsightServiceTest {
     fun `refreshInsightSilently sends today's insight as a data-only push and marks it sent`() {
         val user = createUser()
         val insight = createDailyInsight(user = user, insightText = "Nice work today")
+        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user).apply { timezone = "Europe/Berlin" }
         every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns insight
         val data = slot<Map<String, String>>()
         every { pushNotificationService.sendSilentToUser(1L, capture(data)) } returns
@@ -494,11 +495,23 @@ class DailyInsightServiceTest {
     fun `refreshInsightSilently does not resend an insight already delivered today`() {
         val user = createUser()
         val insight = createDailyInsight(user = user, sentViaPush = true)
+        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user).apply { timezone = "Europe/Berlin" }
         every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns insight
 
         dailyInsightService.refreshInsightSilently(user)
 
         verify(exactly = 0) { pushNotificationService.sendSilentToUser(any(), any()) }
+    }
+
+    @Test
+    fun `refreshInsightSilently skips clients that never reported a timezone`() {
+        val user = createUser()
+        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user)
+
+        dailyInsightService.refreshInsightSilently(user)
+
+        verify(exactly = 0) { pushNotificationService.sendSilentToUser(any(), any()) }
+        verify(exactly = 0) { aiService.generateCelebrationInsight(any(), any()) }
     }
 
     private fun createUser(

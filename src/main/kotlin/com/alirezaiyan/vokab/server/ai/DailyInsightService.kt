@@ -214,8 +214,13 @@ class DailyInsightService(
      * Delivers today's insight as a silent (data-only) push so the in-app insight card stays
      * current for users who get no visible push that day — typically because they already
      * studied. The text rides in the data under "body"; nothing is shown on the device.
+     *
+     * Only for app versions that handle it: older iOS builds display a data-only push carrying a
+     * "body" as a notification. The app version that handles it is also the first to report the
+     * device timezone, so a stored timezone marks a capable client.
      */
     fun refreshInsightSilently(user: User) {
+        if (userSettingsRepository.findByUser(user)?.timezone == null) return
         val insight = generateDailyInsightForUser(user) ?: return
         if (insight.sentViaPush) return
         try {

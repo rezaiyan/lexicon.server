@@ -10,6 +10,10 @@ import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.analytics.WeeklyReportResponse
 import com.alirezaiyan.vokab.server.study.MilestoneDetector.MilestoneEvent
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
+import com.alirezaiyan.vokab.server.analytics.PracticeHistory
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertFalse
+import com.alirezaiyan.vokab.server.TEST_NOW
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -140,6 +144,46 @@ class NotificationContentBuilderTest {
         assertEquals(NotificationType.ADD_WORDS, result.type)
         assertEquals("add_words", result.data["type"])
         assertEquals("vokab://words/add", result.data["deep_link"])
+    }
+
+    // ── WORD_RUSH / LISTENING ─────────────────────────────────────────────────
+
+    @Test
+    fun `should challenge a regular Word Rush player to beat their best`() {
+        val user = createUser()
+        every { learnerSignals.practiceHistory(user.requireId()) } returns
+            PracticeHistory(lastWordRushAt = TEST_NOW.minusSeconds(3 * 86_400), bestWordRushScore = 1240, lastListeningAt = null)
+
+        val result = notificationContentBuilder.build(user, NotificationType.WORD_RUSH)
+
+        assertEquals(NotificationType.WORD_RUSH, result.type)
+        assertTrue(result.title.contains("1240"))
+        assertEquals("word_rush", result.data["type"])
+        assertNull(result.data["deep_link"])
+    }
+
+    @Test
+    fun `should introduce Word Rush to someone who never played`() {
+        val user = createUser()
+        every { learnerSignals.practiceHistory(user.requireId()) } returns
+            PracticeHistory(lastWordRushAt = null, bestWordRushScore = 0, lastListeningAt = null)
+
+        val result = notificationContentBuilder.build(user, NotificationType.WORD_RUSH)
+
+        assertTrue(result.body.contains("Word Rush"))
+        assertFalse(result.title.contains("best"))
+    }
+
+    @Test
+    fun `should invite a regular listener back to Listening`() {
+        val user = createUser()
+        every { learnerSignals.practiceHistory(user.requireId()) } returns
+            PracticeHistory(lastWordRushAt = null, bestWordRushScore = 0, lastListeningAt = TEST_NOW.minusSeconds(5 * 86_400))
+
+        val result = notificationContentBuilder.build(user, NotificationType.LISTENING)
+
+        assertEquals("Practice by ear 🎧", result.title)
+        assertEquals("listening", result.data["type"])
     }
 
     // ── DUE_CARDS ─────────────────────────────────────────────────────────────

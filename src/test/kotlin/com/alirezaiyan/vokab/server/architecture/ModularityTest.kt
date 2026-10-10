@@ -23,7 +23,8 @@ class ModularityTest {
         "admin" to setOf(),
         "ai" to setOf("analytics", "credits", "notification", "study", "user", "words"),
         // Insights screen snapshot reads word stage counts and the Word Rush summary (read-only queries)
-        "analytics" to setOf("subscription", "user", "wordrush", "words"),
+        // and, for practice nudges, when Word Rush and Listening were last used (read-only queries)
+        "analytics" to setOf("listening", "subscription", "user", "wordrush", "words"),
         "auth" to setOf("admin", "notification", "subscription", "user"),
         // Reads the access level to size the monthly allowance
         "credits" to setOf("subscription"),

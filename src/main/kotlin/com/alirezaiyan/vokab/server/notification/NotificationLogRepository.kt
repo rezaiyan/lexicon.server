@@ -13,6 +13,8 @@ interface NotificationLogRepository : JpaRepository<NotificationLog, Long> {
 
     fun findTopByUserIdAndOpenedAtIsNotNullOrderBySentAtDesc(userId: Long): NotificationLog?
 
+    fun findTopByUserIdAndNotificationTypeOrderBySentAtDesc(userId: Long, notificationType: String): NotificationLog?
+
     @Query("""
         SELECT nl FROM NotificationLog nl
         WHERE nl.userId = :userId AND nl.sentAt >= :since

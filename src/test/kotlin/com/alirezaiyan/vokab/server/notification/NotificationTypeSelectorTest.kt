@@ -26,6 +26,7 @@ class NotificationTypeSelectorTest {
     private lateinit var userProgressService: UserProgressService
     private lateinit var learnerSignals: LearnerSignals
     private lateinit var milestoneDetector: MilestoneDetector
+    private lateinit var practiceNudgePolicy: PracticeNudgePolicy
 
     private lateinit var notificationTypeSelector: NotificationTypeSelector
 
@@ -35,6 +36,9 @@ class NotificationTypeSelectorTest {
         userProgressService = mockk()
         learnerSignals = mockk()
         milestoneDetector = mockk()
+        practiceNudgePolicy = mockk()
+        // Default: no practice nudge due; tests about nudges override this
+        every { practiceNudgePolicy.pick(any(), any(), any()) } returns null
         // Default: not studied today; tests about active users override this
         every { dailyActivityRepository.existsByUserAndActivityDate(any(), any()) } returns false
         notificationTypeSelector = NotificationTypeSelector(
@@ -42,6 +46,7 @@ class NotificationTypeSelectorTest {
             userProgressService,
             learnerSignals,
             milestoneDetector,
+            practiceNudgePolicy,
             clock = fixedClock()
         )
     }
@@ -321,6 +326,60 @@ class NotificationTypeSelectorTest {
         val result = notificationTypeSelector.selectType(user, schedule)
 
         assertEquals(NotificationTypeSelector.NotificationType.DUE_CARDS, result)
+    }
+
+    @Test
+    fun `selectType should send a practice nudge instead of an insight when nothing is due`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, timezoneOffsetHrs = -4)
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 2)
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
+        every { practiceNudgePolicy.pick(user, schedule, 20) } returns NotificationTypeSelector.NotificationType.WORD_RUSH
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.WORD_RUSH, result)
+    }
+
+    @Test
+    fun `selectType should keep due cards ahead of practice nudges`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, timezoneOffsetHrs = -4)
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 8)
+        every { practiceNudgePolicy.pick(any(), any(), any()) } returns NotificationTypeSelector.NotificationType.LISTENING
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.DUE_CARDS, result)
+    }
+
+    @Test
+    fun `selectType should not send a practice nudge to a user who studied today`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user)
+        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { practiceNudgePolicy.pick(any(), any(), any()) } returns NotificationTypeSelector.NotificationType.WORD_RUSH
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.NONE, result)
+    }
+
+    @Test
+    fun `re-engagement should offer a practice nudge before a generic insight`() {
+        val user = createUser(currentStreak = 0)
+        val schedule = createSchedule(user, consecutiveIgnores = 4)
+        every { milestoneDetector.hasPendingMilestone(user) } returns false
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 0)
+        every { learnerSignals.topDifficultWord(user.requireId()) } returns null
+        every { practiceNudgePolicy.pick(user, schedule, 20) } returns NotificationTypeSelector.NotificationType.LISTENING
+
+        val result = notificationTypeSelector.selectType(user, schedule)
+
+        assertEquals(NotificationTypeSelector.NotificationType.LISTENING, result)
     }
 
     // --- Factory functions ---

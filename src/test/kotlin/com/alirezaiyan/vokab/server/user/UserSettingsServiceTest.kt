@@ -199,6 +199,44 @@ class UserSettingsServiceTest {
     }
 
     @Test
+    fun `updateTimezone should store the zone without touching other settings`() {
+        val user = createUser()
+        val existing = createUserSettings(user = user, languageCode = "fr")
+        every { repo.findByUser(user) } returns existing
+        every { repo.save(existing) } returns existing
+        every { notificationTimingService.utcOffsetHours("America/Chicago") } returns -5
+        justRun { notificationTimingService.applyTimezone(1L, "America/Chicago") }
+
+        userSettingsService.updateTimezone(user.requireId(), "America/Chicago")
+
+        assertEquals("America/Chicago", existing.timezone)
+        assertEquals("fr", existing.languageCode)
+        verify(exactly = 1) { notificationTimingService.applyTimezone(1L, "America/Chicago") }
+    }
+
+    @Test
+    fun `updateTimezone should do nothing when the zone is unchanged`() {
+        val user = createUser()
+        val existing = createUserSettings(user = user).apply { timezone = "America/Chicago" }
+        every { repo.findByUser(user) } returns existing
+        every { notificationTimingService.utcOffsetHours("America/Chicago") } returns -5
+
+        userSettingsService.updateTimezone(user.requireId(), "America/Chicago")
+
+        verify(exactly = 0) { repo.save(any()) }
+        verify(exactly = 0) { notificationTimingService.applyTimezone(any(), any()) }
+    }
+
+    @Test
+    fun `updateTimezone should reject an unknown zone id`() {
+        every { notificationTimingService.utcOffsetHours("Not/AZone") } returns null
+
+        org.junit.jupiter.api.assertThrows<IllegalArgumentException> {
+            userSettingsService.updateTimezone(1L, "Not/AZone")
+        }
+    }
+
+    @Test
     fun `update should create new settings when none exist`() {
         // Arrange
         val user = createUser()

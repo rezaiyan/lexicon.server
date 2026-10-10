@@ -1,13 +1,11 @@
 package com.alirezaiyan.vokab.server.auth
 
-import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.AccessLogFilter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
@@ -19,7 +17,6 @@ private val log = KotlinLogging.logger {}
 @Component
 class JwtAuthenticationFilter(
     private val jwtTokenProvider: RS256JwtTokenProvider,
-    private val appProperties: AppProperties,
     private val userAccessCache: UserAccessCache,
 ) : OncePerRequestFilter() {
     
@@ -37,6 +34,8 @@ class JwtAuthenticationFilter(
         "/api/v1/onboarding/",
         "/h2-console/",
         "/admin-ui/",
+        // Admin auth (key or dashboard session) is AdminAuthenticationFilter's job
+        ADMIN_PATH_PREFIX,
         "/actuator/",
         "/error"
     )
@@ -53,19 +52,6 @@ class JwtAuthenticationFilter(
     ) {
         val path = request.requestURI
         log.debug { "🔐 JWT Filter [START]: Processing ${request.method} $path" }
-
-        // Admin key — grants ROLE_ADMIN for /admin/** without requiring a user JWT
-        val adminKey = request.getHeader("X-Admin-Key")
-        val configuredKey = appProperties.security.adminApiKey
-        if (!adminKey.isNullOrBlank() && configuredKey.isNotBlank() && adminKey == configuredKey) {
-            val auth = UsernamePasswordAuthenticationToken(
-                "ali-cli", null, listOf(SimpleGrantedAuthority("ROLE_ADMIN"))
-            )
-            SecurityContextHolder.getContext().authentication = auth
-            request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, "admin")
-            filterChain.doFilter(request, response)
-            return
-        }
 
         try {
             val jwt = getJwtFromRequest(request)

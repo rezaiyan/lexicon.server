@@ -55,6 +55,16 @@ class RateLimitConfig(private val appProperties: AppProperties) {
     }
     
     /**
+     * Failed admin key attempts (dashboard sign-in and `X-Admin-Key`) per IP: 5 per 15 minutes.
+     * Only failures consume; an empty bucket locks the IP out of admin auth until it refills.
+     */
+    fun getAdminAuthBucket(ipAddress: String): Bucket =
+        cache.computeIfAbsent("admin_auth_$ipAddress") {
+            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(15)).build()
+            Bucket.builder().addLimit(limit).build()
+        }
+
+    /**
      * Get rate limit bucket for token refresh endpoint (IP-based)
      * Limit: 10 refresh requests per minute per IP
      */

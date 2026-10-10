@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.shared
 
+import com.alirezaiyan.vokab.server.auth.AdminAuthenticationFilter
+import com.alirezaiyan.vokab.server.auth.AdminSessionTokens
 import com.alirezaiyan.vokab.server.auth.JwtAuthenticationFilter
 import com.alirezaiyan.vokab.server.auth.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.auth.SecurityConfig
@@ -39,7 +41,7 @@ class ControllerTestSecurityConfig {
         // the filter body is completely replaced by the overrides below.
         val tokenProvider = Mockito.mock(RS256JwtTokenProvider::class.java)
         val userAccessCache = Mockito.mock(UserAccessCache::class.java)
-        return object : JwtAuthenticationFilter(tokenProvider, AppProperties(), userAccessCache) {
+        return object : JwtAuthenticationFilter(tokenProvider, userAccessCache) {
             override fun shouldNotFilter(request: HttpServletRequest): Boolean = true
 
             override fun doFilterInternal(
@@ -51,4 +53,15 @@ class ControllerTestSecurityConfig {
             }
         }
     }
+
+    /** Lets tests grant ROLE_ADMIN through the `authentication(...)` post-processor. */
+    @Bean
+    @Primary
+    fun adminAuthenticationFilter(clock: java.time.Clock): AdminAuthenticationFilter =
+        object : AdminAuthenticationFilter(
+            AdminSessionTokens(AppProperties(), clock),
+            RateLimitConfig(AppProperties()),
+        ) {
+            override fun shouldNotFilter(request: HttpServletRequest): Boolean = true
+        }
 }

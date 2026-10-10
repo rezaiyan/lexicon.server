@@ -234,4 +234,10 @@ Note: earlier docs listed `/suggest-vocabulary` and `/import-vocabulary` here �
 | POST | `/send` | Manual push (`ManualPushRequest`): `audience` USERS (ids/emails) or ALL, `dryRun`, `respectOptOut`. Logged as type `MANUAL` with open tracking |
 | POST | `/jobs/{job}/run` | Run a scheduled job now: SMART_DISPATCH, STREAK_SAVERS, REVIEW_REMINDERS, REFRESH_SCHEDULES, REFRESH_SEGMENTS |
 
-Dashboard UI: `GET /admin-ui/notifications` serves a static page (public shell, no data) that asks for the admin key and calls the endpoints above with `X-Admin-Key`.
+Dashboard UI: `GET /admin-ui/notifications` (+ `.js`, `.css`) serves a static page under a strict CSP (public shell, no data).
+
+Admin auth (`AdminAuthenticationFilter`, all of `/admin/**`): either `X-Admin-Key` (CLI) or a dashboard session.
+- `POST /admin/session` `{key}` + header `X-Admin-Request: 1` → 4h session in an HttpOnly, Secure, SameSite=Strict cookie (`lexicon_admin_session`, Path=/admin). Refused (503) while the admin key is under 32 chars.
+- `GET /admin/session` → `{authenticated, expiresAt}`; `DELETE /admin/session` signs out.
+- Session requests must also send `X-Admin-Request: 1`. Sessions are HMAC-signed from the admin key: rotating the key ends them all.
+- Wrong keys (sign-in or header) are throttled: 5 failures per IP per 15 min, after which that IP is refused even with the right key.

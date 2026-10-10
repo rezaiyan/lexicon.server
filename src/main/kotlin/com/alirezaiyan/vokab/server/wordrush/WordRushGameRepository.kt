@@ -34,6 +34,9 @@ interface WordRushGameRepository : JpaRepository<WordRushGame, Long> {
     fun countByUser(user: User): Long
 
     fun findByUser(user: User): List<WordRushGame>
+
+    @Query("SELECT COALESCE(MAX(g.score), 0) FROM WordRushGame g WHERE g.user = :user")
+    fun findBestScore(@Param("user") user: User): Int
 }
 
 interface WordRushInsightsProjection {

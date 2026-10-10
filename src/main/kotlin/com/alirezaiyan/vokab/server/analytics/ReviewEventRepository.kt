@@ -11,6 +11,16 @@ import com.alirezaiyan.vokab.server.shared.REVIEWED_AT_TS
 @Repository
 interface ReviewEventRepository : JpaRepository<ReviewEvent, Long> {
 
+    /** Raw review facts since [sinceMs], oldest first. Feeds the zone-aware insights screen. */
+    @Query(
+        """SELECT e.wordId AS wordId, e.wordText AS wordText, e.rating AS rating,
+                  e.previousLevel AS previousLevel, e.newLevel AS newLevel, e.reviewedAt AS reviewedAt
+           FROM ReviewEvent e
+           WHERE e.user.id = :userId AND e.reviewedAt >= :sinceMs
+           ORDER BY e.reviewedAt"""
+    )
+    fun findFactsByUserIdSince(@Param("userId") userId: Long, @Param("sinceMs") sinceMs: Long): List<ReviewFactProjection>
+
     fun findByUser(user: User): List<ReviewEvent>
 
     @Query("SELECT COUNT(e) FROM ReviewEvent e WHERE e.user = :user")

@@ -86,3 +86,12 @@ interface DailyEventStatsProjection {
     val leveledUp: Long
     val leveledDown: Long
 }
+
+interface ReviewFactProjection {
+    val wordId: Long
+    val wordText: String
+    val rating: Int
+    val previousLevel: Int
+    val newLevel: Int
+    val reviewedAt: Long
+}

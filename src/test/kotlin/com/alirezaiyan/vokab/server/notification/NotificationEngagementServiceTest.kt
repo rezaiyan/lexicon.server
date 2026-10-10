@@ -224,6 +224,22 @@ class NotificationEngagementServiceTest {
     }
 
     @Test
+    fun `recordSend does not judge a push sent earlier the same day`() {
+        // Evening streak saver after an unopened morning push: too early to call that one ignored
+        val user = createUser(id = 1L)
+        val schedule = createSchedule(user, consecutiveIgnores = 0, lastSentDate = TEST_TODAY)
+        val morningLog = createNotificationLog(userId = 1L, openedAt = null, sentAt = TEST_NOW.minusSeconds(6 * 3600))
+        every { notificationLogRepository.findFirstByUserIdAndIdNotOrderBySentAtDesc(1L, 77L) } returns morningLog
+        every { notificationScheduleRepository.save(schedule) } returns schedule
+        every { userSettingsRepository.findByUserId(1L) } returns null
+
+        notificationEngagementService.recordSend(schedule, "STREAK_RISK", currentLogId = 77L)
+
+        assertEquals(0, schedule.consecutiveIgnores)
+        assertNull(schedule.suppressedUntil)
+    }
+
+    @Test
     fun `recordSend judges the previous log, not the one just created for this send`() {
         // The current log (id 77) is created before the push so its id can travel in the payload.
         val user = createUser(id = 1L)

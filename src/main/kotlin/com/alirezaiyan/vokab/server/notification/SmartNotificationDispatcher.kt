@@ -70,10 +70,11 @@ class SmartNotificationDispatcher(
 
         val segment        = schedule.engagementSegment
         val isColdOrDormant = segment == "COLD" || segment == "DORMANT"
+        val studiedToday   = notificationTypeSelector.studiedToday(user)
 
         // COLD/DORMANT users: honour AI decision first — unless they came back today on their
         // own, when a "come back" push would be wrong (the selector handles them instead)
-        if (isColdOrDormant && !notificationTypeSelector.studiedToday(user)) {
+        if (isColdOrDormant && !studiedToday) {
             when (schedule.aiAction) {
                 "pause" -> {
                     val pauseDays = schedule.aiIntervalDays?.toLong() ?: 3L
@@ -97,7 +98,7 @@ class SmartNotificationDispatcher(
             logger.debug { "No notification selected for user=$userId" }
             // Nothing worth interrupting an active learner for, but keep their in-app insight
             // card current without a visible push
-            if (notificationTypeSelector.studiedToday(user)) dailyInsightService.refreshInsightSilently(user)
+            if (studiedToday) dailyInsightService.refreshInsightSilently(user)
             return
         }
 

@@ -10,7 +10,6 @@ enum class Prompt(val resource: String) {
     IMAGE_EXTRACTION("image-extraction.v1"),
     IMAGE_EXTRACTION_V2("image-extraction.v2"),
     CELEBRATION_INSIGHT("celebration-insight.v1"),
-    STREAK_RESET_WARNING("streak-reset-warning.v1"),
     DAILY_INSIGHT("daily-insight.v1"),
     MILESTONE_MESSAGE("milestone-message.v1"),
     STREAK_REMINDER("streak-reminder.v1"),

@@ -25,6 +25,4 @@ interface DailyInsightRepository : JpaRepository<DailyInsight, Long> {
     fun findUsersWithInsightsForDate(date: String): List<User>
     
     fun findByUser(user: User): List<DailyInsight>
-
-    fun existsByUserAndDateAndSentViaPushTrue(user: User, date: String): Boolean
 }

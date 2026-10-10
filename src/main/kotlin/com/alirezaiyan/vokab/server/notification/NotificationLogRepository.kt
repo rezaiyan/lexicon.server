@@ -22,8 +22,6 @@ interface NotificationLogRepository : JpaRepository<NotificationLog, Long> {
 
     fun countByUserIdAndOpenedAtIsNotNullAndSentAtAfter(userId: Long, since: Instant): Long
 
-    fun existsByUserIdAndNotificationTypeAndSentAtAfter(userId: Long, notificationType: String, since: Instant): Boolean
-
     fun countBySentAtAfter(since: Instant): Long
 
     fun countBySentAtAfterAndOpenedAtIsNotNull(since: Instant): Long

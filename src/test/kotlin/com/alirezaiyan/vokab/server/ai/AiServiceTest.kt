@@ -96,14 +96,10 @@ class AiServiceTest {
     // ── notification copy: fallback on an empty answer ───────────────────────
 
     @Test
-    fun `celebration, streak warning and streak reminder fall back to fixed copy on an empty answer`() {
-        repeat(3) { expectChat().andRespond(json("""{"choices":[]}""")) }
+    fun `celebration and streak reminder fall back to fixed copy on an empty answer`() {
+        repeat(2) { expectChat().andRespond(json("""{"choices":[]}""")) }
 
         assertEquals("Great work today! 🎉 You're building something real.", service.generateCelebrationInsight(stats(), null))
-        assertEquals(
-            "Don't lose your 7-day streak! 🔥 Log in now to keep it going!",
-            service.generateStreakResetWarning(7, stats(), "Ali"),
-        )
         assertEquals(
             "You have a 7-day streak! 🔥 Complete your review today to keep it going!",
             service.generateStreakReminderMessage(7, "Ali"),

@@ -22,7 +22,6 @@ import io.mockk.justRun
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -92,25 +91,6 @@ class DailyInsightServiceTest {
     }
 
     @Test
-    fun `should return null when streak at risk and reminder hour is before 20`() {
-        // Arrange
-        val user = createUser(currentStreak = 5)
-        val today = TEST_TODAY.toString()
-        val settings = createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
-        every { userSettingsRepository.findByUser(user) } returns settings
-
-        // Act
-        val result = dailyInsightService.generateDailyInsightForUser(user)
-
-        // Assert
-        assertNull(result)
-        verify(exactly = 0) { aiService.generateDailyInsight(any()) }
-        verify(exactly = 0) { aiService.generateCelebrationInsight(any(), any()) }
-    }
-
-    @Test
     fun `should generate celebration insight when user has activity today`() {
         // Arrange
         val user = createUser(currentStreak = 3)
@@ -119,7 +99,6 @@ class DailyInsightServiceTest {
         val savedInsight = createDailyInsight(user = user, insightText = "Great work!")
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } returns savedInsight
@@ -142,7 +121,6 @@ class DailyInsightServiceTest {
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
@@ -161,7 +139,7 @@ class DailyInsightServiceTest {
     }
 
     @Test
-    fun `should generate insight when streak at risk but reminder hour is 20 or later`() {
+    fun `should generate a motivational insight for a streak holder who has not studied yet`() {
         // Arrange
         val user = createUser(currentStreak = 10)
         val today = TEST_TODAY.toString()
@@ -169,7 +147,6 @@ class DailyInsightServiceTest {
         val savedInsight = createDailyInsight(user = user, insightText = "Keep it up!")
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "20:00")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateDailyInsight(any()) } returns "Keep it up!"
         every { notificationScheduleRepository.findByUser(user) } returns null
@@ -195,7 +172,6 @@ class DailyInsightServiceTest {
         val stats = createProgressStats()
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateCelebrationInsight(any(), any()) } throws RuntimeException("AI service unavailable")
 
@@ -215,7 +191,6 @@ class DailyInsightServiceTest {
         val existingInsight = createDailyInsight(user = user, date = today)
         every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
         every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
         every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
         every { aiService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
         every { dailyInsightRepository.save(any()) } throws DataIntegrityViolationException("duplicate key")
@@ -225,166 +200,6 @@ class DailyInsightServiceTest {
         val result = dailyInsightService.generateDailyInsightForUser(user)
 
         assertEquals(existingInsight, result)
-    }
-
-    // --- sendDailyInsightPush ---
-
-    @Test
-    fun `should return true and save updated insight when push succeeds`() {
-        // Arrange
-        val user = createUser()
-        val insight = createDailyInsight(user = user, sentViaPush = false)
-        val successResponse = NotificationResponse(success = true, messageId = "msg-123")
-        every {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        } returns listOf(successResponse)
-        every { dailyInsightRepository.save(any()) } answers { firstArg() }
-
-        // Act
-        val result = dailyInsightService.sendDailyInsightPush(insight)
-
-        // Assert
-        assertTrue(result)
-        verify(exactly = 1) { dailyInsightRepository.save(match { it.sentViaPush }) }
-    }
-
-    @Test
-    fun `should return false when all push responses fail`() {
-        // Arrange
-        val user = createUser()
-        val insight = createDailyInsight(user = user, sentViaPush = false)
-        val failureResponse = NotificationResponse(success = false, error = "Token not registered")
-        every {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        } returns listOf(failureResponse)
-
-        // Act
-        val result = dailyInsightService.sendDailyInsightPush(insight)
-
-        // Assert
-        assertFalse(result)
-        verify(exactly = 0) { dailyInsightRepository.save(any()) }
-    }
-
-    @Test
-    fun `should return false when push notification service throws exception`() {
-        // Arrange
-        val user = createUser()
-        val insight = createDailyInsight(user = user, sentViaPush = false)
-        every {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        } throws RuntimeException("Firebase unavailable")
-
-        // Act
-        val result = dailyInsightService.sendDailyInsightPush(insight)
-
-        // Assert
-        assertFalse(result)
-        verify(exactly = 0) { dailyInsightRepository.save(any()) }
-    }
-
-    // --- generateAndSendForUser ---
-
-    @Test
-    fun `should do nothing when insight generation returns null`() {
-        // Arrange: streak at risk with an early reminder, so generation is skipped
-        val user = createUser(currentStreak = 5)
-        every { dailyInsightRepository.findByUserAndDate(user, TEST_TODAY.toString()) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns false
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-
-        // Act
-        dailyInsightService.generateAndSendForUser(user)
-
-        // Assert
-        verify(exactly = 0) {
-            pushNotificationService.sendNotificationToUser(
-                userId = any(),
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        }
-    }
-
-    @Test
-    fun `should send push when insight exists and has not been sent yet`() {
-        // Arrange
-        val user = createUser(currentStreak = 3)
-        val today = TEST_TODAY.toString()
-        val stats = createProgressStats()
-        val unsent = createDailyInsight(user = user, date = today, sentViaPush = false)
-        every { dailyInsightRepository.findByUserAndDate(user, today) } returns null
-        every { dailyActivityRepository.existsByUserAndActivityDate(user, TEST_TODAY) } returns true
-        every { userSettingsRepository.findByUser(user) } returns createUserSettings(user = user, dailyReminderTime = "18:00")
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { aiService.generateCelebrationInsight(stats, user.name) } returns "Great work!"
-        every { dailyInsightRepository.save(any()) } returns unsent
-        every {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        } returns listOf(NotificationResponse(success = true))
-
-        // Act
-        dailyInsightService.generateAndSendForUser(user)
-
-        // Assert
-        verify(exactly = 1) {
-            pushNotificationService.sendNotificationToUser(
-                userId = user.id!!,
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        }
-    }
-
-    @Test
-    fun `should not send push when insight was already sent via push`() {
-        // Arrange
-        val user = createUser()
-        val today = TEST_TODAY.toString()
-        val alreadySent = createDailyInsight(user = user, date = today, sentViaPush = true)
-        every { dailyInsightRepository.findByUserAndDate(user, today) } returns alreadySent
-
-        // Act
-        dailyInsightService.generateAndSendForUser(user)
-
-        // Assert
-        verify(exactly = 0) {
-            pushNotificationService.sendNotificationToUser(
-                userId = any(),
-                title = any(),
-                body = any(),
-                data = any(),
-                category = any()
-            )
-        }
     }
 
     // --- saveDailyInsight ---

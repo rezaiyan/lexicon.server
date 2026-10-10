@@ -21,7 +21,6 @@ interface UserRepository : JpaRepository<User, Long> {
     fun findByGoogleId(googleId: String): Optional<User>
     fun findByAppleId(appleId: String): Optional<User>
     fun findByRevenueCatUserId(revenueCatUserId: String): Optional<User>
-    fun findByCurrentStreakGreaterThanAndActiveTrue(currentStreak: Int): List<User>
 
     // ── Subscription state: the only write paths for the updatable = false columns on User ──
 

@@ -83,7 +83,9 @@ class NotificationEngagementService(
 
         // Increment ignore counter if a notification was previously sent and the user neither
         // opened it nor studied since. Uses lastSentDate as the "sent-before" signal so
-        // suppression works even when saveLog fails.
+        // suppression works even when saveLog fails. A push from earlier today (the evening
+        // streak saver follows a morning push) is too fresh to call ignored: the next day's
+        // send judges the latest one instead.
         // If a log record IS present and was opened, recordOpen() already reset the counter.
         // The log for this send already exists (its id travels in the push payload) — skip it.
         val previousLog = if (currentLogId != null) {
@@ -93,7 +95,7 @@ class NotificationEngagementService(
         }
         val wasOpened = previousLog?.openedAt != null
         val previousSentDate = schedule.lastSentDate
-        if (!wasOpened && previousSentDate != null) {
+        if (!wasOpened && previousSentDate != null && previousSentDate.isBefore(LocalDate.now(clock))) {
             val sentDate = previousLog?.sentAt?.let { LocalDate.ofInstant(it, ZoneOffset.UTC) } ?: previousSentDate
             // Many learners read the push and open the app from its icon: the reminder worked
             // even though no tap was reported, so it must not push them into backoff.

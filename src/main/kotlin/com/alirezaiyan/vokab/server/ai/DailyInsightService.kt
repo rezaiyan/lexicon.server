@@ -1,7 +1,6 @@
 package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.shared.bestEffort
-import com.alirezaiyan.vokab.server.notification.NotificationCategory
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.notification.NotificationScheduleRepository
@@ -69,12 +68,10 @@ class DailyInsightService(
      *
      * Logic (every user, free and premium alike):
      * 1. Return existing insight if already generated today (idempotent).
-     * 2. Frequency cap: if the user has an active streak but hasn't reviewed yet,
-     *    the 22:00 streak reminder will fire — skip the morning insight to avoid
-     *    double-notifying, UNLESS the user's reminder time is ≥ 20:00 (in which
-     *    case this insight IS their evening notification).
-     * 3. If the user already reviewed today → send a celebration insight.
-     *    Otherwise → send a motivational insight.
+     * 2. If the user already reviewed today → a celebration insight.
+     *    Otherwise → a motivational insight.
+     *
+     * Which push goes out, and when, is NotificationTypeSelector's call; this only writes it.
      */
     fun generateDailyInsightForUser(user: User): DailyInsight? {
         logger.info { "Generating daily insight for user ${user.id}" }
@@ -88,15 +85,6 @@ class DailyInsightService(
         }
 
         val hasActivityToday = dailyActivityRepository.existsByUserAndActivityDate(user, LocalDate.now(clock))
-        val streakAtRisk = user.currentStreak > 0 && !hasActivityToday
-        val reminderHour = userSettingsRepository.findByUser(user)
-            ?.dailyReminderTime?.split(":")?.firstOrNull()?.toIntOrNull() ?: 18
-
-        // Frequency cap: streak reminder fires at 22:00 — don't also send a morning insight
-        if (streakAtRisk && reminderHour < 20) {
-            logger.debug { "Skipping insight for user ${user.id} — streak reminder will fire tonight" }
-            return null
-        }
 
         return try {
             val stats = userProgressService.calculateProgressStats(user.requireId())
@@ -161,53 +149,6 @@ class DailyInsightService(
             sessionCompletionRate = sessionCompletionRate,
             currentStreak = user.currentStreak
         )
-    }
-
-    /**
-     * Send daily insight via push notification.
-     */
-    fun sendDailyInsightPush(insight: DailyInsight): Boolean {
-        logger.info { "Sending daily insight push for user ${insight.user.id}" }
-
-        return try {
-            val responses = pushNotificationService.sendNotificationToUser(
-                userId = insight.user.requireId(),
-                title = "💡 Daily Vocabulary Insight",
-                body = insight.insightText,
-                data = mapOf(
-                    "type" to "daily_insight",
-                    "insight_id" to insight.id.toString(),
-                    "date" to insight.date
-                ),
-                category = NotificationCategory.USER
-            )
-
-            val success = responses.any { it.success }
-
-            if (success) {
-                insight.sentViaPush = true
-                insight.pushSentAt = Instant.now(clock)
-                dailyInsightRepository.save(insight)
-                logger.info { "Successfully sent daily insight push for user ${insight.user.id}" }
-            } else {
-                logger.warn { "Failed to send daily insight push for user ${insight.user.id}" }
-            }
-
-            success
-        } catch (e: Exception) {
-            logger.error(e) { "Error sending daily insight push for user ${insight.user.id}" }
-            false
-        }
-    }
-
-    /**
-     * Generate and push a daily insight for a single user. Used by SmartNotificationDispatcher.
-     */
-    fun generateAndSendForUser(user: User) {
-        val insight = generateDailyInsightForUser(user) ?: return
-        if (!insight.sentViaPush) {
-            sendDailyInsightPush(insight)
-        }
     }
 
     /**

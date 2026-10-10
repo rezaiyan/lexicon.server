@@ -127,25 +127,6 @@ class AiService(
             ?: "Great work today! 🎉 You're building something real."
     }
 
-    fun generateStreakResetWarning(
-        currentStreak: Int,
-        progressStats: ProgressStatsDto,
-        userName: String
-    ): String {
-        val prompt = promptTemplates.render(
-            Prompt.STREAK_RESET_WARNING,
-            mapOf(
-                "userName" to userName,
-                "currentStreak" to currentStreak,
-                "totalWords" to progressStats.totalWords,
-                "dueCards" to progressStats.dueCards,
-                "masteredWords" to progressStats.level5Count + progressStats.level6Count,
-            ),
-        )
-        return aiClient.complete(prompt, AiOperation.STREAK_RESET_WARNING)
-            ?: "Don't lose your $currentStreak-day streak! 🔥 Log in now to keep it going!"
-    }
-
     fun generateDailyInsight(ctx: DailyInsightContext): String {
         val optionalStats = listOfNotNull(
             ctx.primaryLanguage?.let { "- Learning: $it" },

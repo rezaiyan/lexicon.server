@@ -3,11 +3,12 @@
 Production runs on a VPS with Docker Compose (Postgres, the app, Metabase) behind Caddy.
 
 ```
-PR ──► CI: build, detekt, tests, coverage, Docker build check, workflow/script lint
+PR ──► CI: build, detekt, tests, coverage, Docker build + vulnerability scan, workflow/script lint
 main ─► CI: same, then publish ghcr.io/rezaiyan/lexicon.server:sha-<commit> and :latest
      └► Deploy (once enabled): SSH to the VPS, scripts/deploy.sh sha-<commit>
            pull image → restart app → wait for /api/v1/health → roll back if unhealthy
 tag v1.2.3 ─► Release: GitHub release with the jar, image :1.2.3 / :v1.2.3
+every 15 min ─► Health Check: probe /api/v1/health from outside, Telegram on down / recovered
 ```
 
 The VPS never runs Gradle: it pulls the image CI built and tested.
@@ -76,3 +77,26 @@ gunzip -c backups/lexicondb-YYYYmmdd-HHMMSS.sql.gz | \
   docker compose exec -T postgres psql -U lexicon_user -d lexicondb
 ```
 The dump drops and recreates its tables, so it restores over an existing schema.
+
+## Monitoring
+
+The **Health Check** workflow probes `https://lexicon.alirezaiyan.com/api/v1/health` every 15
+minutes from GitHub's runners (three tries a minute apart). It messages Telegram once when the
+server goes down and once when it recovers; failed runs also show red under Actions. Add the
+repository secrets `TELEGRAM_ADMIN_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` (Settings → Secrets and
+variables → Actions), the same values as in the VPS `.env`. GitHub pauses scheduled workflows
+after 60 days without repository activity; re-enable it under Actions if that happens.
+
+## Vulnerability scanning
+
+CI scans every image with Trivy. A **CRITICAL** vulnerability that has a fixed version fails the
+build; fixable **HIGH** ones are listed in the job summary. To clear a failure, bump the
+dependency (the Spring Boot version in `gradle/libs.versions.toml`, or a single library through a
+BOM property in `build.gradle.kts`). A finding that can't reach the app goes in `.trivyignore`
+with the reason and an expiry date.
+
+## Logs
+
+Each container's logs rotate at 3 × 20 MB (`x-logging` in `docker-compose.yml`). Containers
+created before that setting keep unbounded logs until recreated: run `docker compose up -d` once.
+`docker compose logs --tail 200 app` shows recent output.

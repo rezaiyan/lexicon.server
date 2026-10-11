@@ -1,3 +1,18 @@
+// The Spring Boot Gradle plugin brings Jackson and Apache HttpClient onto the build classpath at
+// older versions; keep them on the same patched releases as the app (the extra[...] overrides below)
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.eachDependency {
+			when {
+				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
+					useVersion("2.21.7")
+				requested.group == "org.apache.httpcomponents.client5" -> useVersion("5.6.4")
+				requested.group == "org.apache.httpcomponents.core5" -> useVersion("5.4.3")
+			}
+		}
+	}
+}
+
 plugins {
 	alias(libs.plugins.kotlin.jvm)
 	alias(libs.plugins.kotlin.spring)
@@ -14,6 +29,15 @@ description = "Lexicon Server Application"
 
 // The Spring Boot BOM pins Kotlin libraries to its own baseline; keep them on the compiler's version
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
+// Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
+// each override once the BOM catches up.
+extra["tomcat.version"] = "10.1.60"
+extra["netty.version"] = "4.1.137.Final"
+extra["jackson-bom.version"] = "2.21.7"
+extra["postgresql.version"] = "42.7.12"
+// firebase-admin asks for httpclient5 5.6.x; the BOM would pin the older, vulnerable 5.5/core 5.3
+extra["httpclient5.version"] = "5.6.4"
+extra["httpcore5.version"] = "5.4.3"
 
 repositories {
 	mavenCentral()

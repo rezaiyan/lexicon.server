@@ -1,8 +1,17 @@
+# Container logs rotate at 3 x 20 MB per service. Docker's default json-file driver never
+# rotates, so logs would grow until the disk fills (and a full disk takes Postgres down).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   # PostgreSQL Database (for production-like testing)
   postgres:
     image: postgres:17-alpine
     container_name: lexicon-postgres
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lexicondb}
       POSTGRES_USER: ${POSTGRES_USER:-lexicon_user}
@@ -29,6 +38,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: lexicon-server
+    logging: *default-logging
     # The JVM sizes its heap from this (-XX:MaxRAMPercentage=75 in the Dockerfile); without a limit
     # it would size against the whole VPS, which Postgres and Metabase share.
     mem_limit: ${APP_MEM_LIMIT:-1536m}
@@ -101,8 +111,11 @@ services:
 
   # Metabase Analytics Dashboard
   metabase:
-    image: metabase/metabase:latest
+    # Pinned: `latest` could jump a major version on any restart, and Metabase can't downgrade its
+    # application database. Dependabot proposes upgrades.
+    image: metabase/metabase:v0.64.1.5
     container_name: lexicon-metabase
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy

@@ -1,3 +1,15 @@
+// The Spring Boot Gradle plugin brings Jackson onto the build classpath at the BOM's version; keep
+// it on the same patched release as the app (extra["jackson-bom.version"] below)
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.eachDependency {
+			if (requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations") {
+				useVersion("2.21.7")
+			}
+		}
+	}
+}
+
 plugins {
 	alias(libs.plugins.kotlin.jvm)
 	alias(libs.plugins.kotlin.spring)

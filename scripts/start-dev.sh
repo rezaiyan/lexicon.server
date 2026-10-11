@@ -49,7 +49,8 @@ fi
 
 # Load environment variables
 if [ -f .env ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+    # Sourced, not word-split, so values with spaces (e.g. EMAIL_FROM_ADDRESS) survive
+    set -a; . ./.env; set +a
 fi
 
 # Use H2 profile when using default H2 DB so Flyway runs H2-compatible migrations

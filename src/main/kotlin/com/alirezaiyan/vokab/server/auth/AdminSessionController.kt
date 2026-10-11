@@ -51,19 +51,9 @@ class AdminSessionController(
         @RequestHeader(ADMIN_REQUEST_HEADER, required = false) adminRequest: String?,
         request: HttpServletRequest,
     ): ResponseEntity<ApiResponse<AdminSessionDto>> {
-        if (adminRequest != "1") return failure(HttpStatus.FORBIDDEN, "Missing $ADMIN_REQUEST_HEADER header")
-        if (!adminSessionTokens.dashboardSignInEnabled()) {
-            return failure(
-                HttpStatus.SERVICE_UNAVAILABLE,
-                "Dashboard sign-in is disabled: the admin key must be at least " +
-                    "${AdminSessionTokens.MIN_DASHBOARD_KEY_LENGTH} characters",
-            )
-        }
         val ip = AdminAuthenticationFilter.clientIp(request)
         val bucket = rateLimitConfig.getAdminAuthBucket(ip)
-        if (bucket.availableTokens <= 0) {
-            return failure(HttpStatus.TOO_MANY_REQUESTS, "Too many failed attempts. Try again later.")
-        }
+        refusal(adminRequest, bucket.availableTokens)?.let { return it }
         if (!adminSessionTokens.keyMatches(body.key)) {
             bucket.tryConsume(1)
             logger.warn { "Rejected admin dashboard sign-in from $ip" }
@@ -90,6 +80,19 @@ class AdminSessionController(
         ResponseEntity.ok()
             .header(HttpHeaders.SET_COOKIE, sessionCookie("", Duration.ZERO).toString())
             .body(ApiResponse(success = true, data = AdminSessionDto(authenticated = false)))
+
+    /** Why a sign-in is refused before the key is even checked, or null to go on. */
+    private fun refusal(adminRequest: String?, attemptsLeft: Long): ResponseEntity<ApiResponse<AdminSessionDto>>? =
+        when {
+            adminRequest != "1" -> failure(HttpStatus.FORBIDDEN, "Missing $ADMIN_REQUEST_HEADER header")
+            !adminSessionTokens.dashboardSignInEnabled() -> failure(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Dashboard sign-in is disabled: the admin key must be at least " +
+                    "${AdminSessionTokens.MIN_DASHBOARD_KEY_LENGTH} characters",
+            )
+            attemptsLeft <= 0 -> failure(HttpStatus.TOO_MANY_REQUESTS, "Too many failed attempts. Try again later.")
+            else -> null
+        }
 
     private fun failure(status: HttpStatus, message: String): ResponseEntity<ApiResponse<AdminSessionDto>> =
         ResponseEntity.status(status).body(ApiResponse(success = false, message = message))

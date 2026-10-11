@@ -35,7 +35,7 @@ class NotificationAdminService(
             activeTokens = byPlatform.values.sum(),
             activeTokensByPlatform = byPlatform,
             reachableUsers = pushTokenRepository.findReachableUserIds().size.toLong(),
-            optedOutUsers = pushTokenRepository.countReachableOptedOutUsers(),
+            optedOutUsers = userSettingsRepository.countReachableOptedOutUsers(),
         )
     }
 

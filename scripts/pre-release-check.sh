@@ -20,9 +20,13 @@ NC='\033[0m' # No Color
 
 # Check 1: .env files
 echo "1️⃣  Checking for .env files..."
-if ls .env* 2>/dev/null | grep -v .env.example > /dev/null; then
+env_files=()
+for f in .env*; do
+    [ -e "$f" ] && [ "$f" != .env.example ] && env_files+=("$f")
+done
+if [ ${#env_files[@]} -gt 0 ]; then
     echo -e "${RED}❌ FAIL: .env files found in directory!${NC}"
-    ls .env* 2>/dev/null | grep -v .env.example
+    printf '%s\n' "${env_files[@]}"
     echo "   Action: Remove all .env files before publishing"
     FAILED=$((FAILED+1))
 else

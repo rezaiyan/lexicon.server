@@ -12,7 +12,8 @@ if [ ! -f .env ]; then
 fi
 
 # Load environment variables
-export $(cat .env | grep -v '^#' | xargs)
+# Sourced, not word-split, so values with spaces (e.g. EMAIL_FROM_ADDRESS) survive
+set -a; . ./.env; set +a
 
 # Validate required variables
 REQUIRED_VARS=(

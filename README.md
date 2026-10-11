@@ -235,7 +235,11 @@ ACCESS_TOKEN=your_jwt ./scripts/test-endpoints.sh
 
 ## Deployment
 
-The application ships as a Docker image and can be deployed anywhere containers run:
+CI publishes a Docker image for every `main` commit to `ghcr.io/rezaiyan/lexicon.server`, and the
+Deploy workflow can roll it out to the VPS with a health check and automatic rollback. Setup,
+rollbacks and database backups: **[docs/deployment.md](docs/deployment.md)**.
+
+The image runs anywhere containers run:
 
 - **AWS ECS / Fargate**
 - **Google Cloud Run**

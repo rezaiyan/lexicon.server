@@ -14,6 +14,15 @@ description = "Lexicon Server Application"
 
 // The Spring Boot BOM pins Kotlin libraries to its own baseline; keep them on the compiler's version
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
+// Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
+// each override once the BOM catches up.
+extra["tomcat.version"] = "10.1.60"
+extra["netty.version"] = "4.1.137.Final"
+extra["jackson-bom.version"] = "2.21.7"
+extra["postgresql.version"] = "42.7.12"
+// firebase-admin asks for httpclient5 5.6.x; the BOM would pin the older, vulnerable 5.5/core 5.3
+extra["httpclient5.version"] = "5.6.4"
+extra["httpcore5.version"] = "5.4.3"
 
 repositories {
 	mavenCentral()

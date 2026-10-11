@@ -83,7 +83,7 @@ jobs:
           PYEOF
 
   docker:
-    # PRs: prove the Dockerfile still builds. main: publish the image the VPS deploys
+    # PRs: prove the Dockerfile still builds and scan it. main: also publish the image the VPS deploys
     # (ghcr.io/<repo>:sha-<commit> and :latest), so the server never builds with Gradle itself.
     name: Docker Image
     runs-on: ubuntu-latest
@@ -119,16 +119,48 @@ jobs:
             type=sha,format=short,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Build (and push on main)
+      # Built into the local Docker daemon first, so the scan sees exactly the image that ships
+      - name: Build
         uses: docker/build-push-action@v6
         with:
           context: .
-          push: ${{ env.PUBLISH == 'true' }}
+          load: true
+          tags: lexicon-server:scan
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Fails on a CRITICAL vulnerability that has a fixed version (bump the dependency, or for a
+      # finding that can't reach the app, add it to .trivyignore with the reason). HIGH ones are
+      # listed in the job summary without failing, so a new advisory doesn't block every merge.
+      - name: Scan image for vulnerabilities
+        run: |
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivyignore:/.trivyignore:ro" -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+              aquasec/trivy:0.58.1 image --quiet --scanners vuln --ignore-unfixed \
+              --ignorefile /.trivyignore "$@" lexicon-server:scan
+          }
+          trivy --severity CRITICAL,HIGH --format table > trivy.txt || true
+          {
+            echo '### Image vulnerabilities (fixable, CRITICAL/HIGH)'
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          trivy --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update
+
+      # Same build, so every layer comes from the cache: this only tags and uploads
+      - name: Push
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: GIT_SHA=${{ github.sha }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   workflow-lint:
     # Catches broken workflow syntax/expressions and shell bugs in the ops scripts before main

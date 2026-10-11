@@ -1,0 +1,81 @@
+name: Health Check
+
+# Probes production from outside every 15 minutes, so an outage is noticed even when the server
+# itself (and with it the app's own Telegram alerts) is down. Messages Telegram only when the state
+# changes: once on going down, once on recovery. A failed run also shows up red in Actions.
+#
+# Needs the repository secrets TELEGRAM_ADMIN_BOT_TOKEN and TELEGRAM_ADMIN_CHAT_ID (the same bot
+# the app uses); without them it still runs and fails, just without messages.
+# GitHub pauses scheduled workflows after 60 days without repository activity.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: health-check
+  cancel-in-progress: false
+
+env:
+  HEALTH_URL: https://lexicon.alirezaiyan.com/api/v1/health
+
+jobs:
+  probe:
+    name: Probe production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    steps:
+      - name: Check health
+        id: probe
+        run: |
+          # Three tries a minute apart, so one slow response or a deploy restart isn't an outage
+          code=000
+          for attempt in 1 2 3; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --connect-timeout 10 --max-time 20 "$HEALTH_URL" || true)
+            [ "$code" = 200 ] && break
+            echo "Attempt $attempt: HTTP $code"
+            [ "$attempt" -lt 3 ] && sleep 60
+          done
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = 200 ]; then echo "up=true" >> "$GITHUB_OUTPUT"; else echo "up=false" >> "$GITHUB_OUTPUT"; fi
+          echo "Health: HTTP $code"
+
+      - name: Alert on state change
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOT_TOKEN: ${{ secrets.TELEGRAM_ADMIN_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          UP: ${{ steps.probe.outputs.up }}
+          CODE: ${{ steps.probe.outputs.code }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # The previous finished probe's result is the previous state (no run yet counts as up)
+          previous=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow health-check.yml \
+            --status completed --limit 10 --json conclusion \
+            --jq '[.[] | select(.conclusion == "success" or .conclusion == "failure")][0].conclusion // "success"')
+          echo "Previous: $previous, now up: $UP"
+
+          message=""
+          if [ "$UP" = false ] && [ "$previous" = success ]; then
+            message="🔴 Lexicon is DOWN: $HEALTH_URL returned HTTP $CODE. $RUN_URL"
+          elif [ "$UP" = true ] && [ "$previous" = failure ]; then
+            message="🟢 Lexicon recovered: $HEALTH_URL is healthy again."
+          fi
+
+          if [ -n "$message" ]; then
+            if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
+              curl -sf -o /dev/null --max-time 20 "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+                --data-urlencode "chat_id=${CHAT_ID}" --data-urlencode "text=${message}" \
+                || echo "::warning::Telegram message failed"
+            else
+              echo "::warning::TELEGRAM_ADMIN_BOT_TOKEN / TELEGRAM_ADMIN_CHAT_ID not set; no alert sent"
+            fi
+          fi
+
+          if [ "$UP" != true ]; then
+            echo "::error::$HEALTH_URL returned HTTP $CODE"
+            exit 1
+          fi

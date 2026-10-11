@@ -268,4 +268,7 @@ jobs:
         with:
           fail-on-severity: high
           retry-on-snapshot-warnings: true
+          # The spring-webmvc advisories accepted in .trivyignore (CVE-2026-47884, CVE-2026-47890):
+          # fixed only in Spring Framework 7 and not reachable here. Drop with them.
+          allow-ghsas: GHSA-pc63-qcmh-9cmg, GHSA-j9f9-w8pj-32f8
           comment-summary-in-pr: on-failure

@@ -4,6 +4,6 @@
 # spring-webmvc 6.2.x: fixed only in Spring Framework 7 (Spring Boot 4). Not reachable here:
 # - XsltView RCE: the app renders no views (JSON controllers only) and never uses XsltView.
 # - SSE stream corruption: needs Server-Sent Events with view fragments; the app has neither.
-# Drop when moving to Spring Boot 4.
+# Drop when moving to Spring Boot 4, together with `allow-ghsas` in the Dependency Review step of ci.yml.
 CVE-2026-47884 exp:2027-04-01
 CVE-2026-47890 exp:2027-04-01

@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RestController
 
 /**
- * Serves the push notification admin dashboard. These files are public and hold no data: the
- * page signs in at `/admin/session` and reads `/admin/notifications/` with the session cookie.
+ * Serves the admin dashboards (push notifications, support inbox). These files are public and hold no data: the
+ * pages sign in at `/admin/session` and read `/admin/...` with the session cookie.
  */
 @Hidden
 @RestController
@@ -25,6 +25,13 @@ class NotificationDashboardController {
 
     @GetMapping("/admin-ui/notifications.css", produces = ["text/css"])
     fun styles(): ResponseEntity<Resource> = serve("notifications.css", MediaType.parseMediaType("text/css"))
+
+    /** Support inbox; shares the dashboard stylesheet and session sign-in. */
+    @GetMapping("/admin-ui/support", produces = [MediaType.TEXT_HTML_VALUE])
+    fun supportPage(): ResponseEntity<Resource> = serve("support.html", MediaType.TEXT_HTML)
+
+    @GetMapping("/admin-ui/support.js", produces = ["text/javascript"])
+    fun supportScript(): ResponseEntity<Resource> = serve("support.js", MediaType.parseMediaType("text/javascript"))
 
     private fun serve(file: String, type: MediaType): ResponseEntity<Resource> =
         ResponseEntity.ok()

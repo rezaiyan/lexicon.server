@@ -23,6 +23,17 @@
         "required" : [ "accuracyPercent", "correctCount", "level", "totalReviews" ],
         "type" : "object"
       },
+      "AdminSupportReplyRequest" : {
+        "properties" : {
+          "body" : {
+            "maxLength" : 4000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "body" ],
+        "type" : "object"
+      },
       "ApiResponseAppConfigDto" : {
         "properties" : {
           "code" : {
@@ -727,6 +738,27 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListSupportThreadSummaryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportThreadSummaryDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListTagDto" : {
         "properties" : {
           "code" : {
@@ -1061,6 +1093,94 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/SuggestVocabularyResponse"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportMessageDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportMessagesDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportMessagesDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportThreadDetailDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportThreadDetailDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportThreadSummaryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportThreadSummaryDto"
             }, {
               "type" : "null"
             } ]
@@ -2909,6 +3029,22 @@
         "required" : [ "body", "title" ],
         "type" : "object"
       },
+      "SendSupportMessageRequest" : {
+        "properties" : {
+          "body" : {
+            "maxLength" : 4000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "clientMessageId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "body" ],
+        "type" : "object"
+      },
       "SettingsDto" : {
         "properties" : {
           "dailyReminderTime" : {
@@ -3117,6 +3253,103 @@
           }
         },
         "required" : [ "currentLevel", "items", "nativeLanguage", "targetLanguage" ],
+        "type" : "object"
+      },
+      "SupportMessageDto" : {
+        "properties" : {
+          "body" : {
+            "type" : "string"
+          },
+          "clientMessageId" : {
+            "type" : [ "string", "null" ]
+          },
+          "createdAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sender" : {
+            "enum" : [ "USER", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "body", "createdAt", "id", "sender" ],
+        "type" : "object"
+      },
+      "SupportMessagesDto" : {
+        "properties" : {
+          "messages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            },
+            "type" : "array"
+          },
+          "unreadCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "messages", "unreadCount" ],
+        "type" : "object"
+      },
+      "SupportStatusRequest" : {
+        "properties" : {
+          "status" : {
+            "enum" : [ "OPEN", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "status" ],
+        "type" : "object"
+      },
+      "SupportThreadDetailDto" : {
+        "properties" : {
+          "messages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            },
+            "type" : "array"
+          },
+          "thread" : {
+            "$ref" : "#/components/schemas/SupportThreadSummaryDto"
+          }
+        },
+        "required" : [ "messages", "thread" ],
+        "type" : "object"
+      },
+      "SupportThreadSummaryDto" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessageAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessagePreview" : {
+            "type" : [ "string", "null" ]
+          },
+          "lastSender" : {
+            "enum" : [ "USER", "ADMIN" ],
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "OPEN", "CLOSED" ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userLabel" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "lastMessageAt", "status", "userId", "userLabel" ],
         "type" : "object"
       },
       "SuppressedUsersDto" : {
@@ -3514,6 +3747,72 @@
           }
         },
         "required" : [ "createdAt", "id", "name", "updatedAt", "wordCount" ],
+        "type" : "object"
+      },
+      "TelegramChat" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id" ],
+        "type" : "object"
+      },
+      "TelegramMessage" : {
+        "properties" : {
+          "chat" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramChat"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "from" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramUser"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reply_to_message" : {
+            "$ref" : "#/components/schemas/TelegramMessage"
+          },
+          "text" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "message_id" ],
+        "type" : "object"
+      },
+      "TelegramUpdate" : {
+        "properties" : {
+          "message" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramMessage"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "update_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "update_id" ],
+        "type" : "object"
+      },
+      "TelegramUser" : {
+        "properties" : {
+          "is_bot" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "is_bot" ],
         "type" : "object"
       },
       "TrackEventRequest" : {
@@ -4593,6 +4892,125 @@
           }
         },
         "tags" : [ "subscription-admin-controller" ]
+      }
+    },
+    "/admin/support/threads" : {
+      "get" : {
+        "operationId" : "listThreads",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListSupportThreadSummaryDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}" : {
+      "get" : {
+        "operationId" : "getThread",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportThreadDetailDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}/messages" : {
+      "post" : {
+        "operationId" : "reply",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminSupportReplyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessageDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}/status" : {
+      "post" : {
+        "operationId" : "setStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SupportStatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportThreadSummaryDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
       }
     },
     "/api/v1/ai/extract-vocabulary" : {
@@ -5922,6 +6340,93 @@
         "tags" : [ "subscription-controller" ]
       }
     },
+    "/api/v1/support/messages" : {
+      "get" : {
+        "operationId" : "getMessages",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessagesDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
+      },
+      "post" : {
+        "operationId" : "sendMessage",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SendSupportMessageRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessageDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
+      }
+    },
+    "/api/v1/support/read" : {
+      "post" : {
+        "operationId" : "markRead",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
+      }
+    },
     "/api/v1/tags" : {
       "get" : {
         "operationId" : "list_1",
@@ -6293,6 +6798,36 @@
           }
         },
         "tags" : [ "webhook-controller" ]
+      }
+    },
+    "/api/v1/webhooks/telegram" : {
+      "post" : {
+        "operationId" : "onUpdate",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Telegram-Bot-Api-Secret-Token",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TelegramUpdate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : { },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "telegram-webhook-controller" ]
       }
     },
     "/api/v1/word-rush/history" : {

@@ -176,6 +176,7 @@ app:
       telegram:
         bot-token: ${TELEGRAM_ADMIN_BOT_TOKEN:}
         chat-id: ${TELEGRAM_ADMIN_CHAT_ID:}
+        webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
 
   geolocation:
     database-path: ${GEOLITE2_COUNTRY_DB_PATH:}

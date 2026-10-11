@@ -34,6 +34,8 @@ class ModularityTest {
         "shared" to setOf(),
         "study" to setOf("notification", "user", "words"),
         "subscription" to setOf("user"),
+        // Pushes support replies to the user; reads the user's display name and email for the admin label
+        "support" to setOf("notification", "user"),
         "user" to setOf("auth", "notification", "study", "subscription"),
         "wordrush" to setOf("user"),
         "words" to setOf("user"),

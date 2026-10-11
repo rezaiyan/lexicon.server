@@ -26,6 +26,13 @@ class RateLimitConfig(private val appProperties: AppProperties) {
         return Bucket.builder().addLimit(limit).build()
     }
     
+    /** Support chat messages per user: 10 per minute, enough to chat, too few to flood the admin. */
+    fun getSupportBucket(userId: Long): Bucket =
+        cache.computeIfAbsent("support_$userId") {
+            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
+            Bucket.builder().addLimit(limit).build()
+        }
+
     /**
      * Get rate limit bucket for subscription sync (calls RevenueCat's API)
      * Limit: 2 syncs per minute per user

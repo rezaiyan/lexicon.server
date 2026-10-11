@@ -122,7 +122,9 @@ data class NotificationsConfig(
 
 data class TelegramConfig(
     var botToken: String = "",
-    var chatId: String = ""
+    var chatId: String = "",
+    /** Telegram echoes it in `X-Telegram-Bot-Api-Secret-Token`; blank rejects every webhook call. */
+    var webhookSecret: String = ""
 )
 
 data class GeoLocationConfig(

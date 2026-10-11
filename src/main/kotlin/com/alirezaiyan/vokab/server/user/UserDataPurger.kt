@@ -39,6 +39,8 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "word_rush_games" to "DELETE FROM word_rush_games WHERE user_id = :userId",
             "listening_session_words" to "DELETE FROM listening_session_words WHERE user_id = :userId",
             "listening_sessions" to "DELETE FROM listening_sessions WHERE user_id = :userId",
+            // support_messages go with their thread (ON DELETE CASCADE)
+            "support_threads" to "DELETE FROM support_threads WHERE user_id = :userId",
             "refresh_tokens" to "DELETE FROM refresh_tokens WHERE user_id = :userId",
             "push_tokens" to "DELETE FROM push_tokens WHERE user_id = :userId",
             "daily_insights" to "DELETE FROM daily_insights WHERE user_id = :userId",

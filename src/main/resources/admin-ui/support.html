@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Support Inbox</title>
+<link rel="stylesheet" href="/admin-ui/notifications.css">
+</head>
+<body>
+<header>
+  <h1>Support Inbox</h1>
+  <div id="sessionBar" class="session hidden">
+    <a href="/admin-ui/notifications" class="small">Push notifications →</a>
+    <span class="muted" id="sessionInfo"></span>
+    <button type="button" id="signOut">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div id="globalMsg" class="banner hidden" role="status"></div>
+
+  <section id="signIn" class="card signin hidden">
+    <h2>Sign in</h2>
+    <p class="muted">Enter the server's admin key (<span class="mono">app.security.admin-api-key</span>).
+      It is exchanged for a 4-hour session cookie and is not stored in the browser.</p>
+    <form id="signInForm" autocomplete="off">
+      <label for="adminKey">Admin key</label>
+      <input id="adminKey" type="password" required autocomplete="current-password">
+      <button type="submit" class="primary mt12">Sign in</button>
+    </form>
+  </section>
+
+  <div id="app" class="hidden inbox">
+    <section class="card">
+      <div class="row between mb12">
+        <h2 class="m0 fixed">Threads</h2>
+        <div class="seg fixed" role="group" aria-label="Filter">
+          <button type="button" data-filter="OPEN" aria-pressed="true">Open</button>
+          <button type="button" data-filter="ALL" aria-pressed="false">All</button>
+        </div>
+      </div>
+      <ul id="threads" class="threads"></ul>
+      <p id="noThreads" class="muted hidden">No conversations yet.</p>
+    </section>
+
+    <section class="card">
+      <div id="emptyThread" class="muted">Pick a conversation.</div>
+      <div id="thread" class="hidden">
+        <div class="row between mb12">
+          <div class="grow">
+            <h2 class="m0" id="threadTitle"></h2>
+            <div class="small muted" id="threadMeta"></div>
+          </div>
+          <button type="button" id="toggleStatus" class="fixed"></button>
+        </div>
+        <div id="chat" class="chat mb12" aria-live="polite"></div>
+        <form id="replyForm">
+          <label for="replyBody">Reply (also posted to the Telegram admin chat)</label>
+          <textarea id="replyBody" maxlength="4000" required></textarea>
+          <button type="submit" class="primary mt12">Send reply</button>
+        </form>
+      </div>
+    </section>
+  </div>
+</main>
+<script src="/admin-ui/support.js"></script>
+</body>
+</html>

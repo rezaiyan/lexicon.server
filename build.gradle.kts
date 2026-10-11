@@ -1,10 +1,13 @@
-// The Spring Boot Gradle plugin brings Jackson onto the build classpath at the BOM's version; keep
-// it on the same patched release as the app (extra["jackson-bom.version"] below)
+// The Spring Boot Gradle plugin brings Jackson and Apache HttpClient onto the build classpath at
+// older versions; keep them on the same patched releases as the app (the extra[...] overrides below)
 buildscript {
 	configurations.classpath {
 		resolutionStrategy.eachDependency {
-			if (requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations") {
-				useVersion("2.21.7")
+			when {
+				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
+					useVersion("2.21.7")
+				requested.group == "org.apache.httpcomponents.client5" -> useVersion("5.6.4")
+				requested.group == "org.apache.httpcomponents.core5" -> useVersion("5.4.3")
 			}
 		}
 	}

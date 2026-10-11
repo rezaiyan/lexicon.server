@@ -2,7 +2,7 @@
 # Multi-stage build. CI builds and publishes this image to GHCR; the VPS only pulls it.
 
 # Stage 1: Build
-FROM eclipse-temurin:21-jdk AS builder
+FROM eclipse-temurin:25-jdk AS builder
 
 WORKDIR /app
 
@@ -31,7 +31,7 @@ RUN --mount=type=cache,target=/app/.gradle/caches \
  && java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 # Set by CI (docker/metadata-action); shown by `docker inspect` to tell which commit is running
 ARG GIT_SHA=unknown

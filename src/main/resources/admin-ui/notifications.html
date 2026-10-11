@@ -122,6 +122,75 @@
       </table></div>
       <p class="muted hidden" id="sendResultTrunc">Only the first 200 recipients are listed.</p>
     </div>
+
+    <div class="card" id="cheatsheet">
+      <h2>Cheat sheet: data keys the app understands</h2>
+      <p class="muted">What the current app does when someone taps the push. Click <strong>Use</strong> to add the
+        key to the data payload above. Without any of these, a tap just opens the app.</p>
+
+      <h3>Deep links: key <span class="mono">deep_link</span></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Value</th><th>Tap opens</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="mono">vokab://review</td><td>A review of the user's due cards</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://review">Use</button></td></tr>
+          <tr><td class="mono">vokab://review/due</td><td>Same as above (any <span class="mono">vokab://review/…</span> works)</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://review/due">Use</button></td></tr>
+          <tr><td class="mono">vokab://words/add</td><td>The add-words screen</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://words/add">Use</button></td></tr>
+          <tr><td class="mono">vokab://insights</td><td>The Insights screen</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://insights">Use</button></td></tr>
+          <tr><td class="mono">vokab://stats/weekly</td><td>The Insights screen (any <span class="mono">vokab://stats/…</span>)</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://stats/weekly">Use</button></td></tr>
+          <tr><td class="mono">vokab://word/{wordId}</td><td>A review of that one word. The id is the user's own word id, so
+            only use it when sending to one user; a non-numeric id opens the Words tab</td>
+            <td><button type="button" data-use-key="deep_link" data-use-value="vokab://word/">Use</button></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted small">Any other link is ignored and the tap only opens the app. There are no links yet for Word Rush,
+        Listening, the subscription screen or settings; those need an app update first.</p>
+
+      <h3>Type: key <span class="mono">type</span></h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Value</th><th>Effect</th><th></th></tr></thead>
+        <tbody>
+          <tr><td class="mono">review_reminder</td><td>Tap opens the due-card review, ignoring any <span class="mono">deep_link</span>.
+            On iOS it also gets the review-reminder notification style</td>
+            <td><button type="button" data-use-key="type" data-use-value="review_reminder">Use</button></td></tr>
+          <tr><td class="mono">streak_reminder</td><td>iOS shows it with the streak-reminder notification style; the tap follows
+            <span class="mono">deep_link</span></td>
+            <td><button type="button" data-use-key="type" data-use-value="streak_reminder">Use</button></td></tr>
+          <tr><td class="mono">announcement</td><td>Any other value: no special handling, but it labels the push in your own
+            data. A good choice for one-off messages</td>
+            <td><button type="button" data-use-key="type" data-use-value="announcement">Use</button></td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted small">Blocked for manual sends: <span class="mono">billing_issue</span> (opens the subscription screen),
+        <span class="mono">subscription_updated</span> (silent refetch) and <span class="mono">account_deleted</span>.</p>
+
+      <h3>Set by the server: don't add these</h3>
+      <div class="table-wrap"><table>
+        <tbody>
+          <tr><td class="mono">notification_log_id</td><td>Added to every manual push so taps count as opens in History</td></tr>
+          <tr><td class="mono">category</td><td>Added by the message builder (<span class="mono">system</span>)</td></tr>
+        </tbody>
+      </table></div>
+
+      <h3>Ready-made combinations</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Goal</th><th>Data</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>Bring people back to review</td><td class="mono">type=review_reminder</td>
+            <td><button type="button" data-preset="review">Use</button></td></tr>
+          <tr><td>Get new users to add words</td><td class="mono">type=announcement, deep_link=vokab://words/add</td>
+            <td><button type="button" data-preset="add">Use</button></td></tr>
+          <tr><td>Show off progress / insights</td><td class="mono">type=announcement, deep_link=vokab://insights</td>
+            <td><button type="button" data-preset="insights">Use</button></td></tr>
+          <tr><td>Plain announcement (opens the app)</td><td class="mono">type=announcement</td>
+            <td><button type="button" data-preset="plain">Use</button></td></tr>
+        </tbody>
+      </table></div>
+    </div>
   </section>
 
   <!-- History -->

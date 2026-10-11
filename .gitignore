@@ -86,3 +86,6 @@ docker-compose.override.yml
 *.backup
 PRODUCTION_GOOGLE_AUTH_CHECKLIST.md
 local.properties
+
+### Database dumps (scripts/backup-db.sh) ###
+backups/

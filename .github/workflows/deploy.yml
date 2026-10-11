@@ -1,0 +1,93 @@
+name: Deploy
+
+# Ships the image CI published for a main commit to the VPS: pull, restart the app, wait for its
+# health check, roll back on failure (scripts/deploy.sh).
+#
+# Off until the repository variable DEPLOY_ENABLED is "true". Needs the production environment
+# secrets DEPLOY_HOST, DEPLOY_USER, DEPLOY_SSH_KEY, DEPLOY_KNOWN_HOSTS and the variable
+# DEPLOY_PATH. See docs/deployment.md.
+
+on:
+  workflow_run:
+    workflows: [ CI ]
+    types: [ completed ]
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Image tag to deploy: sha-<commit> (to roll back) or latest"
+        required: true
+        default: latest
+
+# One deploy at a time, and a queued one never cancels a deploy in flight
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: >-
+      vars.DEPLOY_ENABLED == 'true' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    environment:
+      name: production
+      url: https://lexicon.alirezaiyan.com/api/v1/health
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Pick the image tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ]; then
+            tag="$INPUT_TAG"
+          else
+            tag="sha-${RUN_SHA::7}"
+          fi
+          if ! [[ "$tag" =~ ^(latest|sha-[0-9a-f]{7,40}|v[0-9][0-9A-Za-z.-]*)$ ]]; then
+            echo "::error::Unexpected tag '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "Deploying $tag"
+
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # The script is streamed from this commit, so the VPS needs no copy of it
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes "$USER@$HOST" \
+            "cd '$DEPLOY_PATH' && bash -s -- '$TAG'" < scripts/deploy.sh
+
+      - name: Check the public endpoint
+        run: |
+          for _ in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://lexicon.alirezaiyan.com/api/v1/health || true)
+            [ "$code" = 200 ] && { echo "Public health check OK"; exit 0; }
+            sleep 6
+          done
+          echo "::error::https://lexicon.alirezaiyan.com/api/v1/health did not return 200 (last: $code)"
+          exit 1

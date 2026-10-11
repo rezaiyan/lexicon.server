@@ -46,3 +46,6 @@ firebase-service-account.json
 tmp/
 temp/
 
+
+# Database dumps and deploy state
+backups/

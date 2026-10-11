@@ -22,6 +22,9 @@ services:
 
   # Lexicon Server Application
   app:
+    # CI publishes this image for every main commit; scripts/deploy.sh sets APP_IMAGE_TAG in .env.
+    # `docker compose build app` still builds it locally from the Dockerfile.
+    image: ghcr.io/rezaiyan/lexicon.server:${APP_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile

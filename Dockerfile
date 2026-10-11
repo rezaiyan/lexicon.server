@@ -1,4 +1,5 @@
-# Multi-stage build for optimized Docker image
+# syntax=docker/dockerfile:1
+# Multi-stage build. CI builds and publishes this image to GHCR; the VPS only pulls it.
 
 # Stage 1: Build
 FROM eclipse-temurin:21-jdk AS builder
@@ -15,19 +16,27 @@ COPY gradlew build.gradle.kts settings.gradle.kts gradle.properties ./
 RUN sed -i '/org.gradle.java.home/d' gradle.properties
 COPY gradle gradle
 
-# Download dependencies (cached layer) — ignore failure due to missing sources
-RUN ./gradlew build --no-daemon || true
+# Resolve dependencies in their own layer, so a code-only change reuses it. The cache mount keeps
+# Gradle's download cache across builds without baking it into the image.
+RUN --mount=type=cache,target=/app/.gradle/caches \
+    ./gradlew dependencies --configuration runtimeClasspath --no-daemon -q > /dev/null
 
 # Copy source code
 COPY src src
 
-# Build the boot jar, then split it into layers ordered from least to most frequently changed,
-# so a code-only deploy rebuilds and ships just the small application layer
-RUN ./gradlew bootJar --no-daemon \
+# Build the boot jar (tests, detekt and coverage already ran in CI), then split it into layers
+# ordered from least to most frequently changed, so a code-only deploy ships just the app layer
+RUN --mount=type=cache,target=/app/.gradle/caches \
+    ./gradlew bootJar --no-daemon \
  && java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
 FROM eclipse-temurin:21-jre-alpine
+
+# Set by CI (docker/metadata-action); shown by `docker inspect` to tell which commit is running
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/rezaiyan/lexicon.server" \
+      org.opencontainers.image.revision="${GIT_SHA}"
 
 WORKDIR /app
 

@@ -168,6 +168,21 @@ class ManualPushServiceTest {
     }
 
     @Test
+    fun `server-owned data keys are rejected`() {
+        val request = request(userIds = listOf(1L)).copy(data = mapOf(NOTIFICATION_LOG_ID_KEY to "1"))
+
+        assertThrows<IllegalArgumentException> { service.send(request) }
+        verify(exactly = 0) { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `types that trigger account or billing behaviour in the app are rejected`() {
+        val request = request(userIds = listOf(1L)).copy(data = mapOf("type" to "billing_issue"))
+
+        assertThrows<IllegalArgumentException> { service.send(request) }
+    }
+
+    @Test
     fun `specific-user audience needs at least one target`() {
         assertThrows<IllegalArgumentException> { service.send(request()) }
     }

@@ -144,6 +144,43 @@
     $("dataRows").appendChild(row);
   }
   $("addData").addEventListener("click", () => addDataRow());
+
+  // Cheat sheet: set a key in the data payload, reusing its row if present or an empty one
+  function setDataKey(key, value) {
+    const rows = [...document.querySelectorAll("#dataRows .data-row")];
+    const row = rows.find((r) => r.querySelector(".dk").value.trim() === key)
+      || rows.find((r) => !r.querySelector(".dk").value.trim() && !r.querySelector(".dv").value.trim());
+    if (row) {
+      row.querySelector(".dk").value = key;
+      row.querySelector(".dv").value = value;
+      return row;
+    }
+    addDataRow(key, value);
+    return $("dataRows").lastElementChild;
+  }
+  const PRESETS = {
+    review: { type: "review_reminder" },
+    add: { type: "announcement", deep_link: "vokab://words/add" },
+    insights: { type: "announcement", deep_link: "vokab://insights" },
+    plain: { type: "announcement" },
+  };
+  $("cheatsheet").addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-use-key], button[data-preset]");
+    if (!btn) return;
+    let row;
+    if (btn.dataset.preset) {
+      document.querySelectorAll("#dataRows .data-row").forEach((r) => {
+        if (r.querySelector(".dk").value.trim() === "deep_link") r.remove();
+      });
+      Object.entries(PRESETS[btn.dataset.preset]).forEach(([k, v]) => { row = setDataKey(k, v); });
+    } else {
+      row = setDataKey(btn.dataset.useKey, btn.dataset.useValue);
+    }
+    $("dataRows").scrollIntoView({ behavior: "smooth", block: "center" });
+    const input = row && row.querySelector(".dv");
+    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+    flash(`Data payload updated: ${btn.dataset.useKey || btn.dataset.preset}`, "ok");
+  });
   function updatePreview() {
     $("pvTitle").textContent = $("title").value || "Title";
     $("pvBody").textContent = $("body").value || "Body";

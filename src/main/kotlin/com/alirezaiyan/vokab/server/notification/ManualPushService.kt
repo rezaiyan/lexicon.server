@@ -27,6 +27,11 @@ class ManualPushService(
     private val meterRegistry: MeterRegistry,
 ) {
     fun send(request: ManualPushRequest): ManualPushResultDto {
+        val reserved = request.data.keys.filter { it in RESERVED_DATA_KEYS }
+        require(reserved.isEmpty()) { "Data keys set by the server can't be overridden: ${reserved.joinToString()}" }
+        val type = request.data["type"]
+        require(type !in BLOCKED_TYPES) { "type=$type triggers account or billing behaviour in the app" }
+
         val targets = resolveTargets(request)
         val optedOut =
             if (request.respectOptOut) userSettingsRepository.findNotificationOptedOutUserIds() else emptySet()
@@ -130,6 +135,16 @@ class ManualPushService(
 
     companion object {
         private const val MAX_REPORTED_RECIPIENTS = 200
+
+        /** Filled in per send: the open-tracking log id, and the category the message builder adds. */
+        val RESERVED_DATA_KEYS = setOf(NOTIFICATION_LOG_ID_KEY, "category")
+
+        /** `type` values the app acts on beyond showing the push (see the dashboard cheat sheet). */
+        val BLOCKED_TYPES = setOf(
+            NotificationEventListeners.BILLING_ISSUE_PUSH_TYPE,
+            NotificationEventListeners.SUBSCRIPTION_UPDATED_PUSH_TYPE,
+            "account_deleted",
+        )
         private val DELIVERED_OUTCOMES = setOf(ManualPushOutcome.SENT, ManualPushOutcome.WOULD_SEND)
     }
 }

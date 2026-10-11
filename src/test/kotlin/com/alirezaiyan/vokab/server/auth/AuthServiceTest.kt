@@ -5,8 +5,7 @@ import com.alirezaiyan.vokab.server.shared.AuthRejectedException
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.withAssignedId
 import com.alirezaiyan.vokab.server.TEST_NOW
-import com.alirezaiyan.vokab.server.shared.CiAuthConfig
-import com.alirezaiyan.vokab.server.shared.SecurityConfig
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import io.mockk.every
@@ -38,6 +37,19 @@ class AuthServiceTest : AuthServiceTestFixture() {
 
         // Subscription columns are not updatable through save(); the targeted update must run.
         verify { userRepository.updateSubscription(61L, SubscriptionStatus.FREE, null, any()) }
+    }
+
+    @Test
+    fun `authenticateForCi with premium grants premium even when the CI email is not a test email`() {
+        val existingUser = createUser(id = 62L, email = "ci@test.vokab.dev", subscriptionStatus = SubscriptionStatus.FREE)
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existingUser)
+
+        authService.authenticateForCi(premium = true)
+
+        verify { userRepository.updateGrant(62L, match { it.isAfter(TEST_NOW) }, "ci_test", any()) }
+        assertEquals("ci_test", existingUser.premiumGrantReason)
     }
 
     @Test
@@ -95,17 +107,9 @@ class AuthServiceTest : AuthServiceTestFixture() {
     }
 
     @Test
-    fun `authenticateForCi should grant premium access when CI user email is in test emails list`() {
-        // Arrange
-        val testEmail = "ci@test.vokab.dev"
-        val propertiesWithTestEmail = appProperties.copy(
-            security = SecurityConfig(testEmails = testEmail)
-        )
-        every { appConfigService.getTestEmails() } returns setOf(testEmail)
-        val service = buildServiceWith(propertiesWithTestEmail)
-
-        val existingUser = createUser(id = 20L, email = testEmail)
-        every { userRepository.findByEmail(testEmail) } returns Optional.of(existingUser)
+    fun `authenticateForCi premium grant leaves store subscription state alone`() {
+        val existingUser = createUser(id = 20L, email = "ci@test.vokab.dev")
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
         var savedUser: User? = null
         every { userRepository.save(any()) } answers {
             savedUser = firstArg()
@@ -113,15 +117,13 @@ class AuthServiceTest : AuthServiceTestFixture() {
         }
         stubTokenGeneration(existingUser)
 
-        // Act
-        service.authenticateForCi()
+        authService.authenticateForCi()
 
-        // Assert
         assertNotNull(savedUser)
-        assertEquals("test_email", savedUser!!.premiumGrantReason)
+        assertEquals("ci_test", savedUser!!.premiumGrantReason)
         assertNotNull(savedUser!!.premiumGrantUntil)
         assertEquals(SubscriptionStatus.FREE, savedUser!!.subscriptionStatus) // grants never touch store state
-        verify { userRepository.updateGrant(20L, any(), "test_email", any()) }
+        verify(exactly = 0) { userRepository.updateSubscription(any(), any(), any(), any()) }
     }
 
     @Test
@@ -323,96 +325,55 @@ class AuthServiceTest : AuthServiceTestFixture() {
         verify { userRepository.save(match { it.email == "real@example.com" }) }
     }
 
-    // ── TestAccessPolicy (via authenticateForCi) ──────────────────────────────
+    // ── TestAccessPolicy (test-email list, applied on interactive sign-in) ────
+
+    private fun policy() = TestAccessPolicy(userRepository, appConfigService, fixedClock())
 
     @Test
     fun `test access policy should set subscription to ACTIVE with far-future expiry`() {
-        // Arrange
-        val testEmail = "premium@test.example"
-        val propertiesWithTestEmail = appProperties.copy(
-            ciAuth = CiAuthConfig(enabled = true, secret = "", testEmail = testEmail),
-            security = SecurityConfig(testEmails = testEmail)
-        )
-        every { appConfigService.getTestEmails() } returns setOf(testEmail)
-        val service = buildServiceWith(propertiesWithTestEmail)
+        every { appConfigService.getTestEmails() } returns setOf("premium@test.example")
+        val user = createUser(id = 50L, email = "premium@test.example", subscriptionStatus = SubscriptionStatus.FREE)
 
-        val existingUser = createUser(id = 50L, email = testEmail,
-            subscriptionStatus = SubscriptionStatus.FREE)
-        every { userRepository.findByEmail(testEmail) } returns Optional.of(existingUser)
-        var savedUser: User? = null
-        every { userRepository.save(any()) } answers {
-            savedUser = firstArg()
-            firstArg()
-        }
-        stubTokenGeneration(existingUser)
+        val result = policy().applyTo(user)
 
-        // Act
-        service.authenticateForCi()
-
-        // Assert
-        assertNotNull(savedUser)
-        assertEquals("test_email", savedUser!!.premiumGrantReason)
+        assertEquals("test_email", result.premiumGrantReason)
         // Grant should last roughly 100 years — at least 50 years in the future
         val fiftyYearsFromNow = TEST_NOW.plusSeconds(50L * 365 * 24 * 3600)
-        assert(savedUser!!.premiumGrantUntil!!.isAfter(fiftyYearsFromNow)) {
+        assert(result.premiumGrantUntil!!.isAfter(fiftyYearsFromNow)) {
             "Expected grant to last far into the future"
         }
+        verify { userRepository.updateGrant(50L, any(), "test_email", any()) }
     }
 
     @Test
     fun `test access policy should handle multiple test emails in comma-separated list`() {
-        // Arrange
-        val targetEmail = "ci@test.vokab.dev"
-        val propertiesWithMultipleTestEmails = appProperties.copy(
-            security = SecurityConfig(testEmails = "other@test.com, $targetEmail, another@test.com")
-        )
-        every { appConfigService.getTestEmails() } returns setOf("other@test.com", targetEmail, "another@test.com")
-        val service = buildServiceWith(propertiesWithMultipleTestEmails)
+        every { appConfigService.getTestEmails() } returns setOf("other@test.com", "tester@test.com", "another@test.com")
+        val user = createUser(id = 51L, email = "tester@test.com", subscriptionStatus = SubscriptionStatus.FREE)
 
-        val existingUser = createUser(id = 51L, email = targetEmail,
-            subscriptionStatus = SubscriptionStatus.FREE)
-        every { userRepository.findByEmail(targetEmail) } returns Optional.of(existingUser)
-        var savedUser: User? = null
-        every { userRepository.save(any()) } answers {
-            savedUser = firstArg()
-            firstArg()
-        }
-        stubTokenGeneration(existingUser)
+        val result = policy().applyTo(user)
 
-        // Act
-        service.authenticateForCi()
-
-        // Assert
-        assertNotNull(savedUser)
-        assertEquals("test_email", savedUser!!.premiumGrantReason)
+        assertEquals("test_email", result.premiumGrantReason)
     }
 
     @Test
     fun `test grant is revoked when email is removed from the test list`() {
-        val existingUser = createUser(id = 52L, email = "ci@test.vokab.dev")
+        val user = createUser(id = 52L, email = "tester@test.com")
             .also { it.mirrorGrant(TEST_NOW.plusSeconds(86400), "test_email") }
         every { appConfigService.getTestEmails() } returns emptySet()
-        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
-        var savedUser: User? = null
-        every { userRepository.save(any()) } answers { savedUser = firstArg(); firstArg() }
-        stubTokenGeneration(existingUser)
 
-        authService.authenticateForCi()
+        val result = policy().applyTo(user)
 
-        assertNull(savedUser!!.premiumGrantUntil)
+        assertNull(result.premiumGrantUntil)
         verify { userRepository.updateGrant(52L, null, null, any()) }
     }
 
     @Test
     fun `legacy or manual grants are not revoked by the test list`() {
-        val existingUser = createUser(id = 53L, email = "ci@test.vokab.dev")
+        val user = createUser(id = 53L, email = "tester@test.com")
             .also { it.mirrorGrant(TEST_NOW.plusSeconds(86400), "legacy_grant") }
         every { appConfigService.getTestEmails() } returns emptySet()
-        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(existingUser)
-        every { userRepository.save(any()) } answers { firstArg() }
-        stubTokenGeneration(existingUser)
 
-        authService.authenticateForCi()
+        policy().applyTo(user)
 
         verify(exactly = 0) { userRepository.updateGrant(any(), any(), any(), any()) }
     }

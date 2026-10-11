@@ -75,7 +75,7 @@ class UserProvisioning(
             ?.also { it.recordLogin(now) }
             ?: User(email = email, name = "CI Test User", lastLoginAt = now)
                 .also { logger.info { "Creating new CI test user" } }
-        return save(if (premium) testAccessPolicy.applyTo(user) else testAccessPolicy.stripPremium(user))
+        return save(if (premium) testAccessPolicy.grantForCi(user) else testAccessPolicy.stripPremium(user))
     }
 
     /** Best effort: an unknown platform or a failed write never blocks sign-in. */

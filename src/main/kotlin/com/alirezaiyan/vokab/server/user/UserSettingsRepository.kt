@@ -16,4 +16,13 @@ interface UserSettingsRepository : JpaRepository<UserSettings, Long> {
             "WHERE s.notificationsEnabled = false OR s.notificationFrequency = 'OFF'"
     )
     fun findNotificationOptedOutUserIds(): Set<Long>
+
+    /** Users a push could reach (active account, active token) who switched notifications off. */
+    @Query(
+        "SELECT COUNT(DISTINCT s.user.id) FROM UserSettings s " +
+            "WHERE (s.notificationsEnabled = false OR s.notificationFrequency = 'OFF') " +
+            "AND s.user.active = true " +
+            "AND EXISTS (SELECT p FROM PushToken p WHERE p.user = s.user AND p.active = true)"
+    )
+    fun countReachableOptedOutUsers(): Long
 }

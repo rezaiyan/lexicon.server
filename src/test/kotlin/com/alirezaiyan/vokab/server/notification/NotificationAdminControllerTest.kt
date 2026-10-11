@@ -57,6 +57,25 @@ class NotificationAdminControllerTest {
     }
 
     @Test
+    fun `stats come from the engagement service`() {
+        `when`(notificationEngagementService.getAdminStats()).thenReturn(
+            NotificationAdminStatsDto(
+                totalActiveSchedules = 3,
+                suppressedUsers = SuppressedUsersDto(day3 = 1, day7 = 0, day14 = 0, day30 = 0),
+                last7Days = Last7DaysDto(totalSent = 10, totalOpened = 4, openRatePercent = 40, typeBreakdown = emptyMap()),
+            )
+        )
+
+        mockMvc.get("/admin/notifications/stats") {
+            with(authentication(admin))
+        }.andExpect {
+            status { isOk() }
+            jsonPath("$.data.totalActiveSchedules") { value(3) }
+            jsonPath("$.data.last7Days.openRatePercent") { value(40) }
+        }
+    }
+
+    @Test
     fun `send passes the request through and returns the result`() {
         `when`(manualPushService.send(anyArg())).thenReturn(
             ManualPushResultDto(

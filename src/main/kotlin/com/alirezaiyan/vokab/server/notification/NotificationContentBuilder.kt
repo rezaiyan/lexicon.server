@@ -50,6 +50,7 @@ class NotificationContentBuilder(
             ADD_WORDS          -> buildAddWords()
             WORD_RUSH,
             LISTENING          -> buildPracticeNudge(user, type)
+            COMEBACK_RESCUE    -> error("Comeback rescue pushes are built from their plan by RescuePushBuilder")
             NONE               -> error("Should not build payload for NONE type")
         }
     }

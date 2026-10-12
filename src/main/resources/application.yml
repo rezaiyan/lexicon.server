@@ -76,6 +76,10 @@ spring.servlet.multipart:
   max-request-size: 6MB
 
 app:
+  comeback-rescue:
+    # Shadow mode until the P3 taste test passes: plans are built nightly, never sent
+    send-enabled: ${COMEBACK_RESCUE_SEND_ENABLED:false}
+
   avatar:
     upload-dir: ${AVATAR_UPLOAD_DIR:/var/www/uploads/avatars}
     base-url: ${AVATAR_BASE_URL:}

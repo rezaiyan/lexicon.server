@@ -54,7 +54,8 @@ object RescueCopyLinter {
         val unknownFacts = c.factIds.filter { id -> ctx.factSheet.facts.none { it.id == id } }
         unknownFacts.forEach { v += "cites unknown fact $it" }
         val citedNumbers = ctx.factSheet.byIds(c.factIds).flatMap { NUMBER.findAll(it.text).map { m -> m.value }.toList() }.toSet()
-        NUMBER.findAll(text).map { it.value }.distinct().filter { it !in citedNumbers }.forEach { v += "ungrounded number $it" }
+        NUMBER.findAll(withoutWords(text, ctx.factSheet.allWords + ctx.sessionWords)).map { it.value }.distinct()
+            .filter { it !in citedNumbers }.forEach { v += "ungrounded number $it" }
         QUOTED.findAll(text).map { it.groupValues[1] }.filter { it !in ctx.factSheet.allWords }.forEach { v += "ungrounded word $it" }
 
         v += toneViolations(text)
@@ -69,9 +70,13 @@ object RescueCopyLinter {
     fun outroOk(outro: String?, sheet: RescueFactSheet): Boolean {
         if (outro.isNullOrBlank() || graphemes(outro) > OUTRO_MAX) return false
         val knownNumbers = sheet.facts.flatMap { NUMBER.findAll(it.text).map { m -> m.value }.toList() }.toSet()
-        if (NUMBER.findAll(outro).any { it.value !in knownNumbers }) return false
+        if (NUMBER.findAll(withoutWords(outro, sheet.allWords)).any { it.value !in knownNumbers }) return false
         return toneViolations(outro).isEmpty()
     }
+
+    /** [text] with the learner's own words blanked out, so a word like "B2" is not read as a stat. */
+    private fun withoutWords(text: String, words: Set<String>): String =
+        words.sortedByDescending { it.length }.fold(text) { acc, word -> acc.replace(word, " ", ignoreCase = true) }
 
     fun graphemes(s: String): Int {
         val it = BreakIterator.getCharacterInstance().apply { setText(s) }

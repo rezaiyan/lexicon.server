@@ -56,6 +56,16 @@ class RescueCopyLinterTest {
     }
 
     @Test
+    fun `digits inside the learner's own words are not stats`() {
+        val withDigitWord = ctx.copy(sessionWords = setOf("B2B", "Hund"))
+
+        val v = RescueCopyLinter.lint(candidate(title = "B2B, one more go"), withDigitWord)
+
+        assertEquals(emptyList<String>(), v)
+        assertTrue(RescueCopyLinter.outroOk("Gewitter: cracked. 8 for 8.", sheet))
+    }
+
+    @Test
     fun `quoted words must come from the fact sheet`() {
         val v = RescueCopyLinter.lint(candidate(body = "Gewitter and \"Blitz\" wait. 8 words, about 3 min."), ctx)
         assertTrue(v.contains("ungrounded word Blitz"))

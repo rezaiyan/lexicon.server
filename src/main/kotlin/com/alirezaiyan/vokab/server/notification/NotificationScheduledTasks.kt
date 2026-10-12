@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueScheduler
 import com.alirezaiyan.vokab.server.user.UserRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -14,6 +15,7 @@ class NotificationScheduledTasks(
     private val smartNotificationDispatcher: SmartNotificationDispatcher,
     private val reviewReminderDispatcher: ReviewReminderDispatcher,
     private val engagementSegmentScheduler: EngagementSegmentScheduler,
+    private val comebackRescueScheduler: ComebackRescueScheduler,
 ) {
     @Scheduled(cron = "0 30 0 * * *")          // 00:30 UTC nightly
     fun refreshNotificationSchedules() {
@@ -30,11 +32,22 @@ class NotificationScheduledTasks(
     @Scheduled(cron = "0 0 1 * * *")           // 01:00 UTC nightly (after timing refresh)
     fun refreshEngagementSegments() {
         logger.info { "Starting nightly engagement segment refresh" }
+        val activeUsers = try {
+            userRepository.findAllActiveUsersWithPushTokens()
+        } catch (e: Exception) {
+            logger.error(e) { "Error loading users for nightly engagement refresh" }
+            return
+        }
         try {
-            val activeUsers = userRepository.findAllActiveUsersWithPushTokens()
             engagementSegmentScheduler.refreshAll(activeUsers)
         } catch (e: Exception) {
             logger.error(e) { "Error in engagement segment refresh" }
+        }
+        // After segments, so a rescue is planned against today's state; independent failure
+        try {
+            comebackRescueScheduler.planAll(activeUsers)
+        } catch (e: Exception) {
+            logger.error(e) { "Error in comeback rescue planning" }
         }
     }
 

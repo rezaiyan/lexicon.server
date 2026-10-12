@@ -13,6 +13,7 @@ enum class AiOperation(val tag: String) {
     TRANSLATION("translation"),
     SUGGEST_VOCABULARY("suggest vocabulary"),
     NOTIFICATION_ADVICE("notification advice"),
+    COMEBACK_RESCUE("comeback rescue"),
 }
 
 /** One-shot chat completion with the configured model. */

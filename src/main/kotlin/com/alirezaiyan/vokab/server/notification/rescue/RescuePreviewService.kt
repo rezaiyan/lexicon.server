@@ -7,6 +7,7 @@ import com.alirezaiyan.vokab.server.user.requireId
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
+import java.time.Clock
 import java.time.Instant
 import kotlin.random.Random
 
@@ -35,6 +36,7 @@ class RescuePreviewService(
     private val previewRepository: RescuePreviewRepository,
     private val ratingRepository: RescueCopyRatingRepository,
     private val objectMapper: ObjectMapper,
+    private val clock: Clock,
     private val random: Random = Random.Default,
 ) {
     /** Up to [count] (max [MAX_COUNT]) previews from randomly chosen learners who have enough usable words. */
@@ -70,14 +72,15 @@ class RescuePreviewService(
 
     /** Rates one candidate of a preview, replacing any earlier rating of it. */
     fun rate(previewId: Long, candidateIndex: Int, rating: CopyRating, note: String?): RescueCopyRating {
-        val preview = previewRepository.findById(previewId).orElseThrow { NoSuchElementException("Preview not found") }
-        require(candidateIndex in 0 until candidateTitles(preview).size) { "No candidate $candidateIndex in this preview" }
+        val preview = previewRepository.findById(previewId)
+            .orElseThrow { NoSuchElementException("Preview not found") }
+        require(candidateIndex in candidateTitles(preview).indices) { "No candidate $candidateIndex in this preview" }
 
-        val existing = ratingRepository.findByPreviewIdAndCandidateIndex(previewId, candidateIndex)
-        val saved = existing ?: RescueCopyRating(previewId = previewId, candidateIndex = candidateIndex, rating = rating)
+        val saved = ratingRepository.findByPreviewIdAndCandidateIndex(previewId, candidateIndex)
+            ?: RescueCopyRating(previewId = previewId, candidateIndex = candidateIndex, rating = rating)
         saved.rating = rating
         saved.note = note?.trim()?.takeIf { it.isNotEmpty() }
-        saved.ratedAt = Instant.now()
+        saved.ratedAt = Instant.now(clock)
         return ratingRepository.save(saved)
     }
 

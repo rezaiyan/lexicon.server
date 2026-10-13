@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import com.alirezaiyan.vokab.server.TEST_NOW
+import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -23,7 +25,7 @@ class RescuePreviewServiceTest {
     private val objectMapper = ObjectMapper()
 
     private val service = RescuePreviewService(
-        planner, userRepository, previewRepository, ratingRepository, objectMapper, Random(1),
+        planner, userRepository, previewRepository, ratingRepository, objectMapper, fixedClock(), Random(1),
     )
 
     private fun user(id: Long) = User(id = id, email = "u$id@example.com", name = "U$id")
@@ -94,6 +96,7 @@ class RescuePreviewServiceTest {
 
         assertEquals(CopyRating.UP, existing.rating)
         assertEquals("warm", existing.note)
+        assertEquals(TEST_NOW, existing.ratedAt)
     }
 
     @Test

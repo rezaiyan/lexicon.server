@@ -29,25 +29,23 @@ class NotificationScheduledTasks(
         }
     }
 
+    // After the timing refresh (send hours are fresh), before the 01:00 dispatch run
+    @Scheduled(cron = "0 45 0 * * *")          // 00:45 UTC nightly
+    fun planComebackRescues() {
+        try {
+            comebackRescueScheduler.planAll()
+        } catch (e: Exception) {
+            logger.error(e) { "Error in comeback rescue planning" }
+        }
+    }
+
     @Scheduled(cron = "0 0 1 * * *")           // 01:00 UTC nightly (after timing refresh)
     fun refreshEngagementSegments() {
         logger.info { "Starting nightly engagement segment refresh" }
-        val activeUsers = try {
-            userRepository.findAllActiveUsersWithPushTokens()
-        } catch (e: Exception) {
-            logger.error(e) { "Error loading users for nightly engagement refresh" }
-            return
-        }
         try {
-            engagementSegmentScheduler.refreshAll(activeUsers)
+            engagementSegmentScheduler.refreshAll(userRepository.findAllActiveUsersWithPushTokens())
         } catch (e: Exception) {
             logger.error(e) { "Error in engagement segment refresh" }
-        }
-        // After segments, so a rescue is planned against today's state; independent failure
-        try {
-            comebackRescueScheduler.planAll(activeUsers)
-        } catch (e: Exception) {
-            logger.error(e) { "Error in comeback rescue planning" }
         }
     }
 

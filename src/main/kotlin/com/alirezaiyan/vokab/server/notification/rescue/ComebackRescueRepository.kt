@@ -11,11 +11,8 @@ interface ComebackRescueRepository : JpaRepository<ComebackRescue, Long> {
 
     fun findByUserIdAndPlannedFor(userId: Long, plannedFor: LocalDate): ComebackRescue?
 
-    fun existsByUserIdAndPlannedForAfterAndStatusIn(
-        userId: Long,
-        plannedFor: LocalDate,
-        statuses: Collection<RescueStatus>,
-    ): Boolean
+    /** Any plan since [plannedFor], whatever its status: one rescue (and one AI call) per lapse. */
+    fun existsByUserIdAndPlannedForAfter(userId: Long, plannedFor: LocalDate): Boolean
 
     /** The learner's latest plans, newest first: last angle and recent copy for variety checks. */
     fun findTop3ByUserIdOrderByPlannedForDesc(userId: Long): List<ComebackRescue>

@@ -24,14 +24,7 @@ enum class RescueSource {
     FALLBACK,
 }
 
-enum class RescueStatus {
-    PLANNED, HOLDOUT, SENT, COMPLETED, EXPIRED;
-
-    companion object {
-        /** Plans that use up the learner's one rescue for the current lapse. */
-        val CONSUMES_LAPSE: Set<RescueStatus> = setOf(HOLDOUT, SENT, COMPLETED)
-    }
-}
+enum class RescueStatus { PLANNED, HOLDOUT, SENT, COMPLETED, EXPIRED }
 
 /**
  * One learner's comeback rescue for one day: the ordered session words, the push copy and the

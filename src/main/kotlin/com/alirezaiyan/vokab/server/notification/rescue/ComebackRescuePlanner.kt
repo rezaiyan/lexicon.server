@@ -76,9 +76,7 @@ class ComebackRescuePlanner(
             .findRecentActivities(user, today.minusDays(ComebackRescuePolicy.LOOKBACK_DAYS))
             .map { it.activityDate }
         val lastStudy = studyDates.maxOrNull() ?: return null
-        val alreadyRescued = rescueRepository.existsByUserIdAndPlannedForAfterAndStatusIn(
-            user.requireId(), lastStudy, RescueStatus.CONSUMES_LAPSE,
-        )
+        val alreadyRescued = rescueRepository.existsByUserIdAndPlannedForAfter(user.requireId(), lastStudy)
         val signals = LapseSignals(studyDates, candidateQueries.totalWords(user.requireId()), alreadyRescued)
         return ComebackRescuePolicy.daysAway(studyDates, today)
             .takeIf { ComebackRescuePolicy.isEligible(signals, today) }

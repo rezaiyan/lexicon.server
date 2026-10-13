@@ -53,7 +53,7 @@ class ComebackRescuePlannerTest {
             aiClient, PromptTemplates(), ObjectMapper(), fixedClock(),
         )
         every { rescueRepository.findByUserIdAndPlannedFor(any(), TEST_TODAY) } returns null
-        every { rescueRepository.existsByUserIdAndPlannedForAfterAndStatusIn(any(), any(), any()) } returns false
+        every { rescueRepository.existsByUserIdAndPlannedForAfter(any(), any()) } returns false
         every { rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(any()) } returns emptyList()
         every { rescueRepository.save(any()) } answers { firstArg() }
         every { candidateQueries.candidates(any()) } returns near + weak

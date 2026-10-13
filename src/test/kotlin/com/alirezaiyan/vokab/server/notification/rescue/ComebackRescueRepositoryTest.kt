@@ -47,16 +47,16 @@ class ComebackRescueRepositoryTest {
     }
 
     @Test
-    fun `one rescue per lapse counts only sent, completed and holdout plans`() {
+    fun `any plan since the last study day uses up the lapse, even an expired one`() {
         val userId = requireNotNull(user().id)
         val lastStudy = today.minusDays(5)
+        repository.saveAndFlush(rescue(userId, lastStudy, RescueStatus.SENT))
+
+        assertFalse(repository.existsByUserIdAndPlannedForAfter(userId, lastStudy))
+
         repository.saveAndFlush(rescue(userId, today.minusDays(1), RescueStatus.EXPIRED))
 
-        assertFalse(repository.existsByUserIdAndPlannedForAfterAndStatusIn(userId, lastStudy, RescueStatus.CONSUMES_LAPSE))
-
-        repository.saveAndFlush(rescue(userId, today.minusDays(2), RescueStatus.SENT))
-
-        assertTrue(repository.existsByUserIdAndPlannedForAfterAndStatusIn(userId, lastStudy, RescueStatus.CONSUMES_LAPSE))
+        assertTrue(repository.existsByUserIdAndPlannedForAfter(userId, lastStudy))
     }
 
     @Test

@@ -8,7 +8,7 @@ data class LapseSignals(
     /** Study days (UTC streak days) in roughly the last four weeks, any order. */
     val studyDates: List<LocalDate>,
     val totalWords: Int,
-    /** A rescue was already sent (or held out) since the last study day. */
+    /** A rescue was already planned since the last study day, whatever became of it. */
     val alreadyRescuedThisLapse: Boolean,
 )
 
@@ -17,7 +17,7 @@ data class LapseSignals(
  * caught before the habit dies. Longer lapses stay with the COLD/DORMANT flow.
  */
 object ComebackRescuePolicy {
-    /** Planning runs at 01:00 UTC, so 3 days since the last study day = two full days missed. */
+    /** Planning runs at 00:45 UTC, so 3 days since the last study day = two full days missed. */
     const val MIN_DAYS_AWAY = 3L
     const val MAX_DAYS_AWAY = 14L
     const val HABIT_WINDOW_DAYS = 14L

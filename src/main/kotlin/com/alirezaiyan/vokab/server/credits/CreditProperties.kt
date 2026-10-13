@@ -15,11 +15,11 @@ data class CreditProperties(
     var trialMonthlyAllowance: Int = 30,
     var premiumMonthlyAllowance: Int = 300,
     var costs: Map<CreditAction, Int> = mapOf(
-        CreditAction.PHOTO_EXTRACTION to 2,
-        CreditAction.AI_SUGGESTION to 2,
-        CreditAction.TEXT_TRANSLATION to 1,
-        CreditAction.PHOTO_EXTRACTION_GUIDED to 3,
+        CreditAction.PHOTO_EXTRACTION to 4,
+        CreditAction.PHOTO_EXTRACTION_GUIDED to 4,
+        CreditAction.AI_SUGGESTION to 3,
         CreditAction.AI_SUGGESTION_GUIDED to 3,
+        CreditAction.TEXT_TRANSLATION to 1,
     ),
 ) {
     fun allowanceFor(level: AccessLevel): Int = when (level) {
@@ -38,9 +38,9 @@ enum class CreditAction {
     AI_SUGGESTION,
     TEXT_TRANSLATION,
 
-    /** Photo extraction with the learner's own instructions. */
+    /** Photo extraction with the learner's own instructions; same price, its own ledger label. */
     PHOTO_EXTRACTION_GUIDED,
 
-    /** AI suggestions with the learner's own instructions. */
+    /** AI suggestions with the learner's own instructions; same price, its own ledger label. */
     AI_SUGGESTION_GUIDED,
 }

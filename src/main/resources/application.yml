@@ -120,12 +120,12 @@ app:
     trial-monthly-allowance: ${CREDITS_TRIAL_MONTHLY:30}
     premium-monthly-allowance: ${CREDITS_PREMIUM_MONTHLY:300}
     costs:
-      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:2}
-      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:2}
+      # One flat price per source, own words or not; the _GUIDED actions only label the ledger
+      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:4}
+      PHOTO_EXTRACTION_GUIDED: ${CREDITS_COST_PHOTO:4}
+      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:3}
+      AI_SUGGESTION_GUIDED: ${CREDITS_COST_SUGGESTION:3}
       TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
-      # With the learner's own instructions (screened by InstructionGuard)
-      PHOTO_EXTRACTION_GUIDED: ${CREDITS_COST_PHOTO_GUIDED:3}
-      AI_SUGGESTION_GUIDED: ${CREDITS_COST_SUGGESTION_GUIDED:3}
 
   # Per-user call limits on the AI endpoints; each limit resets in full every window.
   rate-limit:

@@ -25,9 +25,9 @@ class InstructionGuardTest {
 
     @Test
     fun `screen returns the judge's intent when allowed`() {
-        every { judge.judge(any(), any(), any(), any()) } returns InstructionVerdict.Allowed(ScreenedIntent("Verbs only"))
+        every { judge.judge(any(), any(), any(), any()) } returns InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Verbs only")))
 
-        assertEquals(ScreenedIntent("Verbs only"), screen("only verbs"))
+        assertEquals(ScreenedInstruction(ScreenedIntent("Verbs only")), screen("only verbs"))
     }
 
     @Test
@@ -63,18 +63,18 @@ class InstructionGuardTest {
         every { judge.judge(any(), any(), any(), any()) } returnsMany listOf(
             InstructionVerdict.Refused(InstructionRejection.OFF_TOPIC),
             InstructionVerdict.Refused(InstructionRejection.OFF_TOPIC),
-            InstructionVerdict.Allowed(ScreenedIntent("Verbs only")),
+            InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Verbs only"))),
         )
         repeat(2) { assertThrows<InstructionRejectedException> { screen("tell me a joke", userId = 2L) } }
 
-        assertEquals(ScreenedIntent("Verbs only"), screen("only verbs", userId = 1L))
+        assertEquals(ScreenedInstruction(ScreenedIntent("Verbs only")), screen("only verbs", userId = 1L))
     }
 
     @Test
     fun `screen fails closed when the judge is slower than the timeout`() {
         every { judge.judge(any(), any(), any(), any()) } answers {
             Thread.sleep(3_000)
-            InstructionVerdict.Allowed(ScreenedIntent("too late"))
+            InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("too late")))
         }
 
         val started = System.nanoTime()

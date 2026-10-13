@@ -6,6 +6,7 @@ import com.alirezaiyan.vokab.server.ai.instructions.InstructionRejection
 import com.alirezaiyan.vokab.server.ai.instructions.InstructionScope
 import com.alirezaiyan.vokab.server.ai.instructions.InstructionVerdict
 import com.alirezaiyan.vokab.server.ai.instructions.InstructionsUnavailableException
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedInstruction
 import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
 import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.credits.CreditAction
@@ -425,7 +426,8 @@ class AiControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(rawItems)
 
         val request = createSuggestVocabularyRequest()
@@ -453,7 +455,8 @@ class AiControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenThrow(RuntimeException("AI service down"))
 
         val request = createSuggestVocabularyRequest()
@@ -593,9 +596,9 @@ class AiControllerTest {
     @Test
     fun `POST extract-words with instructions charges a guided extraction and passes the screened intent and picks`() {
         allowImageCalls()
-        judgePhoto(InstructionVerdict.Allowed(ScreenedIntent("Verbs only")))
+        judgePhoto(InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Verbs only"))))
         val focus = VocabularyFocus(markedOnly = true, grammarNotes = true)
-        val preferences = LearnerPreferences(focus, ScreenedIntent("Verbs only"))
+        val preferences = LearnerPreferences(focus, ScreenedInstruction(ScreenedIntent("Verbs only")))
         `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false, preferences))
             .thenReturn(listOf(ExtractedWordItem("gehen", "to go", "")))
 
@@ -700,11 +703,12 @@ class AiControllerTest {
         `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
         val interview = requireNotNull(UserInstruction.of("job interview at a hospital"))
         `when`(instructionJudge.judge(interview, InstructionScope.VOCABULARY_SUGGESTION, "German", "English"))
-            .thenReturn(InstructionVerdict.Allowed(ScreenedIntent("Hospital job interview")))
+            .thenReturn(InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Hospital job interview"))))
         val focus = VocabularyFocus(register = Register.FORMAL)
         `when`(aiService.generateVocabularyFromPreferences(
             "German", "beginner", "English", emptyList(),
-            LearnerPreferences(focus, ScreenedIntent("Hospital job interview")),
+            LearnerPreferences(focus, ScreenedInstruction(ScreenedIntent("Hospital job interview"))),
+            50,
         )).thenReturn(listOf(SuggestVocabularyItemResponse(originalWord = "Bewerbung", translation = "application")))
 
         mockMvc.perform(

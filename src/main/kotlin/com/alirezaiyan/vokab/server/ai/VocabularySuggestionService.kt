@@ -8,10 +8,11 @@ import com.alirezaiyan.vokab.server.words.WordService
 private val logger = KotlinLogging.logger {}
 
 /**
- * AI vocabulary suggestions, trimmed to the configured count.
+ * AI vocabulary suggestions: as many as the learner asked for, otherwise
+ * `app.vocabulary.suggestion-count`, which is also the most a request can get.
  *
  * The model returns extra items (see [AiService.generateVocabularyFromPreferences]) so
- * that duplicates can be dropped and the list still reaches `app.vocabulary.suggestion-count`.
+ * that duplicates can be dropped and the list still reaches the count.
  */
 @Service
 class VocabularySuggestionService(
@@ -66,15 +67,18 @@ class VocabularySuggestionService(
         existingKeys: Set<String>,
         preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
+        // The learner's own number wins over the default, up to the configured maximum
+        val maxCount = appProperties.vocabulary.suggestionCount
+        val targetCount = preferences.requestedItemCount?.coerceAtMost(maxCount) ?: maxCount
         val rawItems = aiService.generateVocabularyFromPreferences(
             targetLanguage = targetLanguage,
             currentLevel = currentLevel,
             nativeLanguage = nativeLanguage,
             interests = interests,
             preferences = preferences,
+            count = targetCount,
         )
 
-        val targetCount = appProperties.vocabulary.suggestionCount
         val items = uniqueNewItems(rawItems, existingKeys).take(targetCount)
         logger.info {
             "Vocabulary suggestions: raw=${rawItems.size}, existing=${existingKeys.size}, " +

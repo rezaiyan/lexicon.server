@@ -31,7 +31,7 @@ class InstructionGuard(
     private val judgeExecutor = Executors.newVirtualThreadPerTaskExecutor()
 
     /**
-     * The rewritten intent to hand to the generation prompt.
+     * The rewritten intent (and any item count) to hand to the generation prompt.
      *
      * @throws InstructionsPausedException when the user was refused too often lately
      * @throws InstructionRejectedException when the instruction is refused
@@ -43,7 +43,7 @@ class InstructionGuard(
         scope: InstructionScope,
         learningLanguage: String,
         nativeLanguage: String,
-    ): ScreenedIntent {
+    ): ScreenedInstruction {
         val rejections = rateLimitConfig.getInstructionRejectionBucket(userId)
         if (rejections.availableTokens <= 0) {
             val waitNanos = rejections.estimateAbilityToConsume(1).nanosToWaitForRefill
@@ -56,7 +56,7 @@ class InstructionGuard(
                     logger.info {
                         "userId=$userId instruction allowed: scope=$scope, length=${instruction.text.length}"
                     }
-                    return verdict.intent
+                    return verdict.instruction
                 }
                 is InstructionVerdict.Refused -> verdict.reason
             }

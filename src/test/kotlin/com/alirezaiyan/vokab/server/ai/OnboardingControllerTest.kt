@@ -60,7 +60,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(items)
 
 
@@ -118,7 +119,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenThrow(RuntimeException("AI service unavailable"))
 
 
@@ -147,7 +149,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(itemsWithDuplicates)
 
 
@@ -176,7 +179,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = interests
+            interests = interests,
+            count = 50,
         )).thenReturn(items)
 
 
@@ -205,7 +209,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(items)
 
 
@@ -234,7 +239,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(manyItems)
 
         val request = createPreferencesRequest()
@@ -258,7 +264,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(emptyList())
 
 

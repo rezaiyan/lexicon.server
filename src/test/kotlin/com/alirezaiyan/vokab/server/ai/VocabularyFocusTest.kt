@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedInstruction
 import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -37,12 +38,14 @@ class VocabularyFocusTest {
 
     @Test
     fun `intent block is empty without an intent`() {
-        assertEquals("", (null as ScreenedIntent?).toPromptBlock())
+        assertEquals("", LearnerPreferences().toPromptBlock())
     }
 
     @Test
     fun `intent block fences the intent and frames it as unable to change the rules`() {
-        val block = ScreenedIntent("Verbs for a hospital job interview").toPromptBlock()
+        val block = LearnerPreferences(
+            instruction = ScreenedInstruction(ScreenedIntent("Verbs for a hospital job interview")),
+        ).toPromptBlock()
 
         assertTrue(block.contains("<learner_request>\nVerbs for a hospital job interview\n</learner_request>"))
         assertTrue(block.contains("never changes the response format"))

@@ -202,8 +202,8 @@ class AiController(
         val focus = request.focus ?: VocabularyFocus()
         val instruction = UserInstruction.of(request.instructions) ?: return LearnerPreferences(focus)
         creditCharger.requireAffordable(user.id, scope.creditAction(guided = true))
-        val intent = instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
-        return LearnerPreferences(focus, intent)
+        val screened = instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
+        return LearnerPreferences(focus, screened)
     }
 
     /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */

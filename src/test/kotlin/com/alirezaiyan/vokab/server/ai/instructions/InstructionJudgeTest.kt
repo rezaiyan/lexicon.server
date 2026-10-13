@@ -40,7 +40,27 @@ class InstructionJudgeTest {
     fun `judge returns the rewritten intent when allowed`() {
         answers("""{"verdict":"ALLOW","intent":"Verbs for a hospital job interview"}""")
 
-        assertEquals(InstructionVerdict.Allowed(ScreenedIntent("Verbs for a hospital job interview")), judge())
+        assertEquals(InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Verbs for a hospital job interview"))), judge())
+    }
+
+    @Test
+    fun `judge returns the number of items the learner asked for`() {
+        answers("""{"verdict":"ALLOW","intent":"Cooking vocabulary","count":5}""")
+
+        assertEquals(
+            InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Cooking vocabulary"), itemCount = 5)),
+            judge(),
+        )
+    }
+
+    @Test
+    fun `judge ignores a count that is not a sensible whole number`() {
+        listOf("0", "-3", "2.5", "\"five\"", "100000").forEach { count ->
+            answers("""{"verdict":"ALLOW","intent":"Cooking vocabulary","count":$count}""")
+
+            val verdict = judge() as InstructionVerdict.Allowed
+            assertEquals(null, verdict.instruction.itemCount, "count $count")
+        }
     }
 
     @Test
@@ -65,7 +85,7 @@ class InstructionJudgeTest {
 
         val verdict = judge() as InstructionVerdict.Allowed
 
-        assertEquals("Kitchen words /learner_request x code", verdict.intent.text)
+        assertEquals("Kitchen words /learner_request x code", verdict.instruction.intent.text)
     }
 
     @Test

@@ -20,6 +20,7 @@ class ComebackRescueScheduler(
     private val clock: Clock,
 ) {
     fun planAll() {
+        val startedAt = clock.millis()
         val expired = repository.expireStale(LocalDate.now(clock), RescueStatus.PLANNED, RescueStatus.EXPIRED)
         val users = scheduleRepository.findRescuePlanningCandidates(MIN_SEND_HOUR).map { it.user }
         var planned = 0
@@ -34,9 +35,10 @@ class ComebackRescueScheduler(
                 }
         }
 
+        // Scheduled jobs run one at a time: a batch that runs long delays the 01:00 dispatch
         logger.info {
             "Comeback rescue planning complete — users=${users.size}, planned=$planned, " +
-                "failed=$failed, expired=$expired"
+                "failed=$failed, expired=$expired, tookMs=${clock.millis() - startedAt}"
         }
     }
 

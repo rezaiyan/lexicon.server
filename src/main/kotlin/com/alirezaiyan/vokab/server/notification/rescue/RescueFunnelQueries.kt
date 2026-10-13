@@ -50,8 +50,9 @@ class RescueFunnelQueries(private val jdbc: NamedParameterJdbcTemplate) {
         val FUNNEL_SQL = """
             WITH r AS (
                 SELECT cr.*,
+                       -- a completion proves the push arrived even if its sent mark was lost
                        CASE WHEN cr.status = 'HOLDOUT' THEN 'HOLDOUT'
-                            WHEN cr.sent_at IS NOT NULL THEN 'SENT'
+                            WHEN cr.sent_at IS NOT NULL OR cr.status = 'COMPLETED' THEN 'SENT'
                             ELSE 'UNSENT' END AS arm,
                        COALESCE(CAST(cr.sent_at AS DATE), cr.planned_for) AS from_day
                 FROM comeback_rescue cr
@@ -59,7 +60,7 @@ class RescueFunnelQueries(private val jdbc: NamedParameterJdbcTemplate) {
             )
             SELECT r.arm, r.source, r.angle,
                    COUNT(*)                                          AS planned,
-                   COUNT(*) FILTER (WHERE r.sent_at IS NOT NULL)     AS sent,
+                   COUNT(*) FILTER (WHERE r.arm = 'SENT')            AS sent,
                    COUNT(l.opened_at)                                AS opened,
                    COUNT(*) FILTER (WHERE r.status = 'COMPLETED')    AS completed,
                    COUNT(*) FILTER (WHERE EXISTS (

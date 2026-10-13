@@ -101,7 +101,7 @@ class ComebackRescuePlanner(
         val recent = rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(userId)
         val uiLanguage = userSettingsRepository.findByUserId(userId)?.languageCode ?: DEFAULT_UI_LANGUAGE
 
-        return aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool, uiLanguage)
+        return aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool)
     }
 
     private fun aiDraft(
@@ -139,30 +139,25 @@ class ComebackRescuePlanner(
                 outroSoft = response.outroSoft?.takeIf { RescueCopyLinter.outroOk(it, pickedSheet) },
             )
         } else {
-            templateCopy(pool, picks, uiLanguage)
+            // English like every other push: dropping the rescue would only send a less relevant English one
+            RescueFallback.copy(pool, picks)
         }
 
-        return copy?.let {
-            RescueDraft(
-                wordIds = picks,
-                copy = it,
-                source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
-                candidatesJson = objectMapper.writeValueAsString(
-                    linted.map { l -> mapOf("candidate" to l.candidate, "violations" to l.violations) }
-                ),
-                reasoningJson = objectMapper.writeValueAsString(response.reasons),
-            )
-        }
+        return RescueDraft(
+            wordIds = picks,
+            copy = copy,
+            source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
+            candidatesJson = objectMapper.writeValueAsString(
+                linted.map { mapOf("candidate" to it.candidate, "violations" to it.violations) }
+            ),
+            reasoningJson = objectMapper.writeValueAsString(response.reasons),
+        )
     }
 
-    private fun fallbackDraft(pool: RescuePool, uiLanguage: String): RescueDraft? {
+    private fun fallbackDraft(pool: RescuePool): RescueDraft {
         val picks = RescueFallback.picks(pool)
-        return templateCopy(pool, picks, uiLanguage)?.let { RescueDraft(picks, it, RescueSource.FALLBACK) }
+        return RescueDraft(picks, RescueFallback.copy(pool, picks), RescueSource.FALLBACK)
     }
-
-    /** The template copy is English; a learner using the app in another language gets no rescue rather than that. */
-    private fun templateCopy(pool: RescuePool, picks: List<Long>, uiLanguage: String): RescueCopy? =
-        RescueFallback.copy(pool, picks).takeIf { uiLanguage == DEFAULT_UI_LANGUAGE }
 
     private fun prompt(pool: RescuePool, sheet: RescueFactSheet, lastAngle: String?, uiLanguage: String): String =
         promptTemplates.render(

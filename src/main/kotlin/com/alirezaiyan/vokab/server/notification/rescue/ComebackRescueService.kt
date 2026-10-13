@@ -1,11 +1,14 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+
+private val logger = KotlinLogging.logger {}
 
 /** Rescue lifecycle after planning: what to send today, sent, completed. */
 @Service
@@ -41,6 +44,9 @@ class ComebackRescueService(
         val rescue = repository.findById(rescueId).orElse(null) ?: return false
         if (rescue.userId != userId) return false
         if (rescue.status in COMPLETABLE) {
+            if (rescue.status != RescueStatus.SENT) {
+                logger.warn { "Comeback rescue $rescueId completed while ${rescue.status}: its sent mark was lost" }
+            }
             rescue.status = RescueStatus.COMPLETED
             rescue.completedAt = Instant.now(clock)
             repository.save(rescue)

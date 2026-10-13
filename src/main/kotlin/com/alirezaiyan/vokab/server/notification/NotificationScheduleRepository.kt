@@ -30,8 +30,8 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
 
     /**
      * Learners a comeback rescue could actually reach today: active, with a push token, notifications
-     * on and not suppressed, sending no earlier than [minSendHour] (UTC). Earliest send hour first, so
-     * the nightly planning batch finishes their plans before their dispatch run.
+     * on and not suppressed, sending no earlier than [minSendHour] (UTC). Earliest send hour first: if
+     * a slow batch is ever cut short, the soonest pushes are the ones already planned.
      */
     @Query("""
         SELECT ns FROM NotificationSchedule ns JOIN FETCH ns.user u

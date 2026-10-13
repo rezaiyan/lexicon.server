@@ -99,8 +99,25 @@ class RescueCopyLinterTest {
     }
 
     @Test
-    fun `banned phrases and emoji match whole words and real emoji only`() {
+    fun `a target word inside copy written without spaces still counts`() {
+        val japaneseUi = candidate(title = "Gewitterをもう一度", body = "8語、約3分。")
+
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(japaneseUi, ctx))
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(title = "还记得Gewitter吗"), ctx))
+    }
+
+    @Test
+    fun `banned words are caught in any form, but not inside other words`() {
+        assertTrue(RescueCopyLinter.lint(candidate(body = "Gewitter unlocked. 8 words, about 3 min."), ctx).contains("banned phrase unlock"))
+        assertTrue(RescueCopyLinter.lint(candidate(body = "Boosting Gewitter. 8 words, about 3 min."), ctx).contains("banned phrase boost"))
+        assertTrue(RescueCopyLinter.lint(candidate(body = "Don’t lose Gewitter. 8 words, about 3 min."), ctx).contains("banned phrase don't lose"))
         assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "Already today? 8 words, about 3 min."), ctx))
+    }
+
+    @Test
+    fun `emoji are caught by the emoji property, not by code point ranges`() {
+        assertTrue(RescueCopyLinter.lint(candidate(body = "8 words, about 3 min ⏰"), ctx).contains("emoji"))
+        assertTrue(RescueCopyLinter.lint(candidate(body = "8 words, about 3 min ⭐"), ctx).contains("emoji"))
         assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "𠀋 8 words, about 3 min."), ctx))
     }
 

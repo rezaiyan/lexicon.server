@@ -20,18 +20,35 @@ internal object RescueText {
 
     /**
      * [word] appears in [text] as a word of its own, so a short word like "in" is not found inside
-     * "Training". In scripts without spaces any occurrence counts.
+     * "Training". Letters of scripts without spaces don't count as part of a word, so "Apfel" is
+     * found in "Apfelをもう一度" and "猫" in "猫を".
      */
-    fun containsWord(text: String, word: String): Boolean {
-        if (word.isBlank()) return false
-        if (word.any { Character.UnicodeScript.of(it.code) in UNSPACED_SCRIPTS }) {
-            return text.contains(word, ignoreCase = true)
+    fun containsWord(text: String, word: String): Boolean =
+        occurrences(text, word).any { start ->
+            !continuesWord(text, start - 1) && !continuesWord(text, start + word.length)
         }
-        val pattern = Regex("""(?<![\p{L}\p{N}])${Regex.escape(word)}(?![\p{L}\p{N}])""", RegexOption.IGNORE_CASE)
-        return pattern.containsMatchIn(text)
-    }
+
+    /** [stem] starts a word in [text]: "unlock" matches "unlocked" but "ready to" not "already today". */
+    fun startsWord(text: String, stem: String): Boolean =
+        occurrences(text, stem).any { start -> !continuesWord(text, start - 1) }
 
     /** [text] with the learner's own words blanked out, so a word like "B2" is not read as a stat. */
     fun withoutWords(text: String, words: Set<String>): String =
         words.sortedByDescending { it.length }.fold(text) { acc, word -> acc.replace(word, " ", ignoreCase = true) }
+
+    private fun occurrences(text: String, word: String): Sequence<Int> {
+        val haystack = normalizeApostrophes(text)
+        val needle = normalizeApostrophes(word)
+        if (needle.isBlank()) return emptySequence()
+        return generateSequence(haystack.indexOf(needle, ignoreCase = true)) { previous ->
+            haystack.indexOf(needle, previous + 1, ignoreCase = true)
+        }.takeWhile { it >= 0 }
+    }
+
+    private fun continuesWord(text: String, index: Int): Boolean {
+        val c = text.getOrNull(index) ?: return false
+        return c.isLetterOrDigit() && Character.UnicodeScript.of(c.code) !in UNSPACED_SCRIPTS
+    }
+
+    private fun normalizeApostrophes(s: String): String = s.replace('’', '\'')
 }

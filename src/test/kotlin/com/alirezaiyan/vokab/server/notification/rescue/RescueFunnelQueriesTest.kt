@@ -81,12 +81,14 @@ class RescueFunnelQueriesTest {
         val d = userId()
         rescue(d, sentDay, RescueStatus.EXPIRED, source = RescueSource.FALLBACK)
         studied(d, sentDay.plusDays(2))
+        // pushed, but the sent mark was lost; the completion still puts it in the sent arm
+        rescue(userId(), sentDay, RescueStatus.COMPLETED)
         // too old for a 7-day window
         rescue(userId(), today.minusDays(9), RescueStatus.SENT, sentAt = sentAt)
 
         val rows = funnelQueries.funnel(days = 7, today = today)
 
-        assertEquals(RescueFunnelRow(RescueArm.SENT, RescueSource.AI, "rematch", 2, 2, 1, 1, 1), row(rows, RescueArm.SENT, RescueSource.AI, "rematch"))
+        assertEquals(RescueFunnelRow(RescueArm.SENT, RescueSource.AI, "rematch", 3, 3, 1, 2, 1), row(rows, RescueArm.SENT, RescueSource.AI, "rematch"))
         assertEquals(RescueFunnelRow(RescueArm.HOLDOUT, RescueSource.AI, "rematch", 1, 0, 0, 0, 1), row(rows, RescueArm.HOLDOUT, RescueSource.AI, "rematch"))
         assertEquals(RescueFunnelRow(RescueArm.UNSENT, RescueSource.FALLBACK, "rematch", 1, 0, 0, 0, 0), row(rows, RescueArm.UNSENT, RescueSource.FALLBACK, "rematch"))
     }

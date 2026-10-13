@@ -96,12 +96,11 @@ class ComebackRescuePlannerTest {
     }
 
     @Test
-    fun `plans nothing rather than English template copy for a learner using another language`() {
+    fun `a learner using another language still gets a plan when the AI copy is unusable`() {
         every { aiClient.complete(any(), any()) } throws UpstreamServiceException("down")
         every { userSettingsRepository.findByUserId(any()) } returns UserSettings(user = user(), languageCode = "fa")
 
-        assertNull(planner.planIfEligible(user()))
-        verify(exactly = 0) { rescueRepository.save(any()) }
+        assertEquals(RescueSource.FALLBACK, planner.planIfEligible(user())?.source)
     }
 
     @Test

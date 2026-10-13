@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.notification.rescue
 
 import com.alirezaiyan.vokab.server.notification.rescue.RescueText.containsWord
 import com.alirezaiyan.vokab.server.notification.rescue.RescueText.numbers
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.startsWord
 import com.alirezaiyan.vokab.server.notification.rescue.RescueText.withoutWords
 import java.text.BreakIterator
 
@@ -89,16 +90,12 @@ object RescueCopyLinter {
 
     private fun toneViolations(text: String): List<String> {
         val v = mutableListOf<String>()
-        val lower = text.lowercase().replace('’', '\'')
-        BANNED_PHRASES.filter { containsWord(lower, it) }.forEach { v += "banned phrase $it" }
+        BANNED_PHRASES.filter { startsWord(text, it) }.forEach { v += "banned phrase $it" }
         if ('—' in text) v += "em dash"
         if (text.count { it == '!' } > 1) v += "too many exclamation marks"
-        if (text.codePoints().anyMatch(::isEmoji)) v += "emoji"
+        if (text.codePoints().anyMatch(Character::isExtendedPictographic)) v += "emoji"
         return v
     }
-
-    /** Emoji blocks only; CJK extension characters live above them and are not emoji. */
-    private fun isEmoji(cp: Int): Boolean = cp in 0x1F000..0x1FAFF || cp in 0x2600..0x27BF
 
     private fun normalize(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
 }

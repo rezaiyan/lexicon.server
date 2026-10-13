@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server.ai.instructions
 
+import com.alirezaiyan.vokab.server.shared.AiInstructionsConfig
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
-import com.alirezaiyan.vokab.server.shared.RateLimitProperties
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -14,10 +14,10 @@ import org.junit.jupiter.api.assertThrows
 class InstructionGuardTest {
 
     private val judge = mockk<InstructionJudge>()
-    private val rateLimits = RateLimitConfig(
-        AppProperties(rateLimit = RateLimitProperties(instructionRejections = 2, instructionRejectionWindowMinutes = 60)),
+    private val properties = AppProperties(
+        aiInstructions = AiInstructionsConfig(maxRejections = 2, rejectionWindowMinutes = 60, judgeTimeoutSeconds = 1),
     )
-    private val guard = InstructionGuard(judge, rateLimits)
+    private val guard = InstructionGuard(judge, RateLimitConfig(properties), properties)
 
     private fun screen(text: String, userId: Long = 1L) = guard.screen(
         userId, requireNotNull(UserInstruction.of(text)), InstructionScope.PHOTO_EXTRACTION, "German", "English",
@@ -68,6 +68,26 @@ class InstructionGuardTest {
         repeat(2) { assertThrows<InstructionRejectedException> { screen("tell me a joke", userId = 2L) } }
 
         assertEquals(ScreenedIntent("Verbs only"), screen("only verbs", userId = 1L))
+    }
+
+    @Test
+    fun `screen fails closed when the judge is slower than the timeout`() {
+        every { judge.judge(any(), any(), any(), any()) } answers {
+            Thread.sleep(3_000)
+            InstructionVerdict.Allowed(ScreenedIntent("too late"))
+        }
+
+        val started = System.nanoTime()
+        assertThrows<InstructionsUnavailableException> { screen("only verbs") }
+
+        assertTrue(System.nanoTime() - started < 2_500_000_000L, "guard waited for the slow judge")
+    }
+
+    @Test
+    fun `screen turns an unexpected judge failure into unavailable`() {
+        every { judge.judge(any(), any(), any(), any()) } throws IllegalStateException("boom")
+
+        assertThrows<InstructionsUnavailableException> { screen("only verbs") }
     }
 
     @Test

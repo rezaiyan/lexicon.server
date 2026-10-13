@@ -35,6 +35,18 @@ class CreditService(
     fun balance(userId: Long): CreditBalance = currentWallet(userId).toBalance()
 
     /**
+     * Throws [InsufficientCreditsException] when the balance is below [action]'s cost; spends nothing.
+     * For paid preparation (e.g. screening a request) that should not run for a user who can't pay.
+     */
+    @Transactional
+    fun requireAffordable(userId: Long, action: CreditAction) {
+        val cost = properties.costOf(action)
+        if (cost <= 0) return
+        val available = currentWallet(userId).balance
+        if (available < cost) throw InsufficientCreditsException(action.name, required = cost, available = available)
+    }
+
+    /**
      * Takes [action]'s cost, allowance first (it expires), then bonus.
      * Returns null for a free action. Throws [InsufficientCreditsException] when the balance is short.
      */

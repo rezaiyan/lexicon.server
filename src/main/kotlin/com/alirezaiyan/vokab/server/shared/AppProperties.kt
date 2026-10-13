@@ -19,7 +19,8 @@ data class AppProperties(
     var ciAuth: CiAuthConfig = CiAuthConfig(),
     var notifications: NotificationsConfig = NotificationsConfig(),
     var geolocation: GeoLocationConfig = GeoLocationConfig(),
-    var rateLimit: RateLimitProperties = RateLimitProperties()
+    var rateLimit: RateLimitProperties = RateLimitProperties(),
+    var aiInstructions: AiInstructionsConfig = AiInstructionsConfig()
 )
 
 data class JwtConfig(
@@ -105,9 +106,15 @@ data class RateLimitProperties(
     var windowMinutes: Long = 5,
     var photoCalls: Long = 20,
     var aiCalls: Long = 50,
-    /** Refused AI instructions a user may have per [instructionRejectionWindowMinutes] before instructions pause. */
-    var instructionRejections: Long = 5,
-    var instructionRejectionWindowMinutes: Long = 60,
+)
+
+/** The learner-instruction guard (see `InstructionGuard`). */
+data class AiInstructionsConfig(
+    /** Refused instructions a user may have per [rejectionWindowMinutes] before instructions pause. */
+    var maxRejections: Long = 5,
+    var rejectionWindowMinutes: Long = 60,
+    /** How long the guard waits for the judge before refusing as unavailable (fails closed). */
+    var judgeTimeoutSeconds: Long = 8,
 )
 
 data class CiAuthConfig(

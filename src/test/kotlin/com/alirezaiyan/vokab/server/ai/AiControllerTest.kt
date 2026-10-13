@@ -26,6 +26,7 @@ import io.github.bucket4j.Bucket
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyBoolean
 import org.mockito.ArgumentMatchers.anyString
+import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verify
@@ -620,6 +621,18 @@ class AiControllerTest {
     }
 
     @Test
+    fun `POST extract-words with instructions a user can't afford returns 402 without asking the judge`() {
+        allowImageCalls()
+        doThrow(InsufficientCreditsException("PHOTO_EXTRACTION_GUIDED", required = 3, available = 2))
+            .`when`(creditService).requireAffordable(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION_GUIDED)
+
+        postExtractWords(ExtractWordsRequest("dGVzdA==", "German", "English", instructions = "only the verbs"))
+            .andExpect(status().isPaymentRequired)
+            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
+        verifyNoInteractions(instructionJudge, aiService)
+    }
+
+    @Test
     fun `POST extract-words returns 422 for refused instructions and charges nothing`() {
         allowImageCalls()
         judgePhoto(InstructionVerdict.Refused(InstructionRejection.UNSAFE))
@@ -627,7 +640,8 @@ class AiControllerTest {
         postExtractWords(ExtractWordsRequest("dGVzdA==", "German", "English", instructions = "only the verbs"))
             .andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("INSTRUCTIONS_UNSAFE"))
-        verifyNoInteractions(creditService, aiService)
+        verify(creditService, never()).spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION_GUIDED)
+        verifyNoInteractions(aiService)
     }
 
     @Test
@@ -639,7 +653,8 @@ class AiControllerTest {
         )
             .andExpect(status().isUnprocessableEntity)
             .andExpect(jsonPath("$.code").value("INSTRUCTIONS_OFF_TOPIC"))
-        verifyNoInteractions(instructionJudge, creditService, aiService)
+        verify(creditService, never()).spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION_GUIDED)
+        verifyNoInteractions(instructionJudge, aiService)
     }
 
     @Test
@@ -651,7 +666,8 @@ class AiControllerTest {
             .andExpect(status().isTooManyRequests)
             .andExpect(jsonPath("$.code").value("INSTRUCTIONS_PAUSED"))
             .andExpect(header().exists("Retry-After"))
-        verifyNoInteractions(instructionJudge, creditService)
+        verify(creditService, never()).spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION_GUIDED)
+        verifyNoInteractions(instructionJudge)
     }
 
     @Test
@@ -663,7 +679,7 @@ class AiControllerTest {
         postExtractWords(ExtractWordsRequest("dGVzdA==", "German", "English", instructions = "only the verbs"))
             .andExpect(status().isServiceUnavailable)
             .andExpect(jsonPath("$.code").value("INSTRUCTIONS_UNAVAILABLE"))
-        verifyNoInteractions(creditService)
+        verify(creditService, never()).spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION_GUIDED)
     }
 
     @Test

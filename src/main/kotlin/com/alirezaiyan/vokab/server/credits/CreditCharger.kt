@@ -27,6 +27,9 @@ class CreditCharger(private val creditService: CreditService) {
         return result
     }
 
+    /** Fails fast with `InsufficientCreditsException` when [action] is unaffordable; spends nothing. */
+    fun requireAffordable(userId: Long, action: CreditAction) = creditService.requireAffordable(userId, action)
+
     /** A failed refund must not mask the work's own outcome; it's logged for follow-up. */
     private fun refundQuietly(spend: CreditSpend?) {
         if (spend == null) return

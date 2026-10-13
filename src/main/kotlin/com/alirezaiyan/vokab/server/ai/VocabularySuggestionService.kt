@@ -27,10 +27,10 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String>,
     ): SuggestVocabularyResponse = suggest(
-        targetLanguage = targetLanguage.trim(),
-        currentLevel = currentLevel.trim(),
-        nativeLanguage = nativeLanguage.trim(),
-        interests = interests.map { it.trim() }.filter { it.isNotBlank() },
+        targetLanguage = targetLanguage.asPromptLabel(),
+        currentLevel = currentLevel.asPromptLabel(),
+        nativeLanguage = nativeLanguage.asPromptLabel(),
+        interests = interests.toPromptLabels(),
         existingKeys = emptySet(),
     )
 
@@ -47,12 +47,12 @@ class VocabularySuggestionService(
         targetLanguageCode: String? = null,
         preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
-        val target = targetLanguage.trim()
+        val target = targetLanguage.asPromptLabel()
         return suggest(
             targetLanguage = target,
-            currentLevel = currentLevel.trim(),
-            nativeLanguage = nativeLanguage.trim(),
-            interests = interests.map { it.trim() }.filter { it.isNotBlank() },
+            currentLevel = currentLevel.asPromptLabel(),
+            nativeLanguage = nativeLanguage.asPromptLabel(),
+            interests = interests.toPromptLabels(),
             existingKeys = wordService.getExistingTermKeys(userId, targetLanguageCode?.trim() ?: target),
             preferences = preferences,
         )
@@ -88,6 +88,9 @@ class VocabularySuggestionService(
             items = items,
         )
     }
+
+    /** Client-supplied topics end up in the prompt, so they get the same treatment as language names. */
+    private fun List<String>.toPromptLabels(): List<String> = map { it.asPromptLabel() }.filter { it.isNotBlank() }
 
     /** Items with a non-blank word not in [existingKeys], first occurrence only (case-insensitive). */
     private fun uniqueNewItems(

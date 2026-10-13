@@ -85,6 +85,8 @@ class AiService(
     ): List<ExtractedWordItem> {
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
         require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
+        val learningLanguage = learningLanguage.asPromptLabel()
+        val nativeLanguage = nativeLanguage.asPromptLabel()
         logger.info {
             "[AI] Word extraction v2: size=~${estimatedSizeBytes / 1024}KB, " +
                 "learning=$learningLanguage, native=$nativeLanguage"

@@ -4,37 +4,13 @@ import com.alirezaiyan.vokab.server.ai.AiClient
 import com.alirezaiyan.vokab.server.ai.AiOperation
 import com.alirezaiyan.vokab.server.ai.Prompt
 import com.alirezaiyan.vokab.server.ai.PromptTemplates
+import com.alirezaiyan.vokab.server.ai.asPromptLabel
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
 private val logger = KotlinLogging.logger {}
-
-/** Which AI feature an instruction is for; [description] tells the judge what may be asked there. */
-enum class InstructionScope(val description: String) {
-    PHOTO_EXTRACTION(
-        "Reading vocabulary from a photo the learner took. The request may say which items in the photo " +
-            "to take or skip, and how to annotate them.",
-    ),
-    VOCABULARY_SUGGESTION(
-        "Generating a fresh list of vocabulary for the learner. The request describes what the vocabulary " +
-            "should be about: a topic, situation, profession, exam, word type or register.",
-    ),
-}
-
-/**
- * The guard's rewrite of an allowed instruction: a short, neutral English description of the
- * vocabulary wanted. The only form of learner text a generation prompt ever receives.
- */
-@JvmInline
-value class ScreenedIntent(val text: String)
-
-/** The judge's decision on one instruction. */
-sealed interface InstructionVerdict {
-    data class Allowed(val intent: ScreenedIntent) : InstructionVerdict
-    data class Refused(val reason: InstructionRejection) : InstructionVerdict
-}
 
 /**
  * Asks the judge model whether an instruction is a vocabulary request, and if so for its rewritten
@@ -58,8 +34,8 @@ class InstructionJudge(
             Prompt.INSTRUCTION_GUARD,
             mapOf(
                 "scope" to scope.description,
-                "learningLanguage" to learningLanguage,
-                "nativeLanguage" to nativeLanguage,
+                "learningLanguage" to learningLanguage.asPromptLabel(),
+                "nativeLanguage" to nativeLanguage.asPromptLabel(),
                 "instruction" to instruction.text,
             ),
         )

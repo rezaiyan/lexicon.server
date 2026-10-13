@@ -105,6 +105,29 @@ class CreditServiceTest {
         assertEquals(20, service.balance(userId).balance)
     }
 
+    @Test
+    fun `requireAffordable refuses a short balance and spends nothing`() {
+        setBuckets(allowance = 1, bonus = 1)
+
+        val error = assertThrows<InsufficientCreditsException> {
+            service.requireAffordable(userId, CreditAction.PHOTO_EXTRACTION)
+        }
+
+        assertEquals(3, error.required)
+        assertEquals(2, service.balance(userId).balance)
+        assertEquals(0, ledgerTypes().count { it == CreditTransactionType.SPEND })
+    }
+
+    @Test
+    fun `requireAffordable passes an affordable or free action without touching the balance`() {
+        setBuckets(allowance = 0, bonus = 3)
+
+        service.requireAffordable(userId, CreditAction.PHOTO_EXTRACTION)
+        service.requireAffordable(userId, CreditAction.TEXT_TRANSLATION)
+
+        assertEquals(3, service.balance(userId).balance)
+    }
+
     // ── Refunds ──────────────────────────────────────────────────────────────────────────────
 
     @Test

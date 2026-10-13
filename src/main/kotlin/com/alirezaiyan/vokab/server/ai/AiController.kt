@@ -2,7 +2,6 @@ package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.ai.instructions.InstructionGuard
 import com.alirezaiyan.vokab.server.ai.instructions.InstructionScope
-import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
 import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.credits.CreditAction
 import com.alirezaiyan.vokab.server.credits.CreditCharger
@@ -74,14 +73,10 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
-        // Screened before charging: refused instructions cost nothing
-        val intent = screenInstructions(
-            user, request.instructions, InstructionScope.PHOTO_EXTRACTION,
-            request.learningLanguage, request.nativeLanguage,
-        )
-        val preferences = LearnerPreferences(request.focus ?: VocabularyFocus(), intent)
-        val action = if (preferences.isGuided) CreditAction.PHOTO_EXTRACTION_GUIDED else CreditAction.PHOTO_EXTRACTION
+        val scope = InstructionScope.PHOTO_EXTRACTION
+        val preferences = learnerPreferences(user, request, scope, request.learningLanguage, request.nativeLanguage)
 
+        val action = scope.creditAction(preferences.isGuided)
         // Nothing recognised is refunded: the user got nothing for the credits
         val items = creditCharger.charge(user.id, action, refundIf = { it.isEmpty() }) {
             aiService.extractWordsFromImage(
@@ -160,14 +155,10 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "suggest-vocabulary")
 
-        // Screened before charging: refused instructions cost nothing
-        val intent = screenInstructions(
-            user, request.instructions, InstructionScope.VOCABULARY_SUGGESTION,
-            request.targetLanguage, request.nativeLanguage,
-        )
-        val preferences = LearnerPreferences(request.focus ?: VocabularyFocus(), intent)
-        val action = if (preferences.isGuided) CreditAction.AI_SUGGESTION_GUIDED else CreditAction.AI_SUGGESTION
+        val scope = InstructionScope.VOCABULARY_SUGGESTION
+        val preferences = learnerPreferences(user, request, scope, request.targetLanguage, request.nativeLanguage)
 
+        val action = scope.creditAction(preferences.isGuided)
         val response = creditCharger.charge(user.id, action, refundIf = { it.items.isEmpty() }) {
             vocabularySuggestionService.suggestForUser(
                 userId = user.id,
@@ -196,15 +187,23 @@ class AiController(
         )
     }
 
-    /** The guard's intent for the learner's [raw] instructions; null when there are none. */
-    private fun screenInstructions(
+    /**
+     * What the learner asked for. Their own words are screened before anything is charged, and only
+     * for a user who can afford the guided price: refusals cost nothing, and a user who can't pay
+     * never triggers a judge call.
+     */
+    private fun learnerPreferences(
         user: AuthUser,
-        raw: String?,
+        request: GuidedAiRequest,
         scope: InstructionScope,
         learningLanguage: String,
         nativeLanguage: String,
-    ): ScreenedIntent? = UserInstruction.of(raw)?.let { instruction ->
-        instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
+    ): LearnerPreferences {
+        val focus = request.focus ?: VocabularyFocus()
+        val instruction = UserInstruction.of(request.instructions) ?: return LearnerPreferences(focus)
+        creditCharger.requireAffordable(user.id, scope.creditAction(guided = true))
+        val intent = instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
+        return LearnerPreferences(focus, intent)
     }
 
     /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */

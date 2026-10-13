@@ -7,6 +7,12 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import jakarta.validation.constraints.NotNull
 
+/** A request the learner can steer: free quick picks plus their own (screened, guided-priced) words. */
+interface GuidedAiRequest {
+    val focus: VocabularyFocus?
+    val instructions: String?
+}
+
 data class ExtractVocabularyRequest(
     @field:NotBlank(message = "Image data is required")
     val imageBase64: String,
@@ -68,12 +74,12 @@ data class SuggestVocabularyRequest(
 
     /** Quick picks; free. */
     @field:Valid
-    val focus: VocabularyFocus? = null,
+    override val focus: VocabularyFocus? = null,
 
     /** The learner's own words; screened by the instruction guard and charged as guided suggestions. */
     @field:Size(max = UserInstruction.MAX_LENGTH)
-    val instructions: String? = null,
-)
+    override val instructions: String? = null,
+) : GuidedAiRequest
 
 /**
  * Public onboarding preferences payload.
@@ -131,12 +137,12 @@ data class ExtractWordsRequest(
 
     /** Quick picks; free. */
     @field:Valid
-    val focus: VocabularyFocus? = null,
+    override val focus: VocabularyFocus? = null,
 
     /** The learner's own words; screened by the instruction guard and charged as a guided extraction. */
     @field:Size(max = UserInstruction.MAX_LENGTH)
-    val instructions: String? = null,
-)
+    override val instructions: String? = null,
+) : GuidedAiRequest
 
 data class ExtractedWordItem(
     val term: String,

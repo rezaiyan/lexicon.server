@@ -132,9 +132,13 @@ app:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
     photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
     ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
-    # Refused custom AI instructions per user before instructions pause (see InstructionGuard)
-    instruction-rejections: ${AI_INSTRUCTION_REJECTIONS:5}
-    instruction-rejection-window-minutes: ${AI_INSTRUCTION_REJECTION_WINDOW_MINUTES:60}
+
+  # Learners' own instructions to the AI (see InstructionGuard): refusals per user before
+  # instructions pause, and how long to wait for the judge before failing closed.
+  ai-instructions:
+    max-rejections: ${AI_INSTRUCTION_REJECTIONS:5}
+    rejection-window-minutes: ${AI_INSTRUCTION_REJECTION_WINDOW_MINUTES:60}
+    judge-timeout-seconds: ${AI_INSTRUCTION_JUDGE_TIMEOUT_SECONDS:8}
 
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.

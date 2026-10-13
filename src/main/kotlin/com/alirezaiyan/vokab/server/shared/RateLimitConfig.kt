@@ -25,8 +25,8 @@ class RateLimitConfig(private val appProperties: AppProperties) {
      */
     fun getInstructionRejectionBucket(userId: Long): Bucket =
         cache.computeIfAbsent("instruction_rejections_$userId") {
-            val rejections = appProperties.rateLimit.instructionRejections
-            val window = Duration.ofMinutes(appProperties.rateLimit.instructionRejectionWindowMinutes)
+            val rejections = appProperties.aiInstructions.maxRejections
+            val window = Duration.ofMinutes(appProperties.aiInstructions.rejectionWindowMinutes)
             val limit = Bandwidth.builder().capacity(rejections).refillIntervally(rejections, window).build()
             Bucket.builder().addLimit(limit).build()
         }

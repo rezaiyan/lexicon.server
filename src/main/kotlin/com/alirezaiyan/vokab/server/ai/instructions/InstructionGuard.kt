@@ -1,17 +1,23 @@
 package com.alirezaiyan.vokab.server.ai.instructions
 
+import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.annotation.PreDestroy
 import org.springframework.stereotype.Component
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
+import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 private val logger = KotlinLogging.logger {}
 
 /**
  * Screens a learner's free-text instruction before any credit is spent:
- * prescreen (free, deterministic) → judge model (classify + rewrite). Every refusal counts
- * against a per-user window; a user who keeps getting refused is paused for a while, which caps
- * what probing the guard can cost.
+ * prescreen (free, deterministic) → judge model (classify + rewrite), bounded by
+ * `app.ai-instructions.judge-timeout-seconds`. Every refusal counts against a per-user window; a
+ * user who keeps getting refused is paused for a while, which caps what probing the guard costs.
  *
  * Instruction text is never logged, only its length and the outcome.
  */
@@ -19,14 +25,17 @@ private val logger = KotlinLogging.logger {}
 class InstructionGuard(
     private val judge: InstructionJudge,
     private val rateLimitConfig: RateLimitConfig,
+    private val appProperties: AppProperties,
 ) {
+    // Judge calls block on I/O; virtual threads keep a slow judge from holding a platform thread
+    private val judgeExecutor = Executors.newVirtualThreadPerTaskExecutor()
 
     /**
      * The rewritten intent to hand to the generation prompt.
      *
      * @throws InstructionsPausedException when the user was refused too often lately
      * @throws InstructionRejectedException when the instruction is refused
-     * @throws InstructionsUnavailableException when the judge could not decide
+     * @throws InstructionsUnavailableException when the judge could not decide in time
      */
     fun screen(
         userId: Long,
@@ -42,7 +51,7 @@ class InstructionGuard(
         }
 
         val reason = InstructionPrescreen.check(instruction)
-            ?: when (val verdict = judge.judge(instruction, scope, learningLanguage, nativeLanguage)) {
+            ?: when (val verdict = judgeInTime(instruction, scope, learningLanguage, nativeLanguage)) {
                 is InstructionVerdict.Allowed -> {
                     logger.info {
                         "userId=$userId instruction allowed: scope=$scope, length=${instruction.text.length}"
@@ -58,4 +67,29 @@ class InstructionGuard(
         }
         throw InstructionRejectedException(reason)
     }
+
+    private fun judgeInTime(
+        instruction: UserInstruction,
+        scope: InstructionScope,
+        learningLanguage: String,
+        nativeLanguage: String,
+    ): InstructionVerdict {
+        val call = CompletableFuture.supplyAsync(
+            { judge.judge(instruction, scope, learningLanguage, nativeLanguage) },
+            judgeExecutor,
+        )
+        return try {
+            call.get(appProperties.aiInstructions.judgeTimeoutSeconds, TimeUnit.SECONDS)
+        } catch (e: TimeoutException) {
+            // The learner stops waiting here; the HTTP call itself ends on the client's own timeout
+            call.cancel(true)
+            throw InstructionsUnavailableException("Instruction judge timed out", e)
+        } catch (e: ExecutionException) {
+            // Whatever went wrong (judge down, unreadable answer, a bug), the guard fails closed
+            throw InstructionsUnavailableException("Instruction judge failed", e)
+        }
+    }
+
+    @PreDestroy
+    fun close() = judgeExecutor.close()
 }

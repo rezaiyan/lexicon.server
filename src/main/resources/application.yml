@@ -123,12 +123,18 @@ app:
       PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:2}
       AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:2}
       TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
+      # With the learner's own instructions (screened by InstructionGuard)
+      PHOTO_EXTRACTION_GUIDED: ${CREDITS_COST_PHOTO_GUIDED:3}
+      AI_SUGGESTION_GUIDED: ${CREDITS_COST_SUGGESTION_GUIDED:3}
 
   # Per-user call limits on the AI endpoints; each limit resets in full every window.
   rate-limit:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
     photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
     ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+    # Refused custom AI instructions per user before instructions pause (see InstructionGuard)
+    instruction-rejections: ${AI_INSTRUCTION_REJECTIONS:5}
+    instruction-rejection-window-minutes: ${AI_INSTRUCTION_REJECTION_WINDOW_MINUTES:60}
 
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.

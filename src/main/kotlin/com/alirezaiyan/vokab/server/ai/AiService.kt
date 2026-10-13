@@ -74,12 +74,14 @@ class AiService(
     /**
      * v2 photo extraction: the model answers JSON, which is validated here so clients receive clean,
      * de-duplicated items and never parse text. An image without vocabulary yields an empty list.
+     * [preferences] narrow which items are read.
      */
     fun extractWordsFromImage(
         imageBase64: String,
         learningLanguage: String,
         nativeLanguage: String,
         includePhrases: Boolean = false,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): List<ExtractedWordItem> {
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
         require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
@@ -98,6 +100,8 @@ class AiService(
                 } else {
                     "Extract individual words or short phrases of at most 3 words. Skip full sentences."
                 },
+                "focus" to preferences.focus.toPromptBlock(noteField = "\"note\""),
+                "preferences" to preferences.intent.toPromptBlock(),
             ),
         )
         val raw = aiClient.completeWithImage(imageBase64, prompt, AiOperation.IMAGE_EXTRACTION)
@@ -200,15 +204,20 @@ class AiService(
         targetLanguage: String,
         currentLevel: String,
         nativeLanguage: String,
-        interests: List<String> = emptyList()
+        interests: List<String> = emptyList(),
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): List<SuggestVocabularyItemResponse> {
         val requestedCount = appProperties.vocabulary.suggestionCount + 10
         logger.info {
             "Generating vocabulary: target=$targetLanguage, level=$currentLevel, native=$nativeLanguage, " +
-                "itemsRequested=$requestedCount, interests=${interests.joinToString(limit = 5).ifEmpty { "none" }}"
+                "itemsRequested=$requestedCount, interests=${interests.joinToString(limit = 5).ifEmpty { "none" }}, " +
+                "focus=${preferences.focus}, guided=${preferences.isGuided}"
         }
 
-        val focusRequirements = if (interests.isNotEmpty()) {
+        val focusRequirements = if (preferences.isGuided) {
+            "4. The learner request below comes first: choose vocabulary that fits it closely, even if " +
+                "that means skipping the balanced mix in rule 3."
+        } else if (interests.isNotEmpty()) {
             "4. Prioritize vocabulary that is especially relevant to these interests: ${interests.joinToString()}.\n" +
                 "5. Still include some general everyday vocabulary so the set feels balanced for an " +
                 "onboarding experience."
@@ -226,6 +235,8 @@ class AiService(
                 "interestsLine" to
                     if (interests.isEmpty()) "" else "- Their interests / focus areas: ${interests.joinToString()}",
                 "focusRequirements" to focusRequirements,
+                "focus" to preferences.focus.toPromptBlock(noteField = "optionalShortDescription"),
+                "preferences" to preferences.intent.toPromptBlock(),
             ),
         )
 

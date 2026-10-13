@@ -8,6 +8,17 @@ object ApiErrorCode {
     const val INSUFFICIENT_CREDITS = "INSUFFICIENT_CREDITS"
     const val RATE_LIMITED = "RATE_LIMITED"
     const val UPSTREAM_UNAVAILABLE = "UPSTREAM_UNAVAILABLE"
+
+    /** The learner's AI instructions were refused (422); nothing was charged. */
+    const val INSTRUCTIONS_OFF_TOPIC = "INSTRUCTIONS_OFF_TOPIC"
+    const val INSTRUCTIONS_UNSAFE = "INSTRUCTIONS_UNSAFE"
+    const val INSTRUCTIONS_PERSONAL_DATA = "INSTRUCTIONS_PERSONAL_DATA"
+
+    /** Too many refused instructions; instructions pause for a while (429). */
+    const val INSTRUCTIONS_PAUSED = "INSTRUCTIONS_PAUSED"
+
+    /** Instructions could not be screened right now (503); the request works without them. */
+    const val INSTRUCTIONS_UNAVAILABLE = "INSTRUCTIONS_UNAVAILABLE"
 }
 
 /**

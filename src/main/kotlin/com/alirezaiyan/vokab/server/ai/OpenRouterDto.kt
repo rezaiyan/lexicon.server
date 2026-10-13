@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.study.ProgressStatsDto
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import jakarta.validation.constraints.NotNull
@@ -63,6 +65,14 @@ data class SuggestVocabularyRequest(
     /** ISO code of [targetLanguage] (e.g. "de"), used to skip words the user already has. */
     @field:Size(max = 8)
     val targetLanguageCode: String? = null,
+
+    /** Quick picks; free. */
+    @field:Valid
+    val focus: VocabularyFocus? = null,
+
+    /** The learner's own words; screened by the instruction guard and charged as guided suggestions. */
+    @field:Size(max = UserInstruction.MAX_LENGTH)
+    val instructions: String? = null,
 )
 
 /**
@@ -118,6 +128,14 @@ data class ExtractWordsRequest(
 
     /** Also return short phrases, not only single words. */
     val includePhrases: Boolean = false,
+
+    /** Quick picks; free. */
+    @field:Valid
+    val focus: VocabularyFocus? = null,
+
+    /** The learner's own words; screened by the instruction guard and charged as a guided extraction. */
+    @field:Size(max = UserInstruction.MAX_LENGTH)
+    val instructions: String? = null,
 )
 
 data class ExtractedWordItem(

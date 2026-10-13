@@ -18,6 +18,7 @@ enum class AiOperation(val tag: String, val judge: Boolean = false) {
     NOTIFICATION_ADVICE("notification advice"),
     COMEBACK_RESCUE("comeback rescue"),
     COMEBACK_RESCUE_JUDGE("comeback rescue judge", judge = true),
+    INSTRUCTION_GUARD("instruction guard", judge = true),
 }
 
 /** One-shot chat completion with the configured model. */

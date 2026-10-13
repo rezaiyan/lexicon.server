@@ -45,6 +45,7 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String> = emptyList(),
         targetLanguageCode: String? = null,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
         val target = targetLanguage.trim()
         return suggest(
@@ -53,6 +54,7 @@ class VocabularySuggestionService(
             nativeLanguage = nativeLanguage.trim(),
             interests = interests.map { it.trim() }.filter { it.isNotBlank() },
             existingKeys = wordService.getExistingTermKeys(userId, targetLanguageCode?.trim() ?: target),
+            preferences = preferences,
         )
     }
 
@@ -62,12 +64,14 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String>,
         existingKeys: Set<String>,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
         val rawItems = aiService.generateVocabularyFromPreferences(
             targetLanguage = targetLanguage,
             currentLevel = currentLevel,
             nativeLanguage = nativeLanguage,
             interests = interests,
+            preferences = preferences,
         )
 
         val targetCount = appProperties.vocabulary.suggestionCount

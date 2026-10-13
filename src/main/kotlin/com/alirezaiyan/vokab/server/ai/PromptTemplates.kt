@@ -8,16 +8,17 @@ import org.springframework.stereotype.Component
  */
 enum class Prompt(val resource: String) {
     IMAGE_EXTRACTION("image-extraction.v1"),
-    IMAGE_EXTRACTION_V2("image-extraction.v2"),
+    IMAGE_EXTRACTION_V2("image-extraction.v3"),
     CELEBRATION_INSIGHT("celebration-insight.v1"),
     DAILY_INSIGHT("daily-insight.v1"),
     MILESTONE_MESSAGE("milestone-message.v1"),
     STREAK_REMINDER("streak-reminder.v1"),
     TRANSLATE("translate.v1"),
-    SUGGEST_VOCABULARY("suggest-vocabulary.v1"),
+    SUGGEST_VOCABULARY("suggest-vocabulary.v2"),
     NOTIFICATION_ADVICE("notification-advice.v1"),
     COMEBACK_RESCUE("comeback-rescue.v1"),
     COMEBACK_RESCUE_JUDGE("comeback-rescue-judge.v1"),
+    INSTRUCTION_GUARD("instruction-guard.v1"),
 }
 
 /**

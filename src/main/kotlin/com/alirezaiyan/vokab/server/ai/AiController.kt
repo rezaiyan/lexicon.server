@@ -1,5 +1,9 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionGuard
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionScope
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
+import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.credits.CreditAction
 import com.alirezaiyan.vokab.server.credits.CreditCharger
 import com.alirezaiyan.vokab.server.shared.AuthUser
@@ -30,6 +34,7 @@ class AiController(
     private val dailyInsightService: DailyInsightService,
     private val vocabularySuggestionService: VocabularySuggestionService,
     private val creditCharger: CreditCharger,
+    private val instructionGuard: InstructionGuard,
 ) {
     
     @PostMapping("/extract-vocabulary")
@@ -69,13 +74,22 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
+        // Screened before charging: refused instructions cost nothing
+        val intent = screenInstructions(
+            user, request.instructions, InstructionScope.PHOTO_EXTRACTION,
+            request.learningLanguage, request.nativeLanguage,
+        )
+        val preferences = LearnerPreferences(request.focus ?: VocabularyFocus(), intent)
+        val action = if (preferences.isGuided) CreditAction.PHOTO_EXTRACTION_GUIDED else CreditAction.PHOTO_EXTRACTION
+
         // Nothing recognised is refunded: the user got nothing for the credits
-        val items = creditCharger.charge(user.id, CreditAction.PHOTO_EXTRACTION, refundIf = { it.isEmpty() }) {
+        val items = creditCharger.charge(user.id, action, refundIf = { it.isEmpty() }) {
             aiService.extractWordsFromImage(
                 imageBase64 = request.imageBase64,
                 learningLanguage = request.learningLanguage,
                 nativeLanguage = request.nativeLanguage,
                 includePhrases = request.includePhrases,
+                preferences = preferences,
             )
         }
         logger.info { "Word extraction (v2) for userId=${user.id}: ${items.size} items" }
@@ -146,7 +160,15 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "suggest-vocabulary")
 
-        val response = creditCharger.charge(user.id, CreditAction.AI_SUGGESTION, refundIf = { it.items.isEmpty() }) {
+        // Screened before charging: refused instructions cost nothing
+        val intent = screenInstructions(
+            user, request.instructions, InstructionScope.VOCABULARY_SUGGESTION,
+            request.targetLanguage, request.nativeLanguage,
+        )
+        val preferences = LearnerPreferences(request.focus ?: VocabularyFocus(), intent)
+        val action = if (preferences.isGuided) CreditAction.AI_SUGGESTION_GUIDED else CreditAction.AI_SUGGESTION
+
+        val response = creditCharger.charge(user.id, action, refundIf = { it.items.isEmpty() }) {
             vocabularySuggestionService.suggestForUser(
                 userId = user.id,
                 targetLanguage = request.targetLanguage,
@@ -154,6 +176,7 @@ class AiController(
                 nativeLanguage = request.nativeLanguage,
                 interests = request.interests,
                 targetLanguageCode = request.targetLanguageCode,
+                preferences = preferences,
             )
         }
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
@@ -171,6 +194,17 @@ class AiController(
                 )
             )
         )
+    }
+
+    /** The guard's intent for the learner's [raw] instructions; null when there are none. */
+    private fun screenInstructions(
+        user: AuthUser,
+        raw: String?,
+        scope: InstructionScope,
+        learningLanguage: String,
+        nativeLanguage: String,
+    ): ScreenedIntent? = UserInstruction.of(raw)?.let { instruction ->
+        instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
     }
 
     /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */

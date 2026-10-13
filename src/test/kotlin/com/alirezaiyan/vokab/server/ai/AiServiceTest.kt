@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
 import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.fixedClock
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -174,7 +175,52 @@ class AiServiceTest {
         assertThrows<UserFacingException> { service.generateVocabularyFromPreferences("German", "beginner", "English") }
     }
 
+    @Test
+    fun `generateVocabularyFromPreferences puts quick picks and the screened request ahead of the balanced mix`() {
+        expectChat()
+            .andExpect(promptContains("The learner request below comes first"))
+            .andExpect(promptContains("Only include these kinds of items: verbs."))
+            .andExpect(promptContains("<learner_request>"))
+            .andExpect(promptContains("Hospital job interview"))
+            .andRespond(answer("Bewerbung,application"))
+
+        service.generateVocabularyFromPreferences(
+            "German", "beginner", "English",
+            preferences = LearnerPreferences(
+                VocabularyFocus(wordTypes = setOf(WordType.VERB)),
+                ScreenedIntent("Hospital job interview"),
+            ),
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences leaves the learner blocks out when nothing was asked`() {
+        expectChat()
+            .andExpect(content().string(not(containsString("learner_request"))))
+            .andExpect(content().string(not(containsString("Learner focus"))))
+            .andRespond(answer("Hallo,hello"))
+
+        service.generateVocabularyFromPreferences("German", "beginner", "English")
+        server.verify()
+    }
+
     // ── extractWordsFromImage (v2) ────────────────────────────────────────────
+
+    @Test
+    fun `extractWordsFromImage adds quick picks and the screened request before the output format`() {
+        expectChat()
+            .andExpect(promptContains("Only take items that are visibly marked"))
+            .andExpect(promptContains("<learner_request>"))
+            .andExpect(promptContains("Verbs only"))
+            .andRespond(answer("{\"items\":[]}"))
+
+        service.extractWordsFromImage(
+            "AAAA", "German", "English",
+            preferences = LearnerPreferences(VocabularyFocus(markedOnly = true), ScreenedIntent("Verbs only")),
+        )
+        server.verify()
+    }
 
     @Test
     fun `extractWordsFromImage returns clean de-duplicated items from the JSON answer`() {

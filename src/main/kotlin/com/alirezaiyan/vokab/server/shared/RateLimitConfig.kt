@@ -19,6 +19,18 @@ class RateLimitConfig(private val appProperties: AppProperties) {
     fun getImageProcessingBucket(userId: String): Bucket =
         cache.computeIfAbsent("image_$userId") { windowBucket(appProperties.rateLimit.photoCalls) }
 
+    /**
+     * Refused AI instructions per user. Only refusals consume; an empty bucket pauses the user's
+     * instructions until the window ends (plain AI requests keep working).
+     */
+    fun getInstructionRejectionBucket(userId: Long): Bucket =
+        cache.computeIfAbsent("instruction_rejections_$userId") {
+            val rejections = appProperties.rateLimit.instructionRejections
+            val window = Duration.ofMinutes(appProperties.rateLimit.instructionRejectionWindowMinutes)
+            val limit = Bandwidth.builder().capacity(rejections).refillIntervally(rejections, window).build()
+            Bucket.builder().addLimit(limit).build()
+        }
+
     /** [calls] tokens that all come back at once at the end of each `app.rate-limit.window-minutes`. */
     private fun windowBucket(calls: Long): Bucket {
         val window = Duration.ofMinutes(appProperties.rateLimit.windowMinutes)

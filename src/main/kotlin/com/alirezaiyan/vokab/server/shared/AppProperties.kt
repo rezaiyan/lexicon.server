@@ -104,7 +104,10 @@ data class VocabularyConfig(
 data class RateLimitProperties(
     var windowMinutes: Long = 5,
     var photoCalls: Long = 20,
-    var aiCalls: Long = 50
+    var aiCalls: Long = 50,
+    /** Refused AI instructions a user may have per [instructionRejectionWindowMinutes] before instructions pause. */
+    var instructionRejections: Long = 5,
+    var instructionRejectionWindowMinutes: Long = 60,
 )
 
 data class CiAuthConfig(

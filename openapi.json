@@ -2070,12 +2070,24 @@
       },
       "ExtractWordsRequest" : {
         "properties" : {
+          "focus" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/VocabularyFocus"
+            }, {
+              "type" : "null"
+            } ]
+          },
           "imageBase64" : {
             "minLength" : 1,
             "type" : "string"
           },
           "includePhrases" : {
             "type" : "boolean"
+          },
+          "instructions" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
           },
           "learningLanguage" : {
             "minLength" : 1,
@@ -3550,6 +3562,18 @@
             "minLength" : 1,
             "type" : "string"
           },
+          "focus" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/VocabularyFocus"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "instructions" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
           "interests" : {
             "items" : {
               "type" : "string"
@@ -4447,6 +4471,35 @@
           }
         },
         "required" : [ "extractedText", "wordCount" ],
+        "type" : "object"
+      },
+      "VocabularyFocus" : {
+        "properties" : {
+          "grammarNotes" : {
+            "type" : "boolean"
+          },
+          "markedOnly" : {
+            "type" : "boolean"
+          },
+          "register" : {
+            "enum" : [ "FORMAL", "EVERYDAY", "SLANG" ],
+            "type" : [ "string", "null" ]
+          },
+          "skipNames" : {
+            "type" : "boolean"
+          },
+          "wordTypes" : {
+            "items" : {
+              "enum" : [ "NOUN", "VERB", "ADJECTIVE", "ADVERB", "PHRASE", "IDIOM" ],
+              "type" : "string"
+            },
+            "maxItems" : 6,
+            "minItems" : 0,
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "required" : [ "grammarNotes", "markedOnly", "skipNames", "wordTypes" ],
         "type" : "object"
       },
       "WeekdayAccuracyDto" : {

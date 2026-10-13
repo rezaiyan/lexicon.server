@@ -38,6 +38,7 @@ class NotificationContentBuilderTest {
     private lateinit var learnerSignals: LearnerSignals
     private lateinit var dailyInsightService: DailyInsightService
     private lateinit var milestoneDetector: MilestoneDetector
+    private lateinit var dueWordQueries: DueWordQueries
 
     private lateinit var notificationContentBuilder: NotificationContentBuilder
 
@@ -48,6 +49,8 @@ class NotificationContentBuilderTest {
         learnerSignals = mockk()
         dailyInsightService = mockk()
         milestoneDetector = mockk()
+        dueWordQueries = mockk()
+        every { dueWordQueries.dueWords(any(), any()) } returns emptyList()
 
         notificationContentBuilder = NotificationContentBuilder(
             aiService,
@@ -55,6 +58,7 @@ class NotificationContentBuilderTest {
             learnerSignals,
             dailyInsightService,
             milestoneDetector,
+            dueWordQueries,
             fixedClock(),
         )
     }
@@ -123,7 +127,7 @@ class NotificationContentBuilderTest {
     @Test
     fun `should say the streak resets within the hour late in the UTC day`() {
         val builder = NotificationContentBuilder(
-            aiService, userProgressService, learnerSignals, dailyInsightService, milestoneDetector,
+            aiService, userProgressService, learnerSignals, dailyInsightService, milestoneDetector, dueWordQueries,
             fixedClock(Instant.parse("2026-06-17T23:30:00Z")),
         )
         val user = createUser(currentStreak = 4)
@@ -189,33 +193,35 @@ class NotificationContentBuilderTest {
     // ── DUE_CARDS ─────────────────────────────────────────────────────────────
 
     @Test
-    fun `should return DUE_CARDS payload with target language and estimated minutes`() {
-        // Arrange
+    fun `DUE_CARDS offers a short bite of the backlog, not its total time`() {
         val user = createUser()
-        val stats = createProgressStats(totalWords = 20, dueCards = 10)
-        val langStats = listOf(createLanguagePairStats(targetLanguage = "Spanish"))
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns langStats.firstOrNull()?.targetLanguage
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 154)
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "de"
+        every { dueWordQueries.dueWords(user.requireId(), any()) } returns
+            (1L..154L).map { DueWordRow(it, level = if (it <= 10) 1 else 4, nextReviewDate = it) }
 
-        // Act
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
 
-        // Assert
         assertEquals(NotificationType.DUE_CARDS, result.type)
-        assertTrue(result.body.contains("Spanish"))
-        assertTrue(result.title.contains("10"))
-        assertEquals("10", result.data["due_count"])
+        assertEquals("📚 8 German words, about 3 min", result.title)
+        assertEquals("Most of them you already know. Quick win?", result.body)
+        assertFalse(result.title.contains("154") || result.body.contains("154"))
+        assertEquals("vokab://review/words?ids=11,12,1,2,13,14,15,16", result.data["deep_link"])
+        assertEquals("154", result.data["due_count"])
     }
 
     @Test
-    fun `should name the language when the target language is stored as a code`() {
+    fun `DUE_CARDS opens the due review without a size when the due words cannot be read`() {
         val user = createUser()
         every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 10)
         every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "de"
+        every { dueWordQueries.dueWords(any(), any()) } throws RuntimeException("DB error")
 
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
 
-        assertEquals("Your German review takes ~1 min.", result.body)
+        assertEquals("📚 Your German words are ready", result.title)
+        assertFalse(result.body.contains("min"))
+        assertEquals("vokab://review/due", result.data["deep_link"])
     }
 
     @Test
@@ -226,22 +232,7 @@ class NotificationContentBuilderTest {
 
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
 
-        assertEquals("Your xx review takes ~1 min.", result.body)
-    }
-
-    @Test
-    fun `should calculate estimated minutes as at least 1 even when due cards are very few`() {
-        // Arrange - 5 cards * 8 / 60 = 0, so maxOf(1, 0) = 1
-        val user = createUser()
-        val stats = createProgressStats(dueCards = 5)
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
-        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "French"
-
-        // Act
-        val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
-
-        // Assert
-        assertTrue(result.body.contains("1 min"))
+        assertEquals("📚 Your xx words are ready", result.title)
     }
 
     @Test
@@ -257,7 +248,7 @@ class NotificationContentBuilderTest {
 
         // Assert
         assertEquals(NotificationType.DUE_CARDS, result.type)
-        assertTrue(result.body.contains("vocabulary"))
+        assertTrue(result.title.contains("vocabulary"))
     }
 
     @Test
@@ -272,7 +263,7 @@ class NotificationContentBuilderTest {
         val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
 
         // Assert
-        assertTrue(result.body.contains("vocabulary"))
+        assertTrue(result.title.contains("vocabulary"))
     }
 
     // ── COMEBACK_ALERT ────────────────────────────────────────────────────────
@@ -484,30 +475,24 @@ class NotificationContentBuilderTest {
     // ── REVIEW_REMINDER ────────────────────────────────────────────────────────
 
     @Test
-    fun `should return REVIEW_REMINDER payload with due card count and estimated time when cards are due`() {
-        // Arrange
+    fun `REVIEW_REMINDER offers a short bite and opens exactly those words`() {
         val user = createUser()
-        val stats = createProgressStats(dueCards = 15)
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
+        every { dueWordQueries.dueWords(user.requireId(), any()) } returns
+            (1L..15L).map { DueWordRow(it, level = 3, nextReviewDate = it) }
 
-        // Act
         val result = notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER)
 
-        // Assert
         assertEquals(NotificationType.REVIEW_REMINDER, result.type)
         assertEquals("📚 Time to review!", result.title)
-        assertTrue(result.body.contains("15"))
-        assertTrue(result.body.contains("min"))
+        assertEquals("8 words, about 3 min. Most of them you already know. Quick win?", result.body)
         assertEquals("review_reminder", result.data["type"])
-        assertEquals("vokab://review", result.data["deep_link"])
+        assertEquals("vokab://review/words?ids=1,2,3,4,5,6,7,8", result.data["deep_link"])
     }
 
     @Test
     fun `should return REVIEW_REMINDER payload with generic message when no cards are due`() {
         // Arrange
         val user = createUser()
-        val stats = createProgressStats(dueCards = 0)
-        every { userProgressService.calculateProgressStats(user.requireId()) } returns stats
 
         // Act
         val result = notificationContentBuilder.build(user, NotificationType.REVIEW_REMINDER)

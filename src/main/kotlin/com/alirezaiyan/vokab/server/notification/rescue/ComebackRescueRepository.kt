@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -13,6 +14,8 @@ interface ComebackRescueRepository : JpaRepository<ComebackRescue, Long> {
 
     /** Any plan since [plannedFor], whatever its status: one rescue (and one AI call) per lapse. */
     fun existsByUserIdAndPlannedForAfter(userId: Long, plannedFor: LocalDate): Boolean
+
+    fun findAllByOrderByPlannedForDescIdDesc(pageable: Pageable): List<ComebackRescue>
 
     /** The learner's latest plans, newest first: last angle and recent copy for variety checks. */
     fun findTop3ByUserIdOrderByPlannedForDesc(userId: Long): List<ComebackRescue>

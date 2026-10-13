@@ -94,12 +94,15 @@ class ComebackRescue(
 ) : JpaEntity<Long>() {
 
     val wordIdList: List<Long>
-        get() = wordIds.removeSurrounding("[", "]").split(",").mapNotNull { it.trim().toLongOrNull() }
+        get() = decodeWordIds(wordIds)
 
     override fun toString(): String =
         "ComebackRescue(id=$id, userId=$userId, plannedFor=$plannedFor, status=$status, source=$source)"
 
     companion object {
         fun encodeWordIds(ids: List<Long>): String = ids.joinToString(",", "[", "]")
+
+        fun decodeWordIds(json: String): List<Long> =
+            json.removeSurrounding("[", "]").split(",").mapNotNull { it.trim().toLongOrNull() }
     }
 }

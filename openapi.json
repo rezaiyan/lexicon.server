@@ -675,6 +675,69 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListRescueFunnelRow" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescueFunnelRow"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListRescuePlanView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescuePlanView"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListRescuePreviewView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescuePreviewView"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListResponseTimeTrendResponse" : {
         "properties" : {
           "code" : {
@@ -1269,6 +1332,28 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/TagDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseTasteScore" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TasteScore"
             }, {
               "type" : "null"
             } ]
@@ -2593,7 +2678,7 @@
             "type" : "integer"
           },
           "job" : {
-            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS", "COMEBACK_RESCUE_PLANNING" ],
             "type" : "string"
           },
           "startedAt" : {
@@ -2953,6 +3038,214 @@
           }
         },
         "required" : [ "name" ],
+        "type" : "object"
+      },
+      "RescueCandidateView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "chosen" : {
+            "type" : "boolean"
+          },
+          "factIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "index" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "rating" : {
+            "enum" : [ "UP", "DOWN" ],
+            "type" : [ "string", "null" ]
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "violations" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "angle", "body", "chosen", "factIds", "index", "rank", "title", "violations" ],
+        "type" : "object"
+      },
+      "RescueFunnelRow" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "arm" : {
+            "enum" : [ "SENT", "HOLDOUT", "UNSENT" ],
+            "type" : "string"
+          },
+          "completed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "opened" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "planned" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "returned24h" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "angle", "arm", "completed", "opened", "planned", "returned24h", "sent", "source" ],
+        "type" : "object"
+      },
+      "RescuePlanView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "outroSoft" : {
+            "type" : [ "string", "null" ]
+          },
+          "outroWin" : {
+            "type" : [ "string", "null" ]
+          },
+          "plannedFor" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PLANNED", "HOLDOUT", "SENT", "COMPLETED", "EXPIRED" ],
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "angle", "body", "id", "plannedFor", "source", "status", "title", "userId", "wordCount" ],
+        "type" : "object"
+      },
+      "RescuePreviewView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "candidates" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescueCandidateView"
+            },
+            "type" : "array"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "outroSoft" : {
+            "type" : [ "string", "null" ]
+          },
+          "outroWin" : {
+            "type" : [ "string", "null" ]
+          },
+          "promptVersion" : {
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "angle", "body", "candidates", "createdAt", "id", "promptVersion", "source", "title", "userId", "wordIds" ],
+        "type" : "object"
+      },
+      "RescueRatingRequest" : {
+        "properties" : {
+          "candidateIndex" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
+          "rating" : {
+            "enum" : [ "UP", "DOWN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "candidateIndex", "rating" ],
         "type" : "object"
       },
       "ResponseTimeTrendResponse" : {
@@ -3747,6 +4040,40 @@
           }
         },
         "required" : [ "createdAt", "id", "name", "updatedAt", "wordCount" ],
+        "type" : "object"
+      },
+      "TasteScore" : {
+        "properties" : {
+          "allRated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allUp" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allUpRate" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "rated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "target" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "up" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "upRate" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          }
+        },
+        "required" : [ "allRated", "allUp", "rated", "target", "up" ],
         "type" : "object"
       },
       "TelegramChat" : {
@@ -4668,7 +4995,7 @@
           "name" : "job",
           "required" : true,
           "schema" : {
-            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS", "COMEBACK_RESCUE_PLANNING" ],
             "type" : "string"
           }
         } ],
@@ -4854,6 +5181,189 @@
           }
         },
         "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/rescue/eval.jsonl" : {
+      "get" : {
+        "operationId" : "evalSet",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/funnel" : {
+      "get" : {
+        "operationId" : "funnel",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "days",
+          "required" : false,
+          "schema" : {
+            "default" : 14,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescueFunnelRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/plans" : {
+      "get" : {
+        "operationId" : "plans",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePlanView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/previews" : {
+      "get" : {
+        "operationId" : "previews",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePreviewView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      },
+      "post" : {
+        "operationId" : "generatePreviews",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "count",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePreviewView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/previews/{previewId}/ratings" : {
+      "post" : {
+        "operationId" : "rate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "previewId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RescueRatingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTasteScore"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/taste" : {
+      "get" : {
+        "operationId" : "taste",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTasteScore"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
       }
     },
     "/admin/subscriptions/reconcile" : {

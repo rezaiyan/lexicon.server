@@ -102,10 +102,8 @@ class RescuePreviewService(
         candidateTitles(preview).indexOf(preview.title).takeIf { it >= 0 && preview.source == RescueSource.AI }
 
     /** Titles of the stored candidates, in the order the AI returned them. */
-    fun candidateTitles(preview: RescuePreview): List<String> {
-        val json = preview.candidates ?: return emptyList()
-        return objectMapper.readTree(json).map { it.path("candidate").path("title").asText() }
-    }
+    private fun candidateTitles(preview: RescuePreview): List<String> =
+        objectMapper.readStoredCandidates(preview.candidates).map { it.candidate.title }
 
     companion object {
         const val MAX_COUNT = 50

@@ -145,6 +145,7 @@ enum class NotificationJob {
     REVIEW_REMINDERS,
     REFRESH_SCHEDULES,
     REFRESH_SEGMENTS,
+    COMEBACK_RESCUE_PLANNING,
 }
 
 data class NotificationJobRunDto(

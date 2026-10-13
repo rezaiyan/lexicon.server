@@ -95,6 +95,7 @@ class NotificationAdminService(
             NotificationJob.REVIEW_REMINDERS -> notificationScheduledTasks.dispatchReviewReminders()
             NotificationJob.REFRESH_SCHEDULES -> notificationScheduledTasks.refreshNotificationSchedules()
             NotificationJob.REFRESH_SEGMENTS -> notificationScheduledTasks.refreshEngagementSegments()
+            NotificationJob.COMEBACK_RESCUE_PLANNING -> notificationScheduledTasks.planComebackRescues()
         }
         return NotificationJobRunDto(
             job = job,

@@ -6062,6 +6062,33 @@
         "tags" : [ "push-notification-controller" ]
       }
     },
+    "/api/v1/notifications/rescue/{rescueId}/complete" : {
+      "post" : {
+        "operationId" : "complete",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "rescueId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "comeback-rescue-controller" ]
+      }
+    },
     "/api/v1/notifications/send" : {
       "post" : {
         "operationId" : "sendNotification",

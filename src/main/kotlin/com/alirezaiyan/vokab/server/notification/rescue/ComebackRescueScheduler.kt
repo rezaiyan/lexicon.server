@@ -32,6 +32,9 @@ class ComebackRescueScheduler(
                 }
         }
 
-        logger.info { "Comeback rescue planning complete — users=${users.size}, planned=$planned, failed=$failed, expired=$expired" }
+        logger.info {
+            "Comeback rescue planning complete — users=${users.size}, planned=$planned, " +
+                "failed=$failed, expired=$expired"
+        }
     }
 }

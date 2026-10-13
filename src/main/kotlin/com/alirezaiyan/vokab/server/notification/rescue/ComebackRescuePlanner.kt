@@ -17,6 +17,15 @@ import java.time.LocalDate
 
 private val logger = KotlinLogging.logger {}
 
+/** A rescue's words and copy before it is stored; [candidatesJson] holds every candidate with its violations. */
+data class RescueDraft(
+    val wordIds: List<Long>,
+    val copy: RescueCopy,
+    val source: RescueSource,
+    val candidatesJson: String? = null,
+    val reasoningJson: String? = null,
+)
+
 /**
  * Builds today's comeback rescue for one learner: checks eligibility, gathers the candidate pool
  * and fact sheet, asks the model for picks and copy, validates both and falls back where needed,
@@ -39,29 +48,8 @@ class ComebackRescuePlanner(
         val today = LocalDate.now(clock)
         if (rescueRepository.findByUserIdAndPlannedFor(userId, today) != null) return null
 
-        val studyDates = dailyActivityRepository
-            .findRecentActivities(user, today.minusDays(ComebackRescuePolicy.LOOKBACK_DAYS))
-            .map { it.activityDate }
-        val lastStudy = studyDates.maxOrNull() ?: return null
-        val totalWords = candidateQueries.totalWords(userId)
-        val alreadyRescued = rescueRepository.existsByUserIdAndPlannedForAfterAndStatusIn(
-            userId, lastStudy, RescueStatus.CONSUMES_LAPSE,
-        )
-        if (!ComebackRescuePolicy.isEligible(LapseSignals(studyDates, totalWords, alreadyRescued), today)) return null
-
-        val pool = RescuePool.from(candidateQueries.candidates(userId), clock.millis())
-            ?.takeIf { it.canPlan } ?: return null
-        val profile = RescueProfile(
-            daysAway = requireNotNull(ComebackRescuePolicy.daysAway(studyDates, today)),
-            totalWords = totalWords,
-            longestStreak = user.longestStreak,
-            firstWord = candidateQueries.firstWord(userId, pool.sourceLanguage, pool.targetLanguage),
-        )
-        val sheet = RescueFactSheetBuilder.build(profile, pool)
-        val recent = rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(userId)
-        val uiLanguage = userSettingsRepository.findByUserId(userId)?.languageCode ?: DEFAULT_UI_LANGUAGE
-
-        val draft = aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool)
+        val daysAway = lapseDaysAway(user, today) ?: return null
+        val draft = draft(user, daysAway) ?: return null
         val status = if (isHoldout(userId)) RescueStatus.HOLDOUT else RescueStatus.PLANNED
 
         return rescueRepository.save(
@@ -82,13 +70,40 @@ class ComebackRescuePlanner(
         ).also { logger.info { "Comeback rescue planned for user=$userId source=${it.source} status=${it.status}" } }
     }
 
-    private data class Draft(
-        val wordIds: List<Long>,
-        val copy: RescueCopy,
-        val source: RescueSource,
-        val candidatesJson: String? = null,
-        val reasoningJson: String? = null,
-    )
+    /** Days since the last study day when the learner is in an early, not yet rescued lapse; else null. */
+    private fun lapseDaysAway(user: User, today: LocalDate): Long? {
+        val studyDates = dailyActivityRepository
+            .findRecentActivities(user, today.minusDays(ComebackRescuePolicy.LOOKBACK_DAYS))
+            .map { it.activityDate }
+        val lastStudy = studyDates.maxOrNull() ?: return null
+        val alreadyRescued = rescueRepository.existsByUserIdAndPlannedForAfterAndStatusIn(
+            user.requireId(), lastStudy, RescueStatus.CONSUMES_LAPSE,
+        )
+        val signals = LapseSignals(studyDates, candidateQueries.totalWords(user.requireId()), alreadyRescued)
+        return ComebackRescuePolicy.daysAway(studyDates, today)
+            .takeIf { ComebackRescuePolicy.isEligible(signals, today) }
+    }
+
+    /**
+     * Words and copy for [user] as if they had been away [daysAway] days, without checking the lapse
+     * or storing anything. Null when the learner has too few usable words.
+     */
+    fun draft(user: User, daysAway: Long): RescueDraft? {
+        val userId = user.requireId()
+        val pool = RescuePool.from(candidateQueries.candidates(userId), clock.millis())
+            ?.takeIf { it.canPlan } ?: return null
+        val profile = RescueProfile(
+            daysAway = daysAway,
+            totalWords = candidateQueries.totalWords(userId),
+            longestStreak = user.longestStreak,
+            firstWord = candidateQueries.firstWord(userId, pool.sourceLanguage, pool.targetLanguage),
+        )
+        val sheet = RescueFactSheetBuilder.build(profile, pool)
+        val recent = rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(userId)
+        val uiLanguage = userSettingsRepository.findByUserId(userId)?.languageCode ?: DEFAULT_UI_LANGUAGE
+
+        return aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool)
+    }
 
     private fun aiDraft(
         userId: Long,
@@ -96,7 +111,7 @@ class ComebackRescuePlanner(
         sheet: RescueFactSheet,
         recent: List<ComebackRescue>,
         uiLanguage: String,
-    ): Draft? {
+    ): RescueDraft? {
         val lastAngle = recent.firstOrNull()?.angle
         val raw = try {
             aiClient.complete(prompt(pool, sheet, lastAngle, uiLanguage), AiOperation.COMEBACK_RESCUE)
@@ -127,7 +142,7 @@ class ComebackRescuePlanner(
             RescueFallback.copy(pool, picks)
         }
 
-        return Draft(
+        return RescueDraft(
             wordIds = picks,
             copy = copy,
             source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
@@ -138,9 +153,9 @@ class ComebackRescuePlanner(
         )
     }
 
-    private fun fallbackDraft(pool: RescuePool): Draft {
+    private fun fallbackDraft(pool: RescuePool): RescueDraft {
         val picks = RescueFallback.picks(pool)
-        return Draft(picks, RescueFallback.copy(pool, picks), RescueSource.FALLBACK)
+        return RescueDraft(picks, RescueFallback.copy(pool, picks), RescueSource.FALLBACK)
     }
 
     private fun prompt(pool: RescuePool, sheet: RescueFactSheet, lastAngle: String?, uiLanguage: String): String =

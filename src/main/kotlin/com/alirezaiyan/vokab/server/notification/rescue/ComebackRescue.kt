@@ -39,6 +39,7 @@ enum class RescueStatus {
  */
 @Entity
 @Table(name = "comeback_rescue")
+@Suppress("LongParameterList") // one constructor parameter per column
 class ComebackRescue(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -53,10 +53,11 @@ object RescueCopyLinter {
 
         val unknownFacts = c.factIds.filter { id -> ctx.factSheet.facts.none { it.id == id } }
         unknownFacts.forEach { v += "cites unknown fact $it" }
-        val citedNumbers = ctx.factSheet.byIds(c.factIds).flatMap { NUMBER.findAll(it.text).map { m -> m.value }.toList() }.toSet()
+        val citedNumbers = numbersIn(ctx.factSheet.byIds(c.factIds))
         NUMBER.findAll(withoutWords(text, ctx.factSheet.allWords + ctx.sessionWords)).map { it.value }.distinct()
             .filter { it !in citedNumbers }.forEach { v += "ungrounded number $it" }
-        QUOTED.findAll(text).map { it.groupValues[1] }.filter { it !in ctx.factSheet.allWords }.forEach { v += "ungrounded word $it" }
+        QUOTED.findAll(text).map { it.groupValues[1] }
+            .filter { it !in ctx.factSheet.allWords }.forEach { v += "ungrounded word $it" }
 
         v += toneViolations(text)
 
@@ -69,10 +70,13 @@ object RescueCopyLinter {
     /** An outro may be shown only if it is short, calm and invents no numbers. */
     fun outroOk(outro: String?, sheet: RescueFactSheet): Boolean {
         if (outro.isNullOrBlank() || graphemes(outro) > OUTRO_MAX) return false
-        val knownNumbers = sheet.facts.flatMap { NUMBER.findAll(it.text).map { m -> m.value }.toList() }.toSet()
+        val knownNumbers = numbersIn(sheet.facts)
         if (NUMBER.findAll(withoutWords(outro, sheet.allWords)).any { it.value !in knownNumbers }) return false
         return toneViolations(outro).isEmpty()
     }
+
+    private fun numbersIn(facts: List<RescueFact>): Set<String> =
+        facts.flatMap { fact -> NUMBER.findAll(fact.text).map { it.value }.toList() }.toSet()
 
     /** [text] with the learner's own words blanked out, so a word like "B2" is not read as a stat. */
     private fun withoutWords(text: String, words: Set<String>): String =

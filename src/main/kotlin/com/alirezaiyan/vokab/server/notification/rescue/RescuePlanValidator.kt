@@ -12,10 +12,11 @@ object RescuePlanValidator {
 
         val near = pool.nearMastery.map { it.wordId }.toSet()
         val weak = pool.weak.map { it.wordId }.toSet()
-        if (ids.any { it !in near && it !in weak }) return null
-        if (ids.count { it in weak } < MIN_WEAK || ids.count { it in near } < MIN_NEAR_MASTERY) return null
-        if (ids.first() !in near || ids.last() !in near) return null
+        val valid = ids.all { it in near || it in weak } &&
+            ids.count { it in weak } >= MIN_WEAK &&
+            ids.count { it in near } >= MIN_NEAR_MASTERY &&
+            ids.first() in near && ids.last() in near
 
-        return ids
+        return ids.takeIf { valid }
     }
 }

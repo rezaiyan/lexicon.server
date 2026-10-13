@@ -51,7 +51,10 @@ object RescueFactSheetBuilder {
         pool.weak.take(MAX_WORD_FACTS_PER_BUCKET).forEach {
             val misses = it.recent.count { r -> r == '0' }
             val lastTry = if (it.lastCorrect) ", right on the last try" else ""
-            add("weak word \"${it.text}\" (${it.translation}): missed $misses of last ${it.recent.length}$lastTry", setOf(it.text))
+            add(
+                "weak word \"${it.text}\" (${it.translation}): missed $misses of last ${it.recent.length}$lastTry",
+                setOf(it.text),
+            )
         }
 
         profile.firstWord

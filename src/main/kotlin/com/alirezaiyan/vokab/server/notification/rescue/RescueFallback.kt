@@ -20,7 +20,11 @@ object RescueFallback {
     fun picks(pool: RescuePool): List<Long> {
         val weak = pool.weak.take(MAX_WEAK)
         val near = pool.nearMastery
-            .sortedWith(compareByDescending<RescueCandidateRow> { it.recentAccuracy }.thenByDescending { it.level }.thenBy { it.wordId })
+            .sortedWith(
+                compareByDescending<RescueCandidateRow> { it.recentAccuracy }
+                    .thenByDescending { it.level }
+                    .thenBy { it.wordId }
+            )
             .take(RescueFactSheetBuilder.SESSION_SIZE - weak.size)
         return (near.take(2) + weak + near.drop(2)).map { it.wordId }
     }
@@ -32,7 +36,8 @@ object RescueFallback {
         return RescueCopy(
             angle = "rematch",
             title = title,
-            body = "${picks.size} words, about ${RescueFactSheetBuilder.EST_MINUTES} min. Most of them you already know.",
+            body = "${picks.size} words, about ${RescueFactSheetBuilder.EST_MINUTES} min. " +
+                "Most of them you already know.",
             outroWin = "$weakWord: cracked. Nice comeback.",
             outroSoft = "${picks.size} words back in rotation. $weakWord will come round again soon.",
         )

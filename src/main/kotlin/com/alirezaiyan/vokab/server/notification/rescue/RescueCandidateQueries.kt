@@ -42,7 +42,11 @@ class RescueCandidateQueries(private val jdbc: NamedParameterJdbcTemplate) {
 
     @Transactional(readOnly = true)
     fun totalWords(userId: Long): Int =
-        jdbc.queryForObject("SELECT COUNT(*) FROM words WHERE user_id = :userId", mapOf("userId" to userId), Int::class.java) ?: 0
+        jdbc.queryForObject(
+            "SELECT COUNT(*) FROM words WHERE user_id = :userId",
+            mapOf("userId" to userId),
+            Int::class.java,
+        ) ?: 0
 
     private companion object {
         val CANDIDATES_SQL = """

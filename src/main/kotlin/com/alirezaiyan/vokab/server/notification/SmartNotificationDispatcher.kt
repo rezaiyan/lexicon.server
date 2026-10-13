@@ -20,6 +20,7 @@ private val logger = KotlinLogging.logger {}
 const val NOTIFICATION_LOG_ID_KEY = "notification_log_id"
 
 @Service
+@Suppress("LongParameterList") // Spring-injected collaborators, one per notification concern
 class SmartNotificationDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val notificationTypeSelector: NotificationTypeSelector,

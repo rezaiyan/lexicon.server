@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+@Suppress("LongParameterList") // test row builder mirrors the query columns
 internal fun candidateRow(
     id: Long,
     text: String = "w$id",

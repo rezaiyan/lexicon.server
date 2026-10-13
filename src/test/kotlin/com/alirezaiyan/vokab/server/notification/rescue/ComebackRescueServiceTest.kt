@@ -48,6 +48,20 @@ class ComebackRescueServiceTest {
     }
 
     @Test
+    fun `the autopilot view shows a running pause and hides one that is over`() {
+        every { guard.state() } returns RescueAutopilot(pausedUntil = TEST_TODAY.plusDays(2), reason = "2 opted out")
+        val paused = service().autopilot()
+        assertEquals(TEST_TODAY.plusDays(2), paused.pausedUntil)
+        assertEquals("2 opted out", paused.reason)
+
+        every { guard.state() } returns RescueAutopilot(pausedUntil = TEST_TODAY, reason = "2 opted out")
+        val over = service(sendEnabled = false).autopilot()
+        assertNull(over.pausedUntil)
+        assertNull(over.reason)
+        assertFalse(over.sendEnabled)
+    }
+
+    @Test
     fun `holdout, sent and expired plans are not sendable`() {
         listOf(RescueStatus.HOLDOUT, RescueStatus.SENT, RescueStatus.EXPIRED).forEach { status ->
             every { repository.findByUserIdAndPlannedFor(1L, TEST_TODAY) } returns rescue(status)

@@ -89,4 +89,15 @@ class RescueGuardTest {
         verify(exactly = 0) { guardQueries.optOutsAfterRescue(any()) }
         verify(exactly = 0) { channel.send(any(), any()) }
     }
+
+    @Test
+    fun `a failed Telegram alert still keeps the pause`() {
+        every { guardQueries.optOutsAfterRescue(any()) } returns RescueGuard.OPT_OUTS_TO_PAUSE
+        every { channel.send(any(), any()) } throws IllegalStateException("telegram down")
+
+        guard.evaluate()
+
+        assertTrue(guard.paused())
+        verify(exactly = 1) { repository.save(state) }
+    }
 }

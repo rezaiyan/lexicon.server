@@ -1082,6 +1082,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseRescueAutopilotView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/RescueAutopilotView"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseSettingsDto" : {
         "properties" : {
           "code" : {
@@ -3040,6 +3062,26 @@
         "required" : [ "name" ],
         "type" : "object"
       },
+      "RescueAutopilotView" : {
+        "properties" : {
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "pausedUntil" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "sendEnabled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "changedAt", "sendEnabled" ],
+        "type" : "object"
+      },
       "RescueCandidateView" : {
         "properties" : {
           "angle" : {
@@ -3060,6 +3102,12 @@
           "index" : {
             "format" : "int32",
             "type" : "integer"
+          },
+          "judgePass" : {
+            "type" : [ "boolean", "null" ]
+          },
+          "judgeReason" : {
+            "type" : [ "string", "null" ]
           },
           "note" : {
             "type" : [ "string", "null" ]
@@ -5181,6 +5229,24 @@
           }
         },
         "tags" : [ "notification-admin-controller" ]
+      }
+    },
+    "/admin/rescue/autopilot" : {
+      "get" : {
+        "operationId" : "autopilot",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseRescueAutopilotView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
       }
     },
     "/admin/rescue/eval.jsonl" : {

@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueScheduler
+import com.alirezaiyan.vokab.server.notification.rescue.RescueDigest
 import com.alirezaiyan.vokab.server.notification.rescue.RescueGuard
 import com.alirezaiyan.vokab.server.user.UserRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -18,6 +19,7 @@ class NotificationScheduledTasks(
     private val engagementSegmentScheduler: EngagementSegmentScheduler,
     private val comebackRescueScheduler: ComebackRescueScheduler,
     private val rescueGuard: RescueGuard,
+    private val rescueDigest: RescueDigest,
 ) {
     @Scheduled(cron = "0 30 0 * * *")          // 00:30 UTC nightly
     fun refreshNotificationSchedules() {
@@ -38,6 +40,15 @@ class NotificationScheduledTasks(
             rescueGuard.evaluate()
         } catch (e: Exception) {
             logger.error(e) { "Error in comeback rescue guard" }
+        }
+    }
+
+    @Scheduled(cron = "0 0 8 * * MON")         // Mondays 08:00 UTC
+    fun sendComebackRescueDigest() {
+        try {
+            rescueDigest.send()
+        } catch (e: Exception) {
+            logger.error(e) { "Error in comeback rescue digest" }
         }
     }
 

@@ -13,12 +13,13 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 
-/** Comeback rescue taste test and funnel for the admin page; SecurityConfig limits /admin to ROLE_ADMIN. */
+/** Comeback rescue autopilot status, previews and funnel for the admin page; SecurityConfig limits /admin to ROLE_ADMIN. */
 @RestController
 @RequestMapping("/admin/rescue")
 class RescueAdminController(
     private val previewService: RescuePreviewService,
     private val adminService: RescueAdminService,
+    private val rescueService: ComebackRescueService,
     private val objectMapper: ObjectMapper,
 ) {
     /** Drafts copy for up to [count] random learners with AI calls; nothing is sent or planned. */
@@ -42,6 +43,10 @@ class RescueAdminController(
         previewService.rate(previewId, request.candidateIndex, request.rating, request.note)
         return ResponseEntity.ok(ApiResponse(success = true, data = previewService.tasteScore()))
     }
+
+    @GetMapping("/autopilot")
+    fun autopilot(): ResponseEntity<ApiResponse<RescueAutopilotView>> =
+        ResponseEntity.ok(ApiResponse(success = true, data = rescueService.autopilot()))
 
     @GetMapping("/taste")
     fun taste(): ResponseEntity<ApiResponse<TasteScore>> =

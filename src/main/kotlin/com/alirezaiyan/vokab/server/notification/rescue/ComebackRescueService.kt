@@ -26,6 +26,18 @@ class ComebackRescueService(
             ?.takeIf { it.status == RescueStatus.PLANNED }
     }
 
+    @Transactional(readOnly = true)
+    fun autopilot(): RescueAutopilotView {
+        val state = guard.state()
+        val paused = state.pausedOn(LocalDate.now(clock))
+        return RescueAutopilotView(
+            sendEnabled = sendEnabled,
+            pausedUntil = state.pausedUntil.takeIf { paused },
+            reason = state.reason.takeIf { paused },
+            changedAt = state.changedAt,
+        )
+    }
+
     @Transactional
     fun markSent(rescueId: Long, notificationLogId: Long?) {
         repository.findById(rescueId).ifPresent { rescue ->

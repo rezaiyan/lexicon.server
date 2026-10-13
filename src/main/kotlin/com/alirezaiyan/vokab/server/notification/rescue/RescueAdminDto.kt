@@ -109,3 +109,11 @@ data class RescueEvalLine(
     val judgePass: Boolean?,
     val judgeReason: String?,
 )
+
+/** Whether rescue pushes go out right now; [pausedUntil] is set only while the guard's pause is running. */
+data class RescueAutopilotView(
+    val sendEnabled: Boolean,
+    val pausedUntil: LocalDate?,
+    val reason: String?,
+    val changedAt: Instant,
+)

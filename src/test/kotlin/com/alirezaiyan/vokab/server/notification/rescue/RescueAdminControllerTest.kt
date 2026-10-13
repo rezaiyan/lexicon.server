@@ -32,6 +32,7 @@ class RescueAdminControllerTest {
     @Autowired private lateinit var mockMvc: MockMvc
     @MockitoBean private lateinit var previewService: RescuePreviewService
     @MockitoBean private lateinit var adminService: RescueAdminService
+    @MockitoBean private lateinit var rescueService: ComebackRescueService
 
     private val admin = UsernamePasswordAuthenticationToken("ali-cli", null, listOf(SimpleGrantedAuthority("ROLE_ADMIN")))
     private val regularUser = UsernamePasswordAuthenticationToken("user", null, emptyList())
@@ -120,6 +121,23 @@ class RescueAdminControllerTest {
             contentType = MediaType.APPLICATION_JSON
             content = """{"candidateIndex":-1,"rating":"UP"}"""
         }.andExpect { status { isBadRequest() } }
+    }
+
+    @Test
+    fun `reports the autopilot status`() {
+        `when`(rescueService.autopilot()).thenReturn(
+            RescueAutopilotView(true, LocalDate.of(2026, 10, 27), "2 learners opted out", Instant.parse("2026-10-13T00:40:00Z"))
+        )
+
+        mockMvc.get("/admin/rescue/autopilot") { with(authentication(admin)) }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.data.sendEnabled") { value(true) }
+                jsonPath("$.data.pausedUntil") { value("2026-10-27") }
+                jsonPath("$.data.reason") { value("2 learners opted out") }
+            }
+        mockMvc.get("/admin/rescue/autopilot") { with(authentication(regularUser)) }
+            .andExpect { status { isForbidden() } }
     }
 
     @Test

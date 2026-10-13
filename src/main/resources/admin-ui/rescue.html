@@ -33,17 +33,23 @@
   <div id="app" class="hidden">
     <section class="card">
       <div class="row between mb12">
-        <h2 class="m0 grow">Taste test</h2>
-        <span id="tasteVerdict" class="pill fixed"></span>
+        <h2 class="m0 grow">Autopilot</h2>
+        <span id="autopilotStatus" class="pill fixed"></span>
       </div>
-      <p class="muted small">Rate the copy a learner would actually get (marked <span class="pill ok">chosen</span>).
-        Sends stay off (<span class="mono">COMEBACK_RESCUE_SEND_ENABLED</span>) until the chosen copy reaches the target.</p>
+      <p class="muted small">Rescues send on their own. An AI judge must pass the copy for each push, otherwise the
+        template goes out. If two rescued learners opt out, sends pause for 14 days and resume by themselves; Telegram
+        gets an alert each time and a digest every Monday.</p>
+      <p class="small" id="autopilotDetail"></p>
+    </section>
+
+    <section class="card">
+      <h2>Your ratings (optional)</h2>
+      <p class="muted small">Ratings don't gate anything. They build an eval set for tuning the prompt and the judge.</p>
       <div class="grid">
         <div class="stat"><div class="label">Chosen copy 👍</div><div class="value" id="tasteRate">–</div>
           <div class="bar mt12"><span id="tasteBar"></span></div></div>
         <div class="stat"><div class="label">Chosen copy rated</div><div class="value" id="tasteRated">0</div></div>
         <div class="stat"><div class="label">All candidates 👍</div><div class="value" id="tasteAllRate">–</div></div>
-        <div class="stat"><div class="label">Target</div><div class="value" id="tasteTarget">80%</div></div>
       </div>
     </section>
 

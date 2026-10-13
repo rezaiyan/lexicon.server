@@ -58,7 +58,7 @@ class RescueGuard(
     fun state(): RescueAutopilot =
         repository.findById(RescueAutopilot.SINGLETON_ID).orElseGet { RescueAutopilot() }
 
-    @Transactional
+    /** Not one transaction: each save commits before its Telegram alert, so an alert never describes unsaved state. */
     fun evaluate() {
         val state = state()
         val today = LocalDate.now(clock)

@@ -133,24 +133,30 @@
     showSignIn("Signed out.");
   });
 
-  // ── Taste score ──
+  // ── Autopilot + ratings ──
+  function renderAutopilot(a) {
+    const status = $("autopilotStatus");
+    const detail = $("autopilotDetail");
+    if (!a.sendEnabled) {
+      status.textContent = "switched off";
+      status.className = "pill warn fixed";
+      detail.textContent = "COMEBACK_RESCUE_SEND_ENABLED is false on the server: plans are built but never sent.";
+    } else if (a.pausedUntil) {
+      status.textContent = `paused until ${a.pausedUntil}`;
+      status.className = "pill warn fixed";
+      detail.textContent = `${a.reason || "Paused by the guard"}. Resumes on its own.`;
+    } else {
+      status.textContent = "sending";
+      status.className = "pill ok fixed";
+      detail.textContent = "";
+    }
+  }
+
   function renderTaste(t) {
     $("tasteRate").textContent = pct(t.upRate);
     $("tasteRated").textContent = String(t.rated);
     $("tasteAllRate").textContent = pct(t.allUpRate);
-    $("tasteTarget").textContent = pct(t.target);
     $("tasteBar").style.width = `${Math.round((t.upRate || 0) * 100)}%`;
-    const verdict = $("tasteVerdict");
-    if (t.upRate == null) {
-      verdict.textContent = "nothing rated yet";
-      verdict.className = "pill fixed";
-    } else if (t.upRate >= t.target) {
-      verdict.textContent = "target met: sends can be enabled";
-      verdict.className = "pill ok fixed";
-    } else {
-      verdict.textContent = "below target: keep sends off";
-      verdict.className = "pill warn fixed";
-    }
   }
 
   // ── Previews ──
@@ -167,6 +173,12 @@
   const sourcePill = (source) =>
     `<span class="pill ${source === "AI" ? "ok" : "warn"}">${esc(source)}</span>`;
 
+  function judgeCell(c) {
+    if (c.judgePass == null) return '<div class="small muted mt12">judge: no verdict</div>';
+    return `<div class="small mt12"><span class="pill ${c.judgePass ? "ok" : "warn"}">judge ${c.judgePass ? "pass" : "fail"}</span>
+      ${c.judgeReason ? `<span class="muted">${esc(c.judgeReason)}</span>` : ""}</div>`;
+  }
+
   function candidateRow(p, c) {
     const rateBtn = (rating, label) =>
       `<button type="button" data-preview="${esc(p.id)}" data-index="${esc(c.index)}" data-rating="${rating}"
@@ -180,7 +192,7 @@
         c.violations.length
           ? `<ul class="violations">${c.violations.map((v) => `<li>${esc(v)}</li>`).join("")}</ul>`
           : '<span class="pill ok">passes</span>'
-      }</td>
+      }${judgeCell(c)}</td>
       <td class="rate"><div class="seg">${rateBtn("UP", "👍")}${rateBtn("DOWN", "👎")}</div>
         <input type="text" maxlength="500" placeholder="Note (saved with the rating)"
           data-note="${esc(p.id)}-${esc(c.index)}" value="${esc(c.note || "")}" class="mt12"></td>
@@ -198,7 +210,7 @@
     ].join("");
     const candidates = p.candidates.length
       ? `<div class="table-wrap"><table>
-          <thead><tr><th>#</th><th>Copy</th><th>Linter</th><th>Rating</th></tr></thead>
+          <thead><tr><th>#</th><th>Copy</th><th>Checks</th><th>Rating</th></tr></thead>
           <tbody>${p.candidates.map((c) => candidateRow(p, c)).join("")}</tbody></table></div>`
       : '<p class="muted small">No AI candidates (template copy).</p>';
     return `<article class="rescue-preview">
@@ -368,6 +380,8 @@
   async function refresh() {
     await Promise.all([
       loadPreviews(),
+      // A failed status call must not blank the other panels
+      api("/autopilot").then(renderAutopilot).catch((e) => flash(e.message)),
       api("/plans?limit=50").then(renderPlans),
       loadFunnel(),
     ]);

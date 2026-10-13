@@ -61,7 +61,8 @@ class RescueCopyJudge(
         return verdicts
             .filter { it.path("index").isInt && it.path("index").asInt() in indices }
             .associate { node ->
-                node.path("index").asInt() to JudgeVerdict(node.path("pass").asBoolean(false), node.path("reason").asText())
+                val verdict = JudgeVerdict(node.path("pass").asBoolean(false), node.path("reason").asText())
+                node.path("index").asInt() to verdict
             }
     }
 }

@@ -87,6 +87,24 @@ class RescuePreviewServiceTest {
     }
 
     @Test
+    fun `an AI draft between template drafts resets the early stop`() {
+        every { userRepository.findAllActiveUsersWithPushTokens() } returns (1L..10L).map(::user)
+        // shuffled order is fixed by the seeded Random; alternate by call count instead of user id
+        var calls = 0
+        every { planner.draft(any(), any()) } answers {
+            calls++
+            if (calls == 3) draft() else draft(RescueSource.FALLBACK)
+        }
+        savesPreviews()
+
+        val previews = service.generate(count = 5)
+
+        // F, F, AI (resets), F, F, F (stops)
+        assertEquals(1, previews.size)
+        assertEquals(6, calls)
+    }
+
+    @Test
     fun `caps the count and the learners tried, and skips a learner whose draft fails`() {
         every { userRepository.findAllActiveUsersWithPushTokens() } returns (1L..400L).map(::user)
         every { planner.draft(any(), any()) } returns null

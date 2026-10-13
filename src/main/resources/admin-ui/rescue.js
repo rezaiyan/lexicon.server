@@ -23,6 +23,8 @@
   let sessionTimer = null;
   let previews = [];
   let show = "ALL";
+  // "previewId-index" of ratings in flight: their buttons stay locked across re-renders
+  const saving = new Set();
 
   function flash(msg, kind = "err") {
     const el = $("globalMsg");
@@ -168,7 +170,7 @@
   function candidateRow(p, c) {
     const rateBtn = (rating, label) =>
       `<button type="button" data-preview="${esc(p.id)}" data-index="${esc(c.index)}" data-rating="${rating}"
-        aria-pressed="${c.rating === rating}" aria-label="${rating === "UP" ? "Like" : "Dislike"} candidate ${esc(c.index + 1)}">${label}</button>`;
+        aria-pressed="${c.rating === rating}" ${saving.has(`${p.id}-${c.index}`) ? "disabled" : ""} aria-label="${rating === "UP" ? "Like" : "Dislike"} candidate ${esc(c.index + 1)}">${label}</button>`;
     return `<tr>
       <td class="nowrap">${esc(c.index + 1)} ${c.chosen ? '<span class="pill ok">chosen</span>' : ""}
         <div class="small muted">${esc(c.angle)} · rank ${esc(c.rank)}</div></td>
@@ -221,7 +223,7 @@
         const candidate = previews
           .find((p) => p.id === previewId)
           ?.candidates.find((c) => c.index === index);
-        if (candidate) candidate.note = input.value;
+        if (candidate) candidate.note = input.value.trim();
       });
   }
 
@@ -245,9 +247,15 @@
       `input[data-note="${previewId}-${index}"]`,
     );
     const note = noteInput ? noteInput.value.trim() : "";
-    // Both buttons of the row: a quick 👍 then 👎 would race on the one-rating-per-candidate rule
-    const rowButtons = btn.closest(".seg").querySelectorAll("button");
-    rowButtons.forEach((b) => (b.disabled = true));
+    // Lock both buttons of the row until saved: a quick 👍 then 👎 would race on the
+    // one-rating-per-candidate rule. The lock lives in `saving` so re-renders keep it.
+    const key = `${previewId}-${index}`;
+    if (saving.has(key)) return;
+    saving.add(key);
+    btn
+      .closest(".seg")
+      .querySelectorAll("button")
+      .forEach((b) => (b.disabled = true));
     withBusy(btn, async () => {
       const taste = await api(`/previews/${previewId}/ratings`, {
         method: "POST",
@@ -265,8 +273,10 @@
         candidate.note = note || null;
       }
       renderTaste(taste);
+    }).finally(() => {
+      saving.delete(key);
       renderPreviews();
-    }).finally(() => rowButtons.forEach((b) => (b.disabled = false)));
+    });
   });
 
   $("generateForm").addEventListener("submit", (e) => {

@@ -41,8 +41,9 @@ class RescuePreviewService(
 ) {
     /**
      * Up to [count] (max [MAX_COUNT]) previews of AI copy from randomly chosen learners with enough
-     * usable words. Template-copy drafts have nothing to taste-test and are skipped; several in a row
-     * mean the AI is down, so the run stops rather than waiting out a timeout per learner.
+     * usable words. Template-copy drafts have nothing to taste-test and are skipped. Several in a row
+     * mean the AI is down or answering badly; either way the run stops rather than paying (or waiting
+     * out a timeout) for every remaining learner.
      */
     fun generate(count: Int): List<RescuePreview> {
         val wanted = count.coerceIn(1, MAX_COUNT)

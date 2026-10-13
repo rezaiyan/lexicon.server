@@ -13,6 +13,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.Locale
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -27,6 +28,12 @@ data class NotificationPayload(
     val data: Map<String, String>,
     val type: NotificationType
 )
+
+/** Words store ISO codes ("de"); learners should read "German". Unknown codes stay as stored. */
+private fun languageName(code: String): String {
+    val name = Locale.forLanguageTag(code).getDisplayLanguage(Locale.ENGLISH)
+    return if (name.isBlank() || name.equals(code, ignoreCase = true)) code else name
+}
 
 @Service
 class NotificationContentBuilder(
@@ -109,7 +116,7 @@ class NotificationContentBuilder(
         val estimatedMinutes = maxOf(1, (stats.dueCards * 8) / 60)
         val primaryLang = bestEffort("Primary language for user=${user.id}") {
             learnerSignals.primaryTargetLanguage(user.requireId())
-        } ?: "vocabulary"
+        }?.let(::languageName) ?: "vocabulary"
         return NotificationPayload(
             title = "📚 ${stats.dueCards} words are waiting",
             body = "Your $primaryLang review takes ~$estimatedMinutes min.",

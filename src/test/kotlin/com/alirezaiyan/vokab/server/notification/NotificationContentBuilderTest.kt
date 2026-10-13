@@ -208,6 +208,28 @@ class NotificationContentBuilderTest {
     }
 
     @Test
+    fun `should name the language when the target language is stored as a code`() {
+        val user = createUser()
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 10)
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "de"
+
+        val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
+
+        assertEquals("Your German review takes ~1 min.", result.body)
+    }
+
+    @Test
+    fun `should keep an unknown language code as stored`() {
+        val user = createUser()
+        every { userProgressService.calculateProgressStats(user.requireId()) } returns createProgressStats(dueCards = 10)
+        every { learnerSignals.primaryTargetLanguage(user.requireId()) } returns "xx"
+
+        val result = notificationContentBuilder.build(user, NotificationType.DUE_CARDS)
+
+        assertEquals("Your xx review takes ~1 min.", result.body)
+    }
+
+    @Test
     fun `should calculate estimated minutes as at least 1 even when due cards are very few`() {
         // Arrange - 5 cards * 8 / 60 = 0, so maxOf(1, 0) = 1
         val user = createUser()

@@ -26,10 +26,12 @@ class RescueAdminServiceTest {
             mapOf(
                 "candidate" to mapOf("angle" to "curiosity", "title" to "Still know Gewitter?", "body" to "x", "factIds" to listOf("F3"), "rank" to 2),
                 "violations" to listOf("repeats last angle"),
+                "judge" to mapOf("pass" to false, "reason" to "generic"),
             ),
             mapOf(
                 "candidate" to mapOf("angle" to "rematch", "title" to "Gewitter, one more try", "body" to "y", "factIds" to listOf("F1"), "rank" to 1),
                 "violations" to emptyList<String>(),
+                "judge" to mapOf("pass" to true, "reason" to "specific"),
             ),
         )
     )
@@ -54,6 +56,8 @@ class RescueAdminServiceTest {
         assertEquals("flat", view.candidates[0].note)
         assertEquals(listOf("F3"), view.candidates[0].factIds)
         assertEquals(null, view.candidates[1].rating)
+        assertEquals(listOf(false, true), view.candidates.map { it.judgePass })
+        assertEquals("generic", view.candidates[0].judgeReason)
     }
 
     @Test

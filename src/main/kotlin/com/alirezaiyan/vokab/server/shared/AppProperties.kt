@@ -42,6 +42,8 @@ data class OpenRouterConfig(
     var apiKey: String = "",
     var baseUrl: String = "https://openrouter.ai/api/v1",
     var model: String = "anthropic/claude-haiku-4.5",
+    /** Model for second-opinion checks (the rescue copy judge); blank = [model]. */
+    var judgeModel: String = "",
     var timeoutSeconds: Long = 60
 )
 

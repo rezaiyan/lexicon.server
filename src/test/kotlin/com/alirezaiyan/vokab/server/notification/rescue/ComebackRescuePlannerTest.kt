@@ -17,6 +17,7 @@ import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 
@@ -26,6 +27,7 @@ class ComebackRescuePlannerTest {
     private val candidateQueries: RescueCandidateQueries = mockk()
     private val dailyActivityRepository: DailyActivityRepository = mockk()
     private val userSettingsRepository: UserSettingsRepository = mockk()
+    private val copyJudge: RescueCopyJudge = mockk()
     private val aiClient: AiClient = mockk()
 
     private lateinit var planner: ComebackRescuePlanner
@@ -51,8 +53,11 @@ class ComebackRescuePlannerTest {
     fun setUp() {
         planner = ComebackRescuePlanner(
             rescueRepository, candidateQueries, dailyActivityRepository, userSettingsRepository,
-            aiClient, PromptTemplates(), ObjectMapper(), fixedClock(),
+            aiClient, PromptTemplates(), copyJudge, ObjectMapper(), fixedClock(),
         )
+        every { copyJudge.judge(any(), any(), any(), any()) } answers {
+            firstArg<List<RescueCopyCandidate>>().indices.associateWith { JudgeVerdict(true, "reads naturally") }
+        }
         every { rescueRepository.findByUserIdAndPlannedFor(any(), TEST_TODAY) } returns null
         every { rescueRepository.existsByUserIdAndPlannedForAfter(any(), any()) } returns false
         every { rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(any()) } returns emptyList()
@@ -83,6 +88,34 @@ class ComebackRescuePlannerTest {
         assertEquals("Still know what gamma means?", rescue.title)
         assertEquals("gamma: cracked. 8 for 8.", rescue.outroWin)
         assertEquals(TEST_TODAY, rescue.plannedFor)
+    }
+
+    @Test
+    fun `sends only copy the judge approved, falling to the next approved candidate`() {
+        val twoGood = validAi.replace(
+            """{"angle":"rematch","title":"Ready to crush it?","body":"Let's go!","factIds":["F1"],"rank":1}""",
+            """{"angle":"rematch","title":"gamma, one more try","body":"8 words, about 3 min.","factIds":["F1"],"rank":1}""",
+        )
+        every { aiClient.complete(any(), AiOperation.COMEBACK_RESCUE) } returns twoGood
+        every { copyJudge.judge(any(), any(), any(), any()) } returns
+            mapOf(0 to JudgeVerdict(false, "flat"), 1 to JudgeVerdict(true, "specific"))
+
+        val rescue = requireNotNull(planner.planIfEligible(user()))
+
+        assertEquals(RescueSource.AI, rescue.source)
+        assertEquals("Still know what gamma means?", rescue.title)
+        assertTrue(requireNotNull(rescue.candidates).contains("flat"))
+    }
+
+    @Test
+    fun `keeps AI picks with template copy when the judge is unavailable`() {
+        every { aiClient.complete(any(), AiOperation.COMEBACK_RESCUE) } returns validAi
+        every { copyJudge.judge(any(), any(), any(), any()) } returns null
+
+        val rescue = requireNotNull(planner.planIfEligible(user()))
+
+        assertEquals(RescueSource.AI_PICKS_TEMPLATE_COPY, rescue.source)
+        assertEquals("gamma wants a rematch", rescue.title)
     }
 
     @Test

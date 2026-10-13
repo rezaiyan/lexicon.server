@@ -40,6 +40,7 @@ class ComebackRescuePlanner(
     private val userSettingsRepository: UserSettingsRepository,
     private val aiClient: AiClient,
     private val promptTemplates: PromptTemplates,
+    private val copyJudge: RescueCopyJudge,
     private val objectMapper: ObjectMapper,
     private val clock: Clock,
 ) {
@@ -128,7 +129,13 @@ class ComebackRescuePlanner(
         val pickedSheet = sheet.withSessionSize(picks.size)
         val ctx = RescueCopyContext(pickedSheet, sessionWords, lastAngle, recent.map { "${it.title} ${it.body}" })
         val linted = RescueCopyLinter.lintAll(response.candidates, ctx)
-        val best = RescueCopyLinter.best(linted)?.candidate
+        // The judge sees every candidate (its verdicts are shown on the admin page); only lint-clean
+        // candidates it approves can be sent
+        val verdicts = copyJudge.judge(response.candidates, pickedSheet, uiLanguage, pool.targetLanguage).orEmpty()
+        val best = linted.withIndex()
+            .filter { (i, l) -> l.ok && verdicts[i]?.pass == true }
+            .minByOrNull { it.value.candidate.rank }
+            ?.value?.candidate
 
         val copy = if (best != null) {
             RescueCopy(
@@ -148,7 +155,9 @@ class ComebackRescuePlanner(
             copy = copy,
             source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
             candidatesJson = objectMapper.writeValueAsString(
-                linted.map { mapOf("candidate" to it.candidate, "violations" to it.violations) }
+                linted.mapIndexed { i, l ->
+                    mapOf("candidate" to l.candidate, "violations" to l.violations, "judge" to verdicts[i])
+                }
             ),
             reasoningJson = objectMapper.writeValueAsString(response.reasons),
         )

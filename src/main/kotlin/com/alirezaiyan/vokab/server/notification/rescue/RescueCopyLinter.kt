@@ -40,10 +40,6 @@ object RescueCopyLinter {
     fun lintAll(candidates: List<RescueCopyCandidate>, ctx: RescueCopyContext): List<LintedCandidate> =
         candidates.map { LintedCandidate(it, lint(it, ctx)) }
 
-    /** The model's highest-ranked candidate that passed every rule, or null. */
-    fun best(linted: List<LintedCandidate>): LintedCandidate? =
-        linted.filter { it.ok }.minByOrNull { it.candidate.rank }
-
     fun lint(c: RescueCopyCandidate, ctx: RescueCopyContext): List<String> {
         val v = mutableListOf<String>()
         val text = "${c.title} ${c.body}"

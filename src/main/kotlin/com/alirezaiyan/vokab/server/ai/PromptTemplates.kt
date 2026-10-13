@@ -17,6 +17,7 @@ enum class Prompt(val resource: String) {
     SUGGEST_VOCABULARY("suggest-vocabulary.v1"),
     NOTIFICATION_ADVICE("notification-advice.v1"),
     COMEBACK_RESCUE("comeback-rescue.v1"),
+    COMEBACK_RESCUE_JUDGE("comeback-rescue-judge.v1"),
 }
 
 /**

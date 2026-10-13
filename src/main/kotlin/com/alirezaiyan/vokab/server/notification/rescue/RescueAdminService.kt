@@ -52,6 +52,8 @@ class RescueAdminService(
                         factIds = stored.candidate.factIds,
                         rank = stored.candidate.rank,
                         violations = stored.violations,
+                        judgePass = stored.judge?.pass,
+                        judgeReason = stored.judge?.reason,
                         chosen = index == chosen,
                         rating = rating?.rating,
                         note = rating?.note,
@@ -107,6 +109,8 @@ class RescueAdminService(
                     body = stored.candidate.body,
                     factIds = stored.candidate.factIds,
                     violations = stored.violations,
+                    judgePass = stored.judge?.pass,
+                    judgeReason = stored.judge?.reason,
                 )
             }
     }

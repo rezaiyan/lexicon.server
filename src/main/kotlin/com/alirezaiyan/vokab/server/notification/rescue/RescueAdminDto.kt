@@ -6,8 +6,16 @@ import jakarta.validation.constraints.Size
 import java.time.Instant
 import java.time.LocalDate
 
-/** One AI copy candidate as stored on a plan or preview: the copy and the linter's verdict. */
-data class StoredCandidate(val candidate: RescueCopyCandidate, val violations: List<String>)
+/** One AI copy candidate as stored on a plan or preview: the copy, the linter's and the judge's verdicts. */
+data class StoredCandidate(
+    val candidate: RescueCopyCandidate,
+    val violations: List<String>,
+    /** Null when the judge gave no answer for it (or the plan predates the judge). */
+    val judge: JudgeVerdict? = null,
+) {
+    /** Could have been sent: clean lint and not rejected by the judge. */
+    val approved: Boolean get() = violations.isEmpty() && judge?.pass != false
+}
 
 /** Reads the `candidates` JSON the planner stores (`[{"candidate": {...}, "violations": [...]}]`). */
 fun ObjectMapper.readStoredCandidates(json: String?): List<StoredCandidate> {
@@ -23,6 +31,9 @@ fun ObjectMapper.readStoredCandidates(json: String?): List<StoredCandidate> {
                 rank = c.path("rank").asInt(Int.MAX_VALUE),
             ),
             violations = node.path("violations").map { it.asText() },
+            judge = node.path("judge").takeIf { it.isObject }?.let {
+                JudgeVerdict(it.path("pass").asBoolean(false), it.path("reason").asText())
+            },
         )
     }
 }
@@ -35,6 +46,8 @@ data class RescueCandidateView(
     val factIds: List<String>,
     val rank: Int,
     val violations: List<String>,
+    val judgePass: Boolean?,
+    val judgeReason: String?,
     /** The candidate the learner would have seen. */
     val chosen: Boolean,
     val rating: CopyRating?,
@@ -93,4 +106,6 @@ data class RescueEvalLine(
     val body: String,
     val factIds: List<String>,
     val violations: List<String>,
+    val judgePass: Boolean?,
+    val judgeReason: String?,
 )

@@ -158,14 +158,14 @@ class RescueCopyLinterTest {
     }
 
     @Test
-    fun `best picks the highest ranked candidate without violations`() {
+    fun `lintAll marks each candidate ok or not, in order`() {
         val bad = candidate(title = "Ready to crush it?", rank = 1)
         val good = candidate(angle = "curiosity", title = "Still know what Gewitter means?", body = "8 words, about 3 min.", rank = 2)
 
         val linted = RescueCopyLinter.lintAll(listOf(bad, good), ctx)
 
-        assertEquals(good, RescueCopyLinter.best(linted)?.candidate)
-        assertNull(RescueCopyLinter.best(RescueCopyLinter.lintAll(listOf(bad), ctx)))
+        assertEquals(listOf(false, true), linted.map { it.ok })
+        assertEquals(good, linted[1].candidate)
     }
 
     @Test

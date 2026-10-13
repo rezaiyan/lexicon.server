@@ -2,8 +2,11 @@ package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 
-/** What a model call is for; [tag] labels the `ai.requests` metric and log lines. */
-enum class AiOperation(val tag: String) {
+/**
+ * What a model call is for; [tag] labels the `ai.requests` metric and log lines. A [judge] call
+ * checks another call's output and runs on `app.openrouter.judge-model` when that is set.
+ */
+enum class AiOperation(val tag: String, val judge: Boolean = false) {
     IMAGE_EXTRACTION("image extraction"),
     CELEBRATION_INSIGHT("celebration insight"),
     STREAK_RESET_WARNING("streak reset warning"),
@@ -14,6 +17,7 @@ enum class AiOperation(val tag: String) {
     SUGGEST_VOCABULARY("suggest vocabulary"),
     NOTIFICATION_ADVICE("notification advice"),
     COMEBACK_RESCUE("comeback rescue"),
+    COMEBACK_RESCUE_JUDGE("comeback rescue judge", judge = true),
 }
 
 /** One-shot chat completion with the configured model. */

@@ -41,7 +41,7 @@ class RescueAdminControllerTest {
         source = RescueSource.AI, angle = "rematch", title = "Gewitter, one more try", body = "8 words, about 3 min.",
         outroWin = null, outroSoft = null, wordIds = listOf(1L, 2L),
         candidates = listOf(
-            RescueCandidateView(0, "rematch", "Gewitter, one more try", "8 words", listOf("F1"), 1, emptyList(), true, CopyRating.UP, null),
+            RescueCandidateView(0, "rematch", "Gewitter, one more try", "8 words", listOf("F1"), 1, emptyList(), true, "specific", true, CopyRating.UP, null),
         ),
     )
 
@@ -146,8 +146,8 @@ class RescueAdminControllerTest {
     fun `exports rated candidates as json lines`() {
         `when`(adminService.evalSet()).thenReturn(
             listOf(
-                RescueEvalLine(11L, 0, "comeback-rescue.v1", CopyRating.UP, null, true, "rematch", "a", "b", listOf("F1"), emptyList()),
-                RescueEvalLine(11L, 1, "comeback-rescue.v1", CopyRating.DOWN, "flat", false, "curiosity", "c", "d", emptyList(), emptyList()),
+                RescueEvalLine(11L, 0, "comeback-rescue.v1", CopyRating.UP, null, true, "rematch", "a", "b", listOf("F1"), emptyList(), true, "warm"),
+                RescueEvalLine(11L, 1, "comeback-rescue.v1", CopyRating.DOWN, "flat", false, "curiosity", "c", "d", emptyList(), emptyList(), false, "generic"),
             )
         )
 

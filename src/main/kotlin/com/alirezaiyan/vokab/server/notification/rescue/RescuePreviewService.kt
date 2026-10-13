@@ -114,9 +114,7 @@ class RescuePreviewService(
     fun chosenCandidateIndex(preview: RescuePreview): Int? {
         if (preview.source != RescueSource.AI) return null
         return candidates(preview)
-            .indexOfFirst {
-                it.violations.isEmpty() && it.candidate.title == preview.title && it.candidate.body == preview.body
-            }
+            .indexOfFirst { it.approved && it.candidate.title == preview.title && it.candidate.body == preview.body }
             .takeIf { it >= 0 }
     }
 

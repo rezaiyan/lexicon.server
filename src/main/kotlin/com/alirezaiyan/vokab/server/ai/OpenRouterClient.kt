@@ -98,9 +98,15 @@ class OpenRouterClient(
         return result.getOrThrow()
     }
 
+    /** A judging call may use its own model, so a check isn't graded by the model that wrote the text. */
+    private fun modelFor(operation: AiOperation): String {
+        val config = appProperties.openrouter
+        return if (operation.judge && config.judgeModel.isNotBlank()) config.judgeModel else config.model
+    }
+
     /** Response bodies are logged, never put into exception messages. */
     private fun requestChat(content: List<Content>, operation: AiOperation): String? {
-        val model = appProperties.openrouter.model
+        val model = modelFor(operation)
         val request = ChatRequest(model = model, messages = listOf(Message(role = "user", content = content)))
         val response = post(request, operation.tag)
         response?.error?.let { error ->

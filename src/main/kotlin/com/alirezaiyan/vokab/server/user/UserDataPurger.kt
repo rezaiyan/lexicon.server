@@ -52,6 +52,11 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "user_platforms" to "DELETE FROM user_platforms WHERE user_id = :userId",
             "notification_schedule" to "DELETE FROM notification_schedule WHERE user_id = :userId",
             "comeback_rescue" to "DELETE FROM comeback_rescue WHERE user_id = :userId",
+            "rescue_copy_rating" to """
+                DELETE FROM rescue_copy_rating
+                WHERE preview_id IN (SELECT id FROM rescue_preview WHERE user_id = :userId)
+            """.trimIndent(),
+            "rescue_preview" to "DELETE FROM rescue_preview WHERE user_id = :userId",
             "notification_log" to "DELETE FROM notification_log WHERE user_id = :userId",
             "email_subscriptions" to "DELETE FROM email_subscriptions WHERE user_id = :userId",
             "email_log" to "UPDATE email_log SET user_id = NULL WHERE user_id = :userId",

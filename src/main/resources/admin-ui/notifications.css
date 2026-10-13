@@ -101,3 +101,9 @@
   .bubble.user { align-self: flex-start; background: var(--surface-2); }
   .bubble.admin { align-self: flex-end; background: var(--accent); color: var(--accent-text); }
   .bubble time { display: block; font-size: 11px; opacity: .7; margin-top: 2px; }
+  /* Comeback rescue */
+  .rescue-preview { border-top: 1px solid var(--border); padding-top: 16px; margin-top: 16px; }
+  .rescue-preview:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+  .violations { margin: 0; padding-left: 18px; color: var(--warn); font-size: 12px; }
+  td.rate { min-width: 180px; }
+  td.rate .seg button { font-size: 16px; padding: 4px 12px; }

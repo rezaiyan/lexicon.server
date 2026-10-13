@@ -33,6 +33,13 @@ class NotificationDashboardController {
     @GetMapping("/admin-ui/support.js", produces = ["text/javascript"])
     fun supportScript(): ResponseEntity<Resource> = serve("support.js", MediaType.parseMediaType("text/javascript"))
 
+    /** Comeback rescue taste test, plans and funnel; same stylesheet and session sign-in. */
+    @GetMapping("/admin-ui/rescue", produces = [MediaType.TEXT_HTML_VALUE])
+    fun rescuePage(): ResponseEntity<Resource> = serve("rescue.html", MediaType.TEXT_HTML)
+
+    @GetMapping("/admin-ui/rescue.js", produces = ["text/javascript"])
+    fun rescueScript(): ResponseEntity<Resource> = serve("rescue.js", MediaType.parseMediaType("text/javascript"))
+
     private fun serve(file: String, type: MediaType): ResponseEntity<Resource> =
         ResponseEntity.ok()
             .contentType(type)

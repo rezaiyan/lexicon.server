@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueScheduler
+import com.alirezaiyan.vokab.server.notification.rescue.RescueGuard
 import com.alirezaiyan.vokab.server.user.UserRepository
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Scheduled
@@ -16,6 +17,7 @@ class NotificationScheduledTasks(
     private val reviewReminderDispatcher: ReviewReminderDispatcher,
     private val engagementSegmentScheduler: EngagementSegmentScheduler,
     private val comebackRescueScheduler: ComebackRescueScheduler,
+    private val rescueGuard: RescueGuard,
 ) {
     @Scheduled(cron = "0 30 0 * * *")          // 00:30 UTC nightly
     fun refreshNotificationSchedules() {
@@ -26,6 +28,16 @@ class NotificationScheduledTasks(
             logger.info { "Notification schedule refresh complete — ${activeUsers.size} users processed" }
         } catch (e: Exception) {
             logger.error(e) { "Error in notification schedule refresh" }
+        }
+    }
+
+    // Pause or resume rescue sends before tonight's plans are built
+    @Scheduled(cron = "0 40 0 * * *")          // 00:40 UTC nightly
+    fun guardComebackRescues() {
+        try {
+            rescueGuard.evaluate()
+        } catch (e: Exception) {
+            logger.error(e) { "Error in comeback rescue guard" }
         }
     }
 

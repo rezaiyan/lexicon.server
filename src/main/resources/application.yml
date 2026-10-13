@@ -77,8 +77,8 @@ spring.servlet.multipart:
 
 app:
   comeback-rescue:
-    # Shadow mode until the P3 taste test passes: plans are built nightly, never sent
-    send-enabled: ${COMEBACK_RESCUE_SEND_ENABLED:false}
+    # Kill switch. On by default; RescueGuard pauses sends on its own when rescued learners opt out
+    send-enabled: ${COMEBACK_RESCUE_SEND_ENABLED:true}
 
   avatar:
     upload-dir: ${AVATAR_UPLOAD_DIR:/var/www/uploads/avatars}

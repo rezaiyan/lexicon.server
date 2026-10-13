@@ -15,12 +15,13 @@ private val logger = KotlinLogging.logger {}
 class ComebackRescueService(
     private val repository: ComebackRescueRepository,
     private val clock: Clock,
-    /** Shadow mode while false: plans are built nightly but never sent. */
-    @Value("\${app.comeback-rescue.send-enabled:false}") private val sendEnabled: Boolean,
+    private val guard: RescueGuard,
+    /** Kill switch: while false, plans are built nightly but never sent. */
+    @Value("\${app.comeback-rescue.send-enabled:true}") private val sendEnabled: Boolean,
 ) {
     @Transactional(readOnly = true)
     fun sendablePlan(userId: Long): ComebackRescue? {
-        if (!sendEnabled) return null
+        if (!sendEnabled || guard.paused()) return null
         return repository.findByUserIdAndPlannedFor(userId, LocalDate.now(clock))
             ?.takeIf { it.status == RescueStatus.PLANNED }
     }

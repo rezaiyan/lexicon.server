@@ -16,8 +16,9 @@ import java.util.Optional
 class ComebackRescueServiceTest {
 
     private val repository: ComebackRescueRepository = mockk()
+    private val guard: RescueGuard = mockk { every { paused() } returns false }
 
-    private fun service(sendEnabled: Boolean = true) = ComebackRescueService(repository, fixedClock(), sendEnabled)
+    private fun service(sendEnabled: Boolean = true) = ComebackRescueService(repository, fixedClock(), guard, sendEnabled)
 
     private fun rescue(status: RescueStatus, userId: Long = 1L) = ComebackRescue(
         id = 42L, userId = userId, plannedFor = TEST_TODAY, wordIds = "[1]", title = "t", body = "b",
@@ -36,6 +37,14 @@ class ComebackRescueServiceTest {
         every { repository.findByUserIdAndPlannedFor(1L, TEST_TODAY) } returns rescue(RescueStatus.PLANNED)
 
         assertNull(service(sendEnabled = false).sendablePlan(1L))
+    }
+
+    @Test
+    fun `nothing is sendable while the autopilot is paused`() {
+        every { repository.findByUserIdAndPlannedFor(1L, TEST_TODAY) } returns rescue(RescueStatus.PLANNED)
+        every { guard.paused() } returns true
+
+        assertNull(service().sendablePlan(1L))
     }
 
     @Test

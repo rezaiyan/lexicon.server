@@ -37,6 +37,27 @@ class VocabularyFocusTest {
     }
 
     @Test
+    fun `example notes ask for one short example sentence on one line`() {
+        val block = VocabularyFocus(noteStyle = NoteStyle.EXAMPLE).toPromptBlock(noteField = "note")
+
+        assertTrue(block.contains("- In note, give one short example sentence using the item, on one line."))
+    }
+
+    @Test
+    fun `grammar notes style asks for the grammar`() {
+        val block = VocabularyFocus(noteStyle = NoteStyle.GRAMMAR).toPromptBlock(noteField = "note")
+
+        assertTrue(block.contains("- In note, give the grammar: article and plural for nouns, key forms for verbs."))
+    }
+
+    @Test
+    fun `older apps sending grammarNotes still get grammar notes`() {
+        assertEquals(NoteStyle.GRAMMAR, VocabularyFocus(grammarNotes = true).effectiveNoteStyle)
+        assertEquals(NoteStyle.EXAMPLE, VocabularyFocus(grammarNotes = true, noteStyle = NoteStyle.EXAMPLE).effectiveNoteStyle)
+        assertEquals(null, VocabularyFocus().effectiveNoteStyle)
+    }
+
+    @Test
     fun `intent block is empty without an intent`() {
         assertEquals("", LearnerPreferences().toPromptBlock())
     }

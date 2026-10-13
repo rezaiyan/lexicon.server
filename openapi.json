@@ -4481,6 +4481,10 @@
           "markedOnly" : {
             "type" : "boolean"
           },
+          "noteStyle" : {
+            "enum" : [ "EXAMPLE", "GRAMMAR" ],
+            "type" : [ "string", "null" ]
+          },
           "register" : {
             "enum" : [ "FORMAL", "EVERYDAY", "SLANG" ],
             "type" : [ "string", "null" ]

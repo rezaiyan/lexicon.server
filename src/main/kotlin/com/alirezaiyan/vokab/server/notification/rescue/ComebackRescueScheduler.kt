@@ -5,6 +5,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDate
+import java.time.ZoneOffset
 
 private val logger = KotlinLogging.logger {}
 
@@ -19,10 +20,19 @@ class ComebackRescueScheduler(
     private val scheduleRepository: NotificationScheduleRepository,
     private val clock: Clock,
 ) {
-    fun planAll() {
+    /** The nightly run: every reachable learner. */
+    fun planAll() = plan(MIN_SEND_HOUR)
+
+    /**
+     * An admin run during the day: only learners whose send hour is still ahead. A plan for an hour
+     * that has passed would never be sent, yet would use up the learner's one rescue for the lapse.
+     */
+    fun planRemainingToday() = plan(maxOf(MIN_SEND_HOUR, clock.instant().atZone(ZoneOffset.UTC).hour + 1))
+
+    private fun plan(minSendHour: Int) {
         val startedAt = clock.millis()
         val expired = repository.expireStale(LocalDate.now(clock), RescueStatus.PLANNED, RescueStatus.EXPIRED)
-        val users = scheduleRepository.findRescuePlanningCandidates(MIN_SEND_HOUR).map { it.user }
+        val users = scheduleRepository.findRescuePlanningCandidates(minSendHour).map { it.user }
         var planned = 0
         var failed = 0
 

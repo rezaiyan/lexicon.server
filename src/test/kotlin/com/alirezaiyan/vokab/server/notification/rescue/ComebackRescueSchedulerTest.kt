@@ -41,6 +41,18 @@ class ComebackRescueSchedulerTest {
     }
 
     @Test
+    fun `a daytime run plans only learners whose send hour is still ahead`() {
+        every { repository.expireStale(any(), any(), any()) } returns 0
+        // the test clock reads 10:00 UTC
+        every { scheduleRepository.findRescuePlanningCandidates(11) } returns listOf(NotificationSchedule(user = user(5)))
+        every { planner.planIfEligible(any()) } returns null
+
+        scheduler.planRemainingToday()
+
+        verify(exactly = 1) { planner.planIfEligible(match { it.id == 5L }) }
+    }
+
+    @Test
     fun `one user's failure does not stop the batch`() {
         every { repository.expireStale(any(), any(), any()) } returns 0
         every { planner.planIfEligible(match { it.id == 1L }) } throws IllegalStateException("boom")

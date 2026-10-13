@@ -93,9 +93,16 @@ object RescueCopyLinter {
         BANNED_PHRASES.filter { startsWord(text, it) }.forEach { v += "banned phrase $it" }
         if ('—' in text) v += "em dash"
         if (text.count { it == '!' } > 1) v += "too many exclamation marks"
-        if (text.codePoints().anyMatch(Character::isExtendedPictographic)) v += "emoji"
+        if (text.codePoints().anyMatch(::isEmoji)) v += "emoji"
         return v
     }
+
+    /** Pictographs plus the flag letters (🇩🇪) and keycap mark (8️⃣), which are not Extended_Pictographic. */
+    private fun isEmoji(cp: Int): Boolean =
+        Character.isExtendedPictographic(cp) || cp in REGIONAL_INDICATORS || cp == COMBINING_KEYCAP
+
+    private val REGIONAL_INDICATORS = 0x1F1E6..0x1F1FF
+    private const val COMBINING_KEYCAP = 0x20E3
 
     private fun normalize(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
 }

@@ -3091,7 +3091,7 @@
             "type" : "string"
           },
           "arm" : {
-            "enum" : [ "SENT", "HOLDOUT", "UNSENT" ],
+            "enum" : [ "TREATED", "HOLDOUT" ],
             "type" : "string"
           },
           "completed" : {

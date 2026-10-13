@@ -212,7 +212,21 @@
     </article>`;
   }
 
+  // Unsaved notes live only in their inputs; keep them across re-renders.
+  function keepTypedNotes() {
+    $("previews")
+      .querySelectorAll("input[data-note]")
+      .forEach((input) => {
+        const [previewId, index] = input.dataset.note.split("-").map(Number);
+        const candidate = previews
+          .find((p) => p.id === previewId)
+          ?.candidates.find((c) => c.index === index);
+        if (candidate) candidate.note = input.value;
+      });
+  }
+
   function renderPreviews() {
+    keepTypedNotes();
     const shown = previews.filter(
       (p) =>
         show === "ALL" ||
@@ -231,6 +245,9 @@
       `input[data-note="${previewId}-${index}"]`,
     );
     const note = noteInput ? noteInput.value.trim() : "";
+    // Both buttons of the row: a quick 👍 then 👎 would race on the one-rating-per-candidate rule
+    const rowButtons = btn.closest(".seg").querySelectorAll("button");
+    rowButtons.forEach((b) => (b.disabled = true));
     withBusy(btn, async () => {
       const taste = await api(`/previews/${previewId}/ratings`, {
         method: "POST",
@@ -249,7 +266,7 @@
       }
       renderTaste(taste);
       renderPreviews();
-    });
+    }).finally(() => rowButtons.forEach((b) => (b.disabled = false)));
   });
 
   $("generateForm").addEventListener("submit", (e) => {
@@ -279,6 +296,10 @@
   $("exportEval").addEventListener("click", (e) =>
     withBusy(e.currentTarget, async () => {
       const { res } = await request(`${API}/eval.jsonl`);
+      if (res.status === 401 || res.status === 403) {
+        showSignIn("Your session ended. Sign in again.");
+        return;
+      }
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const url = URL.createObjectURL(await res.blob());
       const a = document.createElement("a");

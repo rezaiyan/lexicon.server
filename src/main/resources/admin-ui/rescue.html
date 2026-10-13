@@ -51,11 +51,12 @@
 
     <section class="card">
       <h2>Generate previews</h2>
-      <p class="muted small">Drafts copy for random learners exactly like the nightly planner, as if they had just
-        missed two days. One AI call per learner tried; nothing is sent or planned.</p>
+      <p class="muted small">Drafts copy for random learners exactly like the nightly planner, as if their last study day
+        was 3 days ago (the earliest rescue). About one AI call per preview, up to 10 per run; template-only drafts are
+        skipped. Nothing is sent or planned.</p>
       <form id="generateForm" class="row">
         <div class="fixed"><label for="previewCount">Learners</label>
-          <input id="previewCount" type="number" min="1" max="50" value="10" required></div>
+          <input id="previewCount" type="number" min="1" max="10" value="5" required></div>
         <div class="fixed"><button type="submit" class="primary">Generate</button></div>
         <div class="fixed"><button type="button" id="exportEval">Download eval set (.jsonl)</button></div>
       </form>
@@ -96,8 +97,8 @@
             <option value="90">Last 90 days</option>
           </select></div>
       </div>
-      <p class="muted small">Compare <b>returned 24h</b> of the sent arm against the holdout (10% of learners,
-        planned but never sent). Unsent = shadow mode, or the learner studied before their send hour.</p>
+      <p class="muted small">Compare <b>returned 24h</b> of <b>treated</b> (every plan meant to be sent, pushed or not)
+        against <b>holdout</b> (10% of learners, planned and never sent). In shadow mode both arms are unsent: an A/A check.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Arm</th><th>Source</th><th>Angle</th><th class="num">Planned</th><th class="num">Sent</th>

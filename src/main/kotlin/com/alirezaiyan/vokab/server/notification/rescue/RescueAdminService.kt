@@ -19,8 +19,12 @@ class RescueAdminService(
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
-    fun previews(limit: Int): List<RescuePreviewView> {
-        val previews = previewRepository.findAllByOrderByCreatedAtDescIdDesc(page(limit))
+    fun previews(limit: Int): List<RescuePreviewView> =
+        previewViews(previewRepository.findAllByOrderByCreatedAtDescIdDesc(page(limit)))
+
+    /** [previews] with every candidate's verdict, whether it was chosen, and its rating. */
+    @Transactional(readOnly = true)
+    fun previewViews(previews: List<RescuePreview>): List<RescuePreviewView> {
         val ratings = ratingRepository.findAllByPreviewIdIn(previews.mapNotNull { it.id })
             .associateBy { it.previewId to it.candidateIndex }
         return previews.map { preview ->

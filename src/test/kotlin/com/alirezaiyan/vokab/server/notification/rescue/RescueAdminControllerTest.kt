@@ -62,8 +62,9 @@ class RescueAdminControllerTest {
 
     @Test
     fun `generates previews and returns them with their candidates`() {
-        `when`(previewService.generate(3)).thenReturn(listOf(preview(11L)))
-        `when`(adminService.previews(1)).thenReturn(listOf(previewView(11L)))
+        val generated = listOf(preview(11L))
+        `when`(previewService.generate(3)).thenReturn(generated)
+        `when`(adminService.previewViews(generated)).thenReturn(listOf(previewView(11L)))
 
         mockMvc.post("/admin/rescue/previews?count=3") { with(authentication(admin)) }
             .andExpect {
@@ -132,7 +133,7 @@ class RescueAdminControllerTest {
             )
         )
         `when`(adminService.funnel(14)).thenReturn(
-            listOf(RescueFunnelRow(RescueArm.SENT, RescueSource.AI, "rematch", 5, 5, 2, 1, 3))
+            listOf(RescueFunnelRow(RescueArm.TREATED, RescueSource.AI, "rematch", 5, 5, 2, 1, 3))
         )
 
         mockMvc.get("/admin/rescue/plans") { with(authentication(admin)) }

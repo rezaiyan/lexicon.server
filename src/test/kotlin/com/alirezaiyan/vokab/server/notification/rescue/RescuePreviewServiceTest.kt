@@ -32,15 +32,16 @@ class RescuePreviewServiceTest {
 
     private val candidatesJson = objectMapper.writeValueAsString(
         listOf(
-            mapOf("candidate" to mapOf("title" to "Still know Gewitter?"), "violations" to listOf("repeats last angle")),
-            mapOf("candidate" to mapOf("title" to "Gewitter, one more try"), "violations" to emptyList<String>()),
+            // same title as the chosen copy, but the linter rejected it: must not be mistaken for it
+            mapOf("candidate" to mapOf("title" to "Gewitter, one more try", "body" to "b"), "violations" to listOf("repeats last angle")),
+            mapOf("candidate" to mapOf("title" to "Gewitter, one more try", "body" to "b"), "violations" to emptyList<String>()),
         )
     )
 
-    private fun draft() = RescueDraft(
+    private fun draft(source: RescueSource = RescueSource.AI) = RescueDraft(
         wordIds = listOf(1L, 2L, 3L),
-        copy = RescueCopy("rematch", "Gewitter, one more try", "8 words, about 3 min.", "win", "soft"),
-        source = RescueSource.AI,
+        copy = RescueCopy("rematch", "Gewitter, one more try", "b", "win", "soft"),
+        source = source,
         candidatesJson = candidatesJson,
     )
 
@@ -71,7 +72,18 @@ class RescuePreviewServiceTest {
             assertEquals("comeback-rescue.v1", it.promptVersion)
             assertEquals("[1,2,3]", it.wordIds)
             assertEquals("Gewitter, one more try", it.title)
+            assertEquals(TEST_NOW, it.createdAt)
         }
+    }
+
+    @Test
+    fun `skips template-copy drafts and stops once the AI looks down`() {
+        every { userRepository.findAllActiveUsersWithPushTokens() } returns (1L..40L).map(::user)
+        every { planner.draft(any(), any()) } returns draft(RescueSource.FALLBACK)
+
+        assertEquals(emptyList<RescuePreview>(), service.generate(count = 5))
+
+        verify(exactly = RescuePreviewService.MAX_FALLBACKS_IN_A_ROW) { planner.draft(any(), any()) }
     }
 
     @Test

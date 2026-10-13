@@ -608,7 +608,7 @@
     [
       "COMEBACK_RESCUE_PLANNING",
       "00:45 UTC",
-      "Plans today's AI comeback rescues for learners in an early lapse (AI calls).",
+      "Plans AI comeback rescues for lapsed learners. Run now covers only send hours still ahead today (AI calls).",
     ],
     [
       "REFRESH_SEGMENTS",

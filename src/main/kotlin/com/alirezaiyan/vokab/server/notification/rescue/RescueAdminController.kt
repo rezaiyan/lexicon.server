@@ -26,8 +26,7 @@ class RescueAdminController(
     fun generatePreviews(
         @RequestParam(defaultValue = "20") count: Int,
     ): ResponseEntity<ApiResponse<List<RescuePreviewView>>> {
-        val generated = previewService.generate(count).mapNotNull { it.id }.toSet()
-        val views = adminService.previews(generated.size).filter { it.id in generated }
+        val views = adminService.previewViews(previewService.generate(count))
         return ResponseEntity.ok(ApiResponse(success = true, data = views))
     }
 

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueScheduler
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
 import com.alirezaiyan.vokab.server.user.UserSettings
@@ -25,6 +26,7 @@ class NotificationAdminService(
     private val userRepository: UserRepository,
     private val userSettingsRepository: UserSettingsRepository,
     private val notificationScheduledTasks: NotificationScheduledTasks,
+    private val comebackRescueScheduler: ComebackRescueScheduler,
     private val clock: Clock,
 ) {
     @Transactional(readOnly = true)
@@ -95,7 +97,7 @@ class NotificationAdminService(
             NotificationJob.REVIEW_REMINDERS -> notificationScheduledTasks.dispatchReviewReminders()
             NotificationJob.REFRESH_SCHEDULES -> notificationScheduledTasks.refreshNotificationSchedules()
             NotificationJob.REFRESH_SEGMENTS -> notificationScheduledTasks.refreshEngagementSegments()
-            NotificationJob.COMEBACK_RESCUE_PLANNING -> notificationScheduledTasks.planComebackRescues()
+            NotificationJob.COMEBACK_RESCUE_PLANNING -> comebackRescueScheduler.planRemainingToday()
         }
         return NotificationJobRunDto(
             job = job,

@@ -39,14 +39,25 @@ class RescuePreviewService(
     private val clock: Clock,
     private val random: Random = Random.Default,
 ) {
-    /** Up to [count] (max [MAX_COUNT]) previews from randomly chosen learners who have enough usable words. */
+    /**
+     * Up to [count] (max [MAX_COUNT]) previews of AI copy from randomly chosen learners with enough
+     * usable words. Template-copy drafts have nothing to taste-test and are skipped; several in a row
+     * mean the AI is down, so the run stops rather than waiting out a timeout per learner.
+     */
     fun generate(count: Int): List<RescuePreview> {
         val wanted = count.coerceIn(1, MAX_COUNT)
+        var fallbacksInARow = 0
         return userRepository.findAllActiveUsersWithPushTokens()
             .shuffled(random)
             .asSequence()
             .take(wanted * TRIES_PER_PREVIEW)
-            .mapNotNull { user -> draftFor(user)?.let { draft -> previewRepository.save(draft.toPreview(user)) } }
+            .takeWhile { fallbacksInARow < MAX_FALLBACKS_IN_A_ROW }
+            .mapNotNull { user -> draftFor(user)?.let { user to it } }
+            .onEach { (_, draft) ->
+                fallbacksInARow = if (draft.source == RescueSource.FALLBACK) fallbacksInARow + 1 else 0
+            }
+            .filter { (_, draft) -> draft.source != RescueSource.FALLBACK }
+            .map { (user, draft) -> previewRepository.save(draft.toPreview(user)) }
             .take(wanted)
             .toList()
     }
@@ -58,6 +69,7 @@ class RescuePreviewService(
 
     private fun RescueDraft.toPreview(user: User) = RescuePreview(
         userId = user.requireId(),
+        createdAt = Instant.now(clock),
         promptVersion = Prompt.COMEBACK_RESCUE.resource,
         source = source,
         angle = copy.angle,
@@ -74,7 +86,7 @@ class RescuePreviewService(
     fun rate(previewId: Long, candidateIndex: Int, rating: CopyRating, note: String?): RescueCopyRating {
         val preview = previewRepository.findById(previewId)
             .orElseThrow { NoSuchElementException("Preview not found") }
-        require(candidateIndex in candidateTitles(preview).indices) { "No candidate $candidateIndex in this preview" }
+        require(candidateIndex in candidates(preview).indices) { "No candidate $candidateIndex in this preview" }
 
         val saved = ratingRepository.findByPreviewIdAndCandidateIndex(previewId, candidateIndex)
             ?: RescueCopyRating(previewId = previewId, candidateIndex = candidateIndex, rating = rating)
@@ -98,18 +110,25 @@ class RescuePreviewService(
     }
 
     /** The candidate the linter picked and the learner would have seen, or null for template copy. */
-    fun chosenCandidateIndex(preview: RescuePreview): Int? =
-        candidateTitles(preview).indexOf(preview.title).takeIf { it >= 0 && preview.source == RescueSource.AI }
+    fun chosenCandidateIndex(preview: RescuePreview): Int? {
+        if (preview.source != RescueSource.AI) return null
+        return candidates(preview)
+            .indexOfFirst {
+                it.violations.isEmpty() && it.candidate.title == preview.title && it.candidate.body == preview.body
+            }
+            .takeIf { it >= 0 }
+    }
 
-    /** Titles of the stored candidates, in the order the AI returned them. */
-    private fun candidateTitles(preview: RescuePreview): List<String> =
-        objectMapper.readStoredCandidates(preview.candidates).map { it.candidate.title }
+    private fun candidates(preview: RescuePreview): List<StoredCandidate> =
+        objectMapper.readStoredCandidates(preview.candidates)
 
     companion object {
-        const val MAX_COUNT = 50
+        /** Each preview is about one AI call run inside the admin's request; keep a batch to a minute or two. */
+        const val MAX_COUNT = 10
         const val TRIES_PER_PREVIEW = 5
+        const val MAX_FALLBACKS_IN_A_ROW = 3
 
-        /** Previews are drafted as if the learner had just missed two days, the earliest rescue. */
+        /** Previews are drafted for the earliest rescue: three days since the last study day. */
         const val PREVIEW_DAYS_AWAY = ComebackRescuePolicy.MIN_DAYS_AWAY
     }
 }

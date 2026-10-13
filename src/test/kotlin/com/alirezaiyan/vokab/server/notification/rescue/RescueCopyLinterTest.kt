@@ -118,6 +118,8 @@ class RescueCopyLinterTest {
     fun `emoji are caught by the emoji property, not by code point ranges`() {
         assertTrue(RescueCopyLinter.lint(candidate(body = "8 words, about 3 min ⏰"), ctx).contains("emoji"))
         assertTrue(RescueCopyLinter.lint(candidate(body = "8 words, about 3 min ⭐"), ctx).contains("emoji"))
+        assertTrue(RescueCopyLinter.lint(candidate(body = "Your 🇩🇪 Gewitter. 8 words, about 3 min."), ctx).contains("emoji"))
+        assertTrue(RescueCopyLinter.lint(candidate(body = "8 words, about 3️⃣ min."), ctx).contains("emoji"))
         assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "𠀋 8 words, about 3 min."), ctx))
     }
 

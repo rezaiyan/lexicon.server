@@ -724,6 +724,48 @@ class AiControllerTest {
         verify(creditService).spend(mockUser.requireId(), CreditAction.AI_SUGGESTION_GUIDED)
     }
 
+    @Test
+    fun `POST suggest-vocabulary refunds and returns 502 when the AI fails`() {
+        val spend = CreditSpend(transactionId = 9, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.AI_SUGGESTION)).thenReturn(spend)
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(createAllowedBucket())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        `when`(aiService.generateVocabularyFromPreferences(
+            "German", "beginner", "English", emptyList(), LearnerPreferences(), 50,
+        )).thenThrow(UpstreamServiceException("OpenRouter suggestion failed: status=503"))
+
+        mockMvc.perform(
+            post("/api/v1/ai/suggest-vocabulary")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSuggestVocabularyRequest()))
+        )
+            .andExpect(status().isBadGateway)
+            .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"))
+        verify(creditService).refund(spend)
+    }
+
+    @Test
+    fun `POST suggest-vocabulary refunds when no words come back`() {
+        val spend = CreditSpend(transactionId = 10, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.AI_SUGGESTION)).thenReturn(spend)
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(createAllowedBucket())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        `when`(aiService.generateVocabularyFromPreferences(
+            "German", "beginner", "English", emptyList(), LearnerPreferences(), 50,
+        )).thenReturn(emptyList())
+
+        mockMvc.perform(
+            post("/api/v1/ai/suggest-vocabulary")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSuggestVocabularyRequest()))
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.items.length()").value(0))
+        verify(creditService).refund(spend)
+    }
+
     private fun createExtractVocabularyRequest(
         imageBase64: String = "dGVzdA==",
         targetLanguage: String = "German",

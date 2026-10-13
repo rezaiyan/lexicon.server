@@ -27,8 +27,20 @@ class RescueFactSheetBuilderTest {
         val sheet = RescueFactSheetBuilder.build(profile(), pool)
 
         assertEquals("F1", sheet.facts.first().id)
-        assertEquals("session: 8 words, about 3 minutes", sheet.facts.first().text)
         assertEquals(sheet.facts.indices.map { "F${it + 1}" }, sheet.facts.map { it.id })
+    }
+
+    @Test
+    fun `the session size is the planned size, or the whole pool when it is smaller`() {
+        val bigPool = pool.copy(nearMastery = (1L..9L).map { candidateRow(it, text = "w$it", level = 4) })
+
+        // this pool has 4 words, fewer than a full session
+        assertEquals("session: 4 words, about 3 minutes", RescueFactSheetBuilder.build(profile(), pool).facts.first().text)
+        assertEquals("session: 8 words, about 3 minutes", RescueFactSheetBuilder.build(profile(), bigPool).facts.first().text)
+        assertEquals(
+            "session: 7 words, about 3 minutes",
+            RescueFactSheetBuilder.build(profile(), bigPool).withSessionSize(7).facts.first().text,
+        )
     }
 
     @Test

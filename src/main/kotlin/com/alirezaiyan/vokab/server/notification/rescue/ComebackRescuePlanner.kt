@@ -14,6 +14,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.LocalDate
+import java.util.Locale
 
 private val logger = KotlinLogging.logger {}
 
@@ -100,7 +101,7 @@ class ComebackRescuePlanner(
         val recent = rescueRepository.findTop3ByUserIdOrderByPlannedForDesc(userId)
         val uiLanguage = userSettingsRepository.findByUserId(userId)?.languageCode ?: DEFAULT_UI_LANGUAGE
 
-        return aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool)
+        return aiDraft(userId, pool, sheet, recent, uiLanguage) ?: fallbackDraft(pool, uiLanguage)
     }
 
     private fun aiDraft(
@@ -124,7 +125,8 @@ class ComebackRescuePlanner(
         }
 
         val sessionWords = pool.all.filter { it.wordId in picks }.map { it.text }.toSet()
-        val ctx = RescueCopyContext(sheet, sessionWords, lastAngle, recent.map { "${it.title} ${it.body}" })
+        val pickedSheet = sheet.withSessionSize(picks.size)
+        val ctx = RescueCopyContext(pickedSheet, sessionWords, lastAngle, recent.map { "${it.title} ${it.body}" })
         val linted = RescueCopyLinter.lintAll(response.candidates, ctx)
         val best = RescueCopyLinter.best(linted)?.candidate
 
@@ -133,28 +135,34 @@ class ComebackRescuePlanner(
                 angle = best.angle,
                 title = best.title,
                 body = best.body,
-                outroWin = response.outroWin?.takeIf { RescueCopyLinter.outroOk(it, sheet) },
-                outroSoft = response.outroSoft?.takeIf { RescueCopyLinter.outroOk(it, sheet) },
+                outroWin = response.outroWin?.takeIf { RescueCopyLinter.outroOk(it, pickedSheet) },
+                outroSoft = response.outroSoft?.takeIf { RescueCopyLinter.outroOk(it, pickedSheet) },
             )
         } else {
-            RescueFallback.copy(pool, picks)
+            templateCopy(pool, picks, uiLanguage)
         }
 
-        return RescueDraft(
-            wordIds = picks,
-            copy = copy,
-            source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
-            candidatesJson = objectMapper.writeValueAsString(
-                linted.map { mapOf("candidate" to it.candidate, "violations" to it.violations) }
-            ),
-            reasoningJson = objectMapper.writeValueAsString(response.reasons),
-        )
+        return copy?.let {
+            RescueDraft(
+                wordIds = picks,
+                copy = it,
+                source = if (best != null) RescueSource.AI else RescueSource.AI_PICKS_TEMPLATE_COPY,
+                candidatesJson = objectMapper.writeValueAsString(
+                    linted.map { l -> mapOf("candidate" to l.candidate, "violations" to l.violations) }
+                ),
+                reasoningJson = objectMapper.writeValueAsString(response.reasons),
+            )
+        }
     }
 
-    private fun fallbackDraft(pool: RescuePool): RescueDraft {
+    private fun fallbackDraft(pool: RescuePool, uiLanguage: String): RescueDraft? {
         val picks = RescueFallback.picks(pool)
-        return RescueDraft(picks, RescueFallback.copy(pool, picks), RescueSource.FALLBACK)
+        return templateCopy(pool, picks, uiLanguage)?.let { RescueDraft(picks, it, RescueSource.FALLBACK) }
     }
+
+    /** The template copy is English; a learner using the app in another language gets no rescue rather than that. */
+    private fun templateCopy(pool: RescuePool, picks: List<Long>, uiLanguage: String): RescueCopy? =
+        RescueFallback.copy(pool, picks).takeIf { uiLanguage == DEFAULT_UI_LANGUAGE }
 
     private fun prompt(pool: RescuePool, sheet: RescueFactSheet, lastAngle: String?, uiLanguage: String): String =
         promptTemplates.render(
@@ -162,7 +170,7 @@ class ComebackRescuePlanner(
             mapOf(
                 "uiLanguage" to uiLanguage,
                 "targetLanguage" to pool.targetLanguage,
-                "sessionSize" to RescueFactSheetBuilder.SESSION_SIZE,
+                "sessionSize" to RescueFactSheetBuilder.sessionSize(pool),
                 "avoidAngle" to (lastAngle ?: "none"),
                 "facts" to sheet.render(),
                 "nearMastery" to pool.nearMastery.joinToString("\n", transform = ::candidateLine),
@@ -172,7 +180,7 @@ class ComebackRescuePlanner(
 
     private fun candidateLine(r: RescueCandidateRow): String =
         "id=${r.wordId} \"${r.text}\" (${r.translation}) level=${r.level} recent=${r.recent} " +
-            "errorRate=${"%.2f".format(r.errorRate)}"
+            "errorRate=${"%.2f".format(Locale.ROOT, r.errorRate)}"
 
     companion object {
         /** Learners whose id ends in this digit (10%) form the holdout group: planned, never sent. */

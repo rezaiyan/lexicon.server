@@ -74,6 +74,24 @@ class ComebackRescueServiceTest {
     }
 
     @Test
+    fun `a pushed rescue whose sent mark was lost still completes, a holdout never does`() {
+        listOf(RescueStatus.PLANNED, RescueStatus.EXPIRED).forEach { status ->
+            val r = rescue(status)
+            every { repository.findById(42L) } returns Optional.of(r)
+            every { repository.save(r) } returns r
+
+            service().complete(userId = 1L, rescueId = 42L)
+
+            assertEquals(RescueStatus.COMPLETED, r.status)
+        }
+
+        val holdout = rescue(RescueStatus.HOLDOUT)
+        every { repository.findById(42L) } returns Optional.of(holdout)
+        service().complete(userId = 1L, rescueId = 42L)
+        assertEquals(RescueStatus.HOLDOUT, holdout.status)
+    }
+
+    @Test
     fun `another user's or a missing rescue cannot be completed`() {
         every { repository.findById(42L) } returns Optional.of(rescue(RescueStatus.SENT, userId = 2L))
         every { repository.findById(43L) } returns Optional.empty()

@@ -151,6 +151,28 @@ class SmartNotificationDispatcherTest {
     }
 
     @Test
+    fun `a milestone push that fell back to an insight is recorded as the requested type without a snapshot`() {
+        val user     = testUser(id = 5L)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.DAILY_INSIGHT)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.PROGRESS_MILESTONE
+        every { notificationContentBuilder.build(user, NotificationType.PROGRESS_MILESTONE, null) } returns payload
+        every { pushNotificationService.sendNotificationToUser(userId = 5L, title = any(), body = any(), data = any()) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 1) { notificationEngagementService.saveLog(5L, NotificationType.PROGRESS_MILESTONE.name, any(), any(), any()) }
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.PROGRESS_MILESTONE.name, any()) }
+        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any()) }
+    }
+
+    @Test
     fun `should not record milestone snapshot for non-milestone notification types`() {
         val user     = testUser(id = 6L)
         val schedule = testSchedule(user)

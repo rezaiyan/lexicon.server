@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.containsWord
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.numbers
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.withoutWords
 import java.text.BreakIterator
 
 data class RescueCopyContext(
@@ -31,7 +34,6 @@ object RescueCopyLinter {
         "don't lose", "don't break", "we miss you", "ready to", "let's go", "hey there", "oops",
     )
 
-    private val NUMBER = Regex("""\d+""")
     private val QUOTED = Regex("""["“”«»]([^"“”«»]{1,40})["“”«»]""")
 
     fun lintAll(candidates: List<RescueCopyCandidate>, ctx: RescueCopyContext): List<LintedCandidate> =
@@ -49,15 +51,16 @@ object RescueCopyLinter {
         if (c.angle == ctx.lastAngle) v += "repeats last angle"
         if (c.title.isBlank() || graphemes(c.title) > TITLE_MAX) v += "title length"
         if (c.body.isBlank() || graphemes(c.body) > BODY_MAX) v += "body length"
-        if (ctx.sessionWords.none { text.contains(it, ignoreCase = true) }) v += "names no session word"
+        if (ctx.sessionWords.none { containsWord(text, it) }) v += "names no session word"
 
         val unknownFacts = c.factIds.filter { id -> ctx.factSheet.facts.none { it.id == id } }
         unknownFacts.forEach { v += "cites unknown fact $it" }
         val citedNumbers = numbersIn(ctx.factSheet.byIds(c.factIds))
-        NUMBER.findAll(withoutWords(text, ctx.factSheet.allWords + ctx.sessionWords)).map { it.value }.distinct()
+        numbers(withoutWords(text, ctx.factSheet.allWords + ctx.sessionWords)).distinct()
             .filter { it !in citedNumbers }.forEach { v += "ungrounded number $it" }
+        val knownWords = (ctx.factSheet.allWords + ctx.sessionWords).map { it.lowercase() }.toSet()
         QUOTED.findAll(text).map { it.groupValues[1] }
-            .filter { it !in ctx.factSheet.allWords }.forEach { v += "ungrounded word $it" }
+            .filter { it.lowercase() !in knownWords }.forEach { v += "ungrounded word $it" }
 
         v += toneViolations(text)
 
@@ -71,16 +74,11 @@ object RescueCopyLinter {
     fun outroOk(outro: String?, sheet: RescueFactSheet): Boolean {
         if (outro.isNullOrBlank() || graphemes(outro) > OUTRO_MAX) return false
         val knownNumbers = numbersIn(sheet.facts)
-        if (NUMBER.findAll(withoutWords(outro, sheet.allWords)).any { it.value !in knownNumbers }) return false
+        if (numbers(withoutWords(outro, sheet.allWords)).any { it !in knownNumbers }) return false
         return toneViolations(outro).isEmpty()
     }
 
-    private fun numbersIn(facts: List<RescueFact>): Set<String> =
-        facts.flatMap { fact -> NUMBER.findAll(fact.text).map { it.value }.toList() }.toSet()
-
-    /** [text] with the learner's own words blanked out, so a word like "B2" is not read as a stat. */
-    private fun withoutWords(text: String, words: Set<String>): String =
-        words.sortedByDescending { it.length }.fold(text) { acc, word -> acc.replace(word, " ", ignoreCase = true) }
+    private fun numbersIn(facts: List<RescueFact>): Set<String> = facts.flatMap { numbers(it.text).toList() }.toSet()
 
     fun graphemes(s: String): Int {
         val it = BreakIterator.getCharacterInstance().apply { setText(s) }
@@ -92,14 +90,15 @@ object RescueCopyLinter {
     private fun toneViolations(text: String): List<String> {
         val v = mutableListOf<String>()
         val lower = text.lowercase().replace('’', '\'')
-        BANNED_PHRASES.filter { it in lower }.forEach { v += "banned phrase $it" }
+        BANNED_PHRASES.filter { containsWord(lower, it) }.forEach { v += "banned phrase $it" }
         if ('—' in text) v += "em dash"
         if (text.count { it == '!' } > 1) v += "too many exclamation marks"
         if (text.codePoints().anyMatch(::isEmoji)) v += "emoji"
         return v
     }
 
-    private fun isEmoji(cp: Int): Boolean = cp >= 0x1F000 || cp in 0x2600..0x27BF
+    /** Emoji blocks only; CJK extension characters live above them and are not emoji. */
+    private fun isEmoji(cp: Int): Boolean = cp in 0x1F000..0x1FAFF || cp in 0x2600..0x27BF
 
     private fun normalize(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
 }

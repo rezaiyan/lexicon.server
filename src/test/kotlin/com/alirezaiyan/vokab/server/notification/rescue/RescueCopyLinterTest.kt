@@ -66,9 +66,50 @@ class RescueCopyLinterTest {
     }
 
     @Test
-    fun `quoted words must come from the fact sheet`() {
+    fun `numbers in any script must come from cited facts`() {
+        // Persian digits: 500 is invented, 8 and 3 are in the cited F1
+        val v = RescueCopyLinter.lint(candidate(body = "Gewitter ۵۰۰ واژه. ۸ واژه، ۳ دقیقه."), ctx)
+
+        assertEquals(listOf("ungrounded number 500"), v)
+        assertTrue(!RescueCopyLinter.outroOk("Gewitter: ８ of ９９.", sheet))
+    }
+
+    @Test
+    fun `a short session word inside another word does not count as naming it`() {
+        val shortWord = ctx.copy(sessionWords = setOf("in"))
+
+        assertTrue(RescueCopyLinter.lint(candidate(title = "Training time"), shortWord).contains("names no session word"))
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(title = "\"in\", one more go"), shortWord))
+    }
+
+    @Test
+    fun `a session word in a script without spaces counts next to other letters`() {
+        val japanese = ctx.copy(sessionWords = setOf("猫"))
+
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(title = "猫をもう一度"), japanese))
+    }
+
+    @Test
+    fun `quoted words must come from the fact sheet or the session`() {
         val v = RescueCopyLinter.lint(candidate(body = "Gewitter and \"Blitz\" wait. 8 words, about 3 min."), ctx)
         assertTrue(v.contains("ungrounded word Blitz"))
+
+        val quotedSessionWord = candidate(body = "\"hund\" and Gewitter wait. 8 words, about 3 min.")
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(quotedSessionWord, ctx))
+    }
+
+    @Test
+    fun `banned phrases and emoji match whole words and real emoji only`() {
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "Already today? 8 words, about 3 min."), ctx))
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "𠀋 8 words, about 3 min."), ctx))
+    }
+
+    @Test
+    fun `a session of another size grounds its own count, not the planned one`() {
+        val sevenWords = ctx.copy(factSheet = sheet.withSessionSize(7))
+
+        assertTrue(RescueCopyLinter.lint(candidate(), sevenWords).contains("ungrounded number 8"))
+        assertEquals(emptyList<String>(), RescueCopyLinter.lint(candidate(body = "You were close. 7 words, about 3 min."), sevenWords))
     }
 
     @Test

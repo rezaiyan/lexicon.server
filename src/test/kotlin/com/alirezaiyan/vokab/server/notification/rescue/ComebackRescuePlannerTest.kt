@@ -9,6 +9,7 @@ import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.study.DailyActivity
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.UserSettings
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
 import com.fasterxml.jackson.databind.ObjectMapper
 import io.mockk.every
@@ -92,6 +93,15 @@ class ComebackRescuePlannerTest {
 
         assertEquals(RescueSource.FALLBACK, rescue.source)
         assertEquals(RescueFallback.picks(requireNotNull(RescuePool.from(near + weak, fixedClock().millis()))), rescue.wordIdList)
+    }
+
+    @Test
+    fun `plans nothing rather than English template copy for a learner using another language`() {
+        every { aiClient.complete(any(), any()) } throws UpstreamServiceException("down")
+        every { userSettingsRepository.findByUserId(any()) } returns UserSettings(user = user(), languageCode = "fa")
+
+        assertNull(planner.planIfEligible(user()))
+        verify(exactly = 0) { rescueRepository.save(any()) }
     }
 
     @Test

@@ -32,16 +32,24 @@ class ComebackRescueService(
         }
     }
 
-    /** False when the rescue doesn't exist or isn't the user's; repeated calls are no-ops. */
+    /**
+     * False when the rescue doesn't exist or isn't the user's; repeated calls are no-ops. A plan still
+     * PLANNED or EXPIRED was pushed but [markSent] failed after delivery; the session still counts.
+     */
     @Transactional
     fun complete(userId: Long, rescueId: Long): Boolean {
         val rescue = repository.findById(rescueId).orElse(null) ?: return false
         if (rescue.userId != userId) return false
-        if (rescue.status == RescueStatus.SENT) {
+        if (rescue.status in COMPLETABLE) {
             rescue.status = RescueStatus.COMPLETED
             rescue.completedAt = Instant.now(clock)
             repository.save(rescue)
         }
         return true
+    }
+
+    private companion object {
+        /** HOLDOUT plans are never pushed, so a completion for one cannot be genuine. */
+        val COMPLETABLE = setOf(RescueStatus.SENT, RescueStatus.PLANNED, RescueStatus.EXPIRED)
     }
 }

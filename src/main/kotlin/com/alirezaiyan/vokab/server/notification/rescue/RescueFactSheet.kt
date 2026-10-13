@@ -13,6 +13,14 @@ data class RescueFactSheet(val facts: List<RescueFact>) {
     fun byIds(ids: Collection<String>): List<RescueFact> = facts.filter { it.id in ids }
 
     fun render(): String = facts.joinToString("\n") { "${it.id} ${it.text}" }
+
+    /** The same sheet for a session of [size] words, so copy is checked against the words actually picked. */
+    fun withSessionSize(size: Int): RescueFactSheet = copy(
+        facts = facts.map {
+            if (it.id != RescueFactSheetBuilder.SESSION_FACT_ID) it
+            else it.copy(text = RescueFactSheetBuilder.sessionFact(size))
+        }
+    )
 }
 
 data class RescueProfile(
@@ -26,8 +34,16 @@ object RescueFactSheetBuilder {
     const val SESSION_SIZE = 8
     const val EST_MINUTES = 3
 
+    /** The session-size fact always comes first. */
+    const val SESSION_FACT_ID = "F1"
+
     private const val MIN_STREAK_WORTH_MENTIONING = 3
     private const val MAX_WORD_FACTS_PER_BUCKET = 3
+
+    /** Words to ask for: [SESSION_SIZE], or every candidate when the pool is smaller. */
+    fun sessionSize(pool: RescuePool): Int = minOf(SESSION_SIZE, pool.all.size)
+
+    fun sessionFact(size: Int): String = "session: $size words, about $EST_MINUTES minutes"
 
     fun build(profile: RescueProfile, pool: RescuePool): RescueFactSheet {
         val facts = mutableListOf<RescueFact>()
@@ -35,7 +51,7 @@ object RescueFactSheetBuilder {
             facts += RescueFact("F${facts.size + 1}", text, words)
         }
 
-        add("session: $SESSION_SIZE words, about $EST_MINUTES minutes")
+        add(sessionFact(sessionSize(pool)))
         add("days since last study: ${profile.daysAway}")
         add("words in deck: ${profile.totalWords} (${pool.targetLanguage})")
         if (profile.longestStreak >= MIN_STREAK_WORTH_MENTIONING) {

@@ -125,23 +125,30 @@ class SmartNotificationDispatcher(
         contentHint: String?
     ) {
         val payload = notificationContentBuilder.build(schedule.user, type, contentHint)
-        if (deliver(schedule, payload) != null && type == NotificationType.PROGRESS_MILESTONE) {
+        // Only a real milestone push moves the snapshot; the builder may have sent its fallback insight
+        if (deliver(schedule, type, payload) != null && payload.type == NotificationType.PROGRESS_MILESTONE) {
             milestoneDetector.recordMilestoneSnapshot(schedule.user)
         }
     }
 
     private fun sendRescue(schedule: NotificationSchedule, rescue: ComebackRescue) {
-        val delivery = deliver(schedule, RescuePushBuilder.build(rescue)) ?: return
+        val delivery = deliver(schedule, NotificationType.COMEBACK_RESCUE, RescuePushBuilder.build(rescue)) ?: return
         comebackRescueService.markSent(requireNotNull(rescue.id), delivery.logId)
     }
 
     private data class Delivery(val logId: Long?)
 
-    /** Logs, pushes and records [payload]; the delivery when a device got it, otherwise null. */
-    private fun deliver(schedule: NotificationSchedule, payload: NotificationPayload): Delivery? {
+    /**
+     * Logs, pushes and records [payload] under the requested [type] (what rotation and analytics
+     * track, even when the builder fell back to other content); the delivery when a device got it.
+     */
+    private fun deliver(
+        schedule: NotificationSchedule,
+        type: NotificationType,
+        payload: NotificationPayload,
+    ): Delivery? {
         val user   = schedule.user
         val userId = user.requireId()
-        val type   = payload.type
 
         // The log is created before the push so its id can ride in the payload and come back
         // with the tap (POST /notifications/{id}/opened). Without a log we still send — only

@@ -30,11 +30,14 @@ data class McpConfig(
     var issuer: String = "http://localhost:8080",
     /** RSA JWK (with private part) signing MCP tokens; created on first start. Never the app's JWT key. */
     var signingKeyPath: String = "./keys/mcp-signing-key.json",
-    /** Clients with a secret get short access tokens plus refresh tokens. */
-    var confidentialAccessTokenMinutes: Long = 60,
-    /** SAS 1.x issues no refresh token to public clients, so their access tokens live longer. */
-    var publicAccessTokenHours: Long = 24 * 7,
+    /** Short-lived access tokens; every client also gets a rotating refresh token. */
+    var accessTokenMinutes: Long = 60,
     var refreshTokenDays: Long = 30,
+    /**
+     * Browser origins allowed to call `/mcp` besides our own (DNS-rebinding guard). Requests
+     * without an Origin header (native and server-side clients) are unaffected.
+     */
+    var allowedOrigins: List<String> = emptyList(),
     /** Firebase web config for the sign-in page (the same public values the web app ships). */
     var firebaseWebApiKey: String = "",
     var firebaseAuthDomain: String = "",

@@ -61,6 +61,7 @@ class McpOAuthFlowTest {
     @Autowired private lateinit var authorizationService: OAuth2AuthorizationService
     @Autowired private lateinit var appTokens: RS256JwtTokenProvider
     @MockitoBean private lateinit var firebase: FirebaseIdTokenVerifier
+    @MockitoBean private lateinit var metadataFetcher: McpClientMetadataFetcher
 
     private lateinit var learner: User
 
@@ -83,6 +84,8 @@ class McpOAuthFlowTest {
         assertTrue(metadata["code_challenge_methods_supported"].any { it.asText() == "S256" })
         assertTrue(metadata["token_endpoint_auth_methods_supported"].any { it.asText() == "none" })
         assertTrue(metadata["scopes_supported"].map { it.asText() }.containsAll(listOf("words:read", "words:write")))
+        assertTrue(metadata["authorization_response_iss_parameter_supported"].asBoolean())
+        assertTrue(metadata["client_id_metadata_document_supported"].asBoolean())
     }
 
     @Test
@@ -101,6 +104,8 @@ class McpOAuthFlowTest {
             .andExpect(status().isUnauthorized)
             .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
                 org.hamcrest.Matchers.containsString("resource_metadata=\"$ISSUER/.well-known/oauth-protected-resource/mcp\"")))
+            .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
+                org.hamcrest.Matchers.containsString("scope=\"progress:read words:read words:write\"")))
     }
 
     @Test
@@ -144,7 +149,7 @@ class McpOAuthFlowTest {
         val clientId = registerClient("none")["client_id"].asText()
         val tokens = authorize(clientId, clientSecret = null)
 
-        assertNull(tokens["refresh_token"], "SAS 1.x issues no refresh token to public clients")
+        assertTrue(tokens["expires_in"].asLong() <= 3600, "access tokens are short-lived")
         val accessToken = tokens["access_token"].asText()
 
         val toolNames = json(mockMvc.perform(mcp(rpc("tools/list"), accessToken)).andExpect(status().isOk))["result"]["tools"]
@@ -153,7 +158,7 @@ class McpOAuthFlowTest {
 
         val call = json(mockMvc.perform(mcp(rpc("tools/call", mapOf("name" to "search_words", "arguments" to mapOf("query" to "apple"))), accessToken))
             .andExpect(status().isOk))
-        val words = objectMapper.readTree(call["result"]["content"][0]["text"].asText())
+        val words = call["result"]["structuredContent"]["words"]
         assertEquals(listOf("Apfel"), words.map { it["word"].asText() })
     }
 
@@ -163,6 +168,134 @@ class McpOAuthFlowTest {
         val tokens = authorize(client["client_id"].asText(), client["client_secret"].asText())
 
         assertNotNull(tokens["refresh_token"]?.asText())
+    }
+
+    @Test
+    fun `public client refreshes with a rotating refresh token`() {
+        val clientId = registerClient("none")["client_id"].asText()
+        val first = authorize(clientId, clientSecret = null)
+        val firstRefresh = requireNotNull(first["refresh_token"]?.asText()) { "public clients get a refresh token" }
+
+        val second = refresh(clientId, firstRefresh)
+        assertEquals(200, second.status, second.contentAsString)
+        val rotated = objectMapper.readTree(second.contentAsString)
+        val secondRefresh = rotated["refresh_token"].asText()
+        assertTrue(secondRefresh != firstRefresh, "refresh tokens rotate")
+        mockMvc.perform(mcp(rpc("tools/list"), rotated["access_token"].asText())).andExpect(status().isOk)
+
+        // The replaced refresh token is spent
+        assertEquals(400, refresh(clientId, firstRefresh).status)
+    }
+
+    @Test
+    fun `refreshing as another client fails`() {
+        val owner = registerClient("none")["client_id"].asText()
+        val other = registerClient("none")["client_id"].asText()
+        val refreshToken = authorize(owner, clientSecret = null)["refresh_token"].asText()
+
+        assertEquals(400, refresh(other, refreshToken).status)
+    }
+
+    @Test
+    fun `the authorization response names the issuer`() {
+        authorize(registerClient("none")["client_id"].asText(), clientSecret = null)
+
+        assertEquals(ISSUER, lastCallback.getFirst("iss"))
+    }
+
+    @Test
+    fun `authorize refuses a token for another resource and says so to the client`() {
+        val clientId = registerClient("none")["client_id"].asText()
+        val session = signedInSession()
+
+        val response = mockMvc.perform(authorizeRequest(clientId, resource = "https://other.example.com/mcp").session(session))
+            .andReturn().response
+
+        assertEquals(302, response.status, response.contentAsString)
+        val callback = callbackParams(requireNotNull(response.redirectedUrl))
+        assertEquals("invalid_target", callback.getFirst("error"))
+        assertEquals(ISSUER, callback.getFirst("iss"))
+    }
+
+    @Test
+    fun `token endpoint refuses another resource`() {
+        val response = mockMvc.perform(
+            post("/oauth2/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("grant_type", "authorization_code")
+                .param("code", "whatever")
+                .param("client_id", registerClient("none")["client_id"].asText())
+                .param("resource", "https://other.example.com/mcp")
+        ).andReturn().response
+
+        assertEquals(400, response.status)
+        assertEquals("invalid_target", objectMapper.readTree(response.contentAsString)["error"].asText())
+    }
+
+    @Test
+    fun `consent page names the app and where it sends the learner back`() {
+        val clientId = registerClient("none")["client_id"].asText()
+        val session = signedInSession()
+
+        val toConsent = mockMvc.perform(authorizeRequest(clientId).session(session).accept(MediaType.TEXT_HTML))
+            .andReturn().response
+        val page = mockMvc.perform(get(java.net.URI(requireNotNull(toConsent.redirectedUrl) { "no consent redirect: ${toConsent.status}" })).session(session))
+            .andExpect(status().isOk).andReturn().response
+
+        assertTrue("Test MCP client" in page.contentAsString)
+        assertTrue("client.example.com" in page.contentAsString)
+        assertTrue(requireNotNull(page.getHeader("Content-Security-Policy")).contains("frame-ancestors 'none'"))
+    }
+
+    @Test
+    fun `consent page escapes a hostile app name`() {
+        val clientId = json(mockMvc.perform(
+            post("/oauth/register").withFreshIp().contentType(MediaType.APPLICATION_JSON).content(objectMapper.writeValueAsString(mapOf(
+                "client_name" to "<script>alert(1)</script>",
+                "redirect_uris" to listOf(REDIRECT),
+                "token_endpoint_auth_method" to "none",
+            )))
+        ).andExpect(status().isCreated))["client_id"].asText()
+        val session = signedInSession()
+
+        val toConsent = mockMvc.perform(authorizeRequest(clientId).session(session).accept(MediaType.TEXT_HTML)).andReturn().response
+        val page = mockMvc.perform(get(java.net.URI(requireNotNull(toConsent.redirectedUrl))).session(session)).andReturn().response.contentAsString
+
+        assertTrue("<script>alert(1)</script>" !in page)
+        assertTrue("&lt;script&gt;" in page)
+    }
+
+    // ── client ID metadata documents ────────────────────────────────────────
+
+    @Test
+    fun `a client identified by its metadata document URL connects without registering`() {
+        `when`(metadataFetcher.fetch(java.net.URI(CIMD_CLIENT))).thenReturn(metadataDocument(CIMD_CLIENT))
+
+        val tokens = authorize(CIMD_CLIENT, clientSecret = null)
+
+        assertNotNull(tokens["refresh_token"]?.asText())
+        mockMvc.perform(mcp(rpc("tools/list"), tokens["access_token"].asText())).andExpect(status().isOk)
+    }
+
+    @Test
+    fun `consent for a metadata document client names the site that published it`() {
+        `when`(metadataFetcher.fetch(java.net.URI(CIMD_CLIENT))).thenReturn(metadataDocument(CIMD_CLIENT))
+        val session = signedInSession()
+
+        val toConsent = mockMvc.perform(authorizeRequest(CIMD_CLIENT).session(session).accept(MediaType.TEXT_HTML)).andReturn().response
+        val page = mockMvc.perform(get(java.net.URI(requireNotNull(toConsent.redirectedUrl))).session(session))
+            .andReturn().response.contentAsString
+
+        assertTrue("Published by <strong>apps.example.com</strong>" in page, page)
+    }
+
+    @Test
+    fun `a metadata document claiming another client id is refused`() {
+        `when`(metadataFetcher.fetch(java.net.URI(CIMD_CLIENT))).thenReturn(metadataDocument("https://evil.example.com/client.json"))
+
+        val response = mockMvc.perform(authorizeRequest(CIMD_CLIENT).session(signedInSession())).andReturn().response
+
+        assertEquals(400, response.status)
     }
 
     @Test
@@ -196,21 +329,30 @@ class McpOAuthFlowTest {
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /** Query parameters the client got back on its redirect URI in the last [authorize]. */
+    private lateinit var lastCallback: org.springframework.util.MultiValueMap<String, String>
+
+    private val verifier = "verifier-" + "x".repeat(50)
+
+    private fun authorizeRequest(clientId: String, resource: String = "$ISSUER/mcp") = get("/oauth2/authorize")
+        .queryParam("response_type", "code")
+        .queryParam("client_id", clientId)
+        .queryParam("redirect_uri", REDIRECT)
+        .queryParam("scope", "words:read")
+        .queryParam("state", "client-state")
+        .queryParam("code_challenge", Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())))
+        .queryParam("code_challenge_method", "S256")
+        .queryParam("resource", resource)
+
+    private fun signedInSession(): MockHttpSession = MockHttpSession().also { session ->
+        mockMvc.perform(signIn("good-id-token", session)).andExpect(status().isOk)
+    }
+
     /** Runs authorize → login → consent → token and returns the token response. */
     private fun authorize(clientId: String, clientSecret: String?): JsonNode {
         val session = MockHttpSession()
-        val verifier = "verifier-" + "x".repeat(50)
-        val challenge = Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray()))
-        val authorize = get("/oauth2/authorize")
-            .queryParam("response_type", "code")
-            .queryParam("client_id", clientId)
-            .queryParam("redirect_uri", REDIRECT)
-            .queryParam("scope", "words:read")
-            .queryParam("state", "client-state")
-            .queryParam("code_challenge", challenge)
-            .queryParam("code_challenge_method", "S256")
-            .queryParam("resource", "$ISSUER/mcp")
+        val authorize = authorizeRequest(clientId)
 
         // Not signed in yet: off to our login page
         val toLogin = mockMvc.perform(authorize.session(session).accept(MediaType.TEXT_HTML)).andReturn().response
@@ -219,8 +361,10 @@ class McpOAuthFlowTest {
 
         mockMvc.perform(signIn("good-id-token", session)).andExpect(status().isOk)
 
-        // Signed in: SAS shows the consent page
-        val consentPage = mockMvc.perform(authorize.session(session).accept(MediaType.TEXT_HTML))
+        // Signed in: SAS sends the learner to our consent page
+        val toConsent = mockMvc.perform(authorize.session(session).accept(MediaType.TEXT_HTML)).andReturn().response
+        assertEquals(302, toConsent.status, "authorize answered ${toConsent.status}: ${toConsent.contentAsString}")
+        val consentPage = mockMvc.perform(get(java.net.URI(requireNotNull(toConsent.redirectedUrl))).session(session))
             .andExpect(status().isOk).andReturn().response.contentAsString
         val state = Regex("""name="state" value="([^"]+)"""").find(consentPage)?.groupValues?.get(1)
             ?: error("no state on consent page: $consentPage")
@@ -232,10 +376,10 @@ class McpOAuthFlowTest {
                 .param("state", state)
                 .param("scope", "words:read")
         ).andReturn().response
-        assertEquals(302, approved.status, "consent answered ${approved.status}: ${approved.contentAsString}")
-        val callback = UriComponentsBuilder.fromUriString(requireNotNull(approved.redirectedUrl)).build().queryParams
-        assertEquals("client-state", callback.getFirst("state"))
-        val code = requireNotNull(callback.getFirst("code"))
+        assertEquals(302, approved.status, "consent answered ${approved.status}: ${approved.errorMessage} ${approved.contentAsString}")
+        lastCallback = callbackParams(requireNotNull(approved.redirectedUrl))
+        assertEquals("client-state", lastCallback.getFirst("state"))
+        val code = requireNotNull(lastCallback.getFirst("code"))
 
         val token = post("/oauth2/token")
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
@@ -251,10 +395,28 @@ class McpOAuthFlowTest {
         return objectMapper.readTree(response.contentAsString)
     }
 
+    /** Decoded query parameters of a redirect back to the client. */
+    private fun callbackParams(url: String): org.springframework.util.MultiValueMap<String, String> =
+        UriComponentsBuilder.fromUriString(url).build(true).queryParams.let { raw ->
+            org.springframework.util.LinkedMultiValueMap<String, String>().apply {
+                raw.forEach { (name, values) -> put(name, values.map { org.springframework.web.util.UriUtils.decode(it, Charsets.UTF_8) }) }
+            }
+        }
+
+    private fun refresh(clientId: String, refreshToken: String) = mockMvc.perform(
+        post("/oauth2/token")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+            .param("grant_type", "refresh_token")
+            .param("refresh_token", refreshToken)
+            .param("client_id", clientId)
+            .param("resource", "$ISSUER/mcp")
+    ).andReturn().response
+
     private fun registerClient(authMethod: String): JsonNode =
         json(mockMvc.perform(register(listOf(REDIRECT), authMethod)).andExpect(status().isCreated))
 
     private fun register(redirects: List<String>, authMethod: String) = post("/oauth/register")
+        .withFreshIp()
         .contentType(MediaType.APPLICATION_JSON)
         .content(objectMapper.writeValueAsString(mapOf(
             "client_name" to "Test MCP client",
@@ -265,6 +427,7 @@ class McpOAuthFlowTest {
         )))
 
     private fun signIn(idToken: String, session: MockHttpSession) = post("/oauth/session")
+        .withFreshIp()
         .session(session)
         .header(HttpHeaders.ORIGIN, ISSUER)
         .contentType(MediaType.APPLICATION_JSON)
@@ -282,7 +445,21 @@ class McpOAuthFlowTest {
     private fun json(result: org.springframework.test.web.servlet.ResultActions): JsonNode =
         objectMapper.readTree(result.andReturn().response.contentAsString)
 
+    /** Registration is limited per IP; each test registration comes from its own address. */
+    private fun org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder.withFreshIp() =
+        header("X-Forwarded-For", "10.${registrations / 250}.${registrations++ % 250}.1")
+
+    private fun metadataDocument(clientId: String) = objectMapper.writeValueAsString(mapOf(
+        "client_id" to clientId,
+        "client_name" to "Metadata client",
+        "redirect_uris" to listOf(REDIRECT),
+        "grant_types" to listOf("authorization_code", "refresh_token"),
+        "token_endpoint_auth_method" to "none",
+    ))
+
     private companion object {
+        const val CIMD_CLIENT = "https://apps.example.com/lexicon/client.json"
+        var registrations = 0
         const val REDIRECT = "https://client.example.com/callback"
     }
 }

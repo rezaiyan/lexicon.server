@@ -53,6 +53,7 @@ internal class McpTestTokens(
             .issuedAt(now)
             .expiresAt(expiresAt)
             .claim("scope", scopes.toList())
+            .claim("client_id", client.clientId)
             .build()
         val jwt = NimbusJwtEncoder(jwkSource)
             .encode(JwtEncoderParameters.from(JwsHeader.with(SignatureAlgorithm.RS256).build(), claims))

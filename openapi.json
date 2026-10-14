@@ -2642,6 +2642,9 @@
               "type" : "string"
             },
             "type" : "array"
+          },
+          "website" : {
+            "type" : [ "string", "null" ]
           }
         },
         "required" : [ "clientName", "connectedAt", "id", "scopes" ],

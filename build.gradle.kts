@@ -90,6 +90,8 @@ dependencies {
 
 	// Rate Limiting
 	implementation(libs.bucket4j.core)
+	// Fetches MCP client metadata documents with an address-checking DNS resolver
+	implementation(libs.httpclient5)
 
 	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)

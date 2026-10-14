@@ -34,7 +34,10 @@ class McpServerConfig {
                     val scopes = token.authorities.map { it.authority }
                         .filter { it.startsWith(SCOPE_PREFIX) }
                         .map { it.removePrefix(SCOPE_PREFIX) }
-                    McpTransportContext.create(mapOf(USER_ID to userId, SCOPES to scopes.toSet()))
+                    val clientId = token.token.getClaimAsString(McpAuthorizationServerConfig.CLIENT_ID_CLAIM).orEmpty()
+                    McpTransportContext.create(
+                        mapOf(USER_ID to userId, SCOPES to scopes.toSet(), CLIENT_ID to clientId)
+                    )
                 }
             }
             .build()
@@ -42,6 +45,7 @@ class McpServerConfig {
     companion object {
         const val USER_ID = "userId"
         const val SCOPES = "scopes"
+        const val CLIENT_ID = "clientId"
         private const val SCOPE_PREFIX = "SCOPE_"
     }
 }
@@ -49,6 +53,9 @@ class McpServerConfig {
 /** The authenticated caller of this MCP request; the filter chain rejects anonymous calls before this point. */
 internal fun McpTransportContext.userId(): Long =
     get(McpServerConfig.USER_ID) as? Long ?: error("MCP call without an authenticated user")
+
+/** The OAuth client making this call (for the audit log). */
+internal fun McpTransportContext.clientId(): String = get(McpServerConfig.CLIENT_ID) as? String ?: ""
 
 /** The caller's user id, once the learner granted [scope] to this client. Fails the tool call otherwise. */
 internal fun McpTransportContext.userIdWithScope(scope: String): Long {

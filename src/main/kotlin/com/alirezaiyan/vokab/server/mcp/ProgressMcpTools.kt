@@ -3,6 +3,8 @@ package com.alirezaiyan.vokab.server.mcp
 import com.alirezaiyan.vokab.server.analytics.WeeklyReportResponse
 import com.alirezaiyan.vokab.server.analytics.WeeklyReportService
 import com.alirezaiyan.vokab.server.analytics.WordProgressQueries
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.fasterxml.jackson.annotation.JsonProperty
 import io.modelcontextprotocol.common.McpTransportContext
 import org.springaicommunity.mcp.annotation.McpTool
 import org.springaicommunity.mcp.annotation.McpToolParam
@@ -21,16 +23,18 @@ class ProgressMcpTools(
         name = "get_difficult_words",
         description = "The words the learner gets wrong most often in reviews (at least $MIN_REVIEWS reviews), " +
             "hardest first. Good material for extra practice.",
-        annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false),
+        title = "Get my difficult Lexicon words",
+        annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, openWorldHint = false),
+        generateOutputSchema = true,
     )
     fun getDifficultWords(
         context: McpTransportContext,
         @McpToolParam(description = "Max words, 1-$MAX_LIMIT (default $DEFAULT_LIMIT)", required = false)
         limit: Int?,
-    ): List<DifficultWord> {
+    ): DifficultWords {
         val userId = context.userIdWithScope(McpScopes.PROGRESS_READ)
         val max = (limit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
-        return wordProgressQueries.getDifficultWords(userId, MIN_REVIEWS, max)
+        val words = wordProgressQueries.getDifficultWords(userId, MIN_REVIEWS, max)
             .map {
                 DifficultWord(
                     id = it.wordId,
@@ -42,16 +46,32 @@ class ProgressMcpTools(
                     errorRate = it.errorRate,
                 )
             }
+        return DifficultWords(words)
     }
 
     @McpTool(
         name = "get_weekly_report",
         description = "This week's study summary: cards reviewed (and change from last week), accuracy, " +
             "words mastered, study time, sessions and the best day.",
-        annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false),
+        title = "Get my Lexicon weekly report",
+        annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, openWorldHint = false),
+        generateOutputSchema = true,
     )
-    fun getWeeklyReport(context: McpTransportContext): WeeklyReportResponse =
-        weeklyReportService.getWeeklyReport(context.userIdWithScope(McpScopes.PROGRESS_READ))
+    fun getWeeklyReport(context: McpTransportContext): WeeklyReport =
+        weeklyReportService.getWeeklyReport(context.userIdWithScope(McpScopes.PROGRESS_READ)).toReport()
+
+    private fun WeeklyReportResponse.toReport() = WeeklyReport(
+        weekStartDate = weekStartDate,
+        weekEndDate = weekEndDate,
+        cardsReviewed = cardsReviewed,
+        previousWeekCardsReviewed = previousWeekCardsReviewed,
+        changePercent = changePercent,
+        accuracyPercent = accuracyPercent,
+        wordsMastered = wordsMastered,
+        studyMinutes = totalStudyTimeMs / MILLIS_PER_MINUTE,
+        sessions = sessionsCount,
+        bestDay = bestDay?.let { BestDay(it.dayName, it.cardsReviewed, it.accuracyPercent) },
+    )
 
     /** [language] is the language being learned. */
     data class DifficultWord(
@@ -64,9 +84,31 @@ class ProgressMcpTools(
         val errorRate: Double,
     )
 
+    data class DifficultWords(val words: List<DifficultWord>)
+
+    /** Optional fields are left out when unknown (no reviews last week, no study days yet). */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    data class WeeklyReport(
+        val weekStartDate: String,
+        val weekEndDate: String,
+        val cardsReviewed: Int,
+        val previousWeekCardsReviewed: Int,
+        @field:JsonProperty(required = false)
+        val changePercent: Double?,
+        val accuracyPercent: Double,
+        val wordsMastered: Int,
+        val studyMinutes: Long,
+        val sessions: Int,
+        @field:JsonProperty(required = false)
+        val bestDay: BestDay?,
+    )
+
+    data class BestDay(val dayName: String, val cardsReviewed: Int, val accuracyPercent: Double)
+
     private companion object {
         const val MIN_REVIEWS = 3
         const val DEFAULT_LIMIT = 10
         const val MAX_LIMIT = 50
+        const val MILLIS_PER_MINUTE = 60_000L
     }
 }

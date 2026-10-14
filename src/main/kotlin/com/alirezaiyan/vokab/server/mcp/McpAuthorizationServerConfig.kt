@@ -2,6 +2,8 @@ package com.alirezaiyan.vokab.server.mcp
 
 import com.alirezaiyan.vokab.server.auth.UserAccessCache
 import com.alirezaiyan.vokab.server.shared.AppProperties
+import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
@@ -35,16 +37,24 @@ import org.springframework.security.oauth2.server.authorization.JdbcOAuth2Author
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext
+import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator
+import org.springframework.security.oauth2.server.authorization.token.JwtGenerator
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenCustomizer
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder
 import org.springframework.security.web.AuthenticationEntryPoint
 import org.springframework.security.web.SecurityFilterChain
+import org.springframework.security.web.access.intercept.AuthorizationFilter
+import org.springframework.security.web.session.DisableEncodeUrlFilter
 import org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint
 import org.springframework.security.web.util.matcher.MediaTypeRequestMatcher
+import java.time.Clock
 
 /**
  * OAuth 2.1 for MCP clients. We are both sides:
@@ -65,18 +75,50 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
 
     @Bean
     @Order(1)
-    fun mcpAuthorizationServerChain(http: HttpSecurity): SecurityFilterChain {
+    fun mcpAuthorizationServerChain(
+        http: HttpSecurity,
+        clients: RegisteredClientRepository,
+        jwkSource: JWKSource<SecurityContext>,
+        tokenCustomizer: OAuth2TokenCustomizer<JwtEncodingContext>,
+        clock: Clock,
+    ): SecurityFilterChain {
         val authorizationServer = OAuth2AuthorizationServerConfigurer.authorizationServer()
+        val resource = McpResourceParameter(mcpResource())
+        val responses = McpAuthorizationResponses(issuer)
+        val publicRefresh = PublicClientRefreshAuthentication(clients)
+        val jwtGenerator = JwtGenerator(NimbusJwtEncoder(jwkSource)).apply { setJwtCustomizer(tokenCustomizer) }
         http
             .securityMatcher(authorizationServer.endpointsMatcher)
+            .addFilterBefore(resource.tokenRequestFilter(TOKEN_PATH), DisableEncodeUrlFilter::class.java)
             .with(authorizationServer) { server ->
+                server.tokenGenerator(DelegatingOAuth2TokenGenerator(jwtGenerator, McpRefreshTokenGenerator(clock)))
                 server.authorizationServerMetadataEndpoint { endpoint ->
                     endpoint.authorizationServerMetadataCustomizer { metadata ->
                         metadata.clientRegistrationEndpoint("$issuer$REGISTRATION_PATH")
                         metadata.scopes { it.addAll(McpScopes.ALL) }
                         // Public clients (PKCE, no secret) are supported; SAS just doesn't advertise it
                         metadata.tokenEndpointAuthenticationMethod(ClientAuthenticationMethod.NONE.value)
+                        metadata.claim("authorization_response_iss_parameter_supported", true)
+                        // client_id may be an https URL serving the client's metadata (preferred over registration)
+                        metadata.claim("client_id_metadata_document_supported", true)
                     }
+                }
+                server.authorizationEndpoint { endpoint ->
+                    endpoint.consentPage(CONSENT_PATH)
+                    endpoint.authorizationResponseHandler(responses.success)
+                    endpoint.errorResponseHandler(responses.failure)
+                    endpoint.authenticationProviders { providers ->
+                        providers.filterIsInstance<OAuth2AuthorizationCodeRequestAuthenticationProvider>().forEach {
+                            it.setAuthenticationValidator(
+                                OAuth2AuthorizationCodeRequestAuthenticationValidator()
+                                    .andThen(resource.authorizationRequestValidator())
+                            )
+                        }
+                    }
+                }
+                server.clientAuthentication { clientAuthentication ->
+                    clientAuthentication.authenticationConverters { it.add(0, publicRefresh.converter) }
+                    clientAuthentication.authenticationProviders { it.add(0, publicRefresh.provider) }
                 }
             }
             .authorizeHttpRequests { it.anyRequest().authenticated() }
@@ -107,10 +149,19 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
         http: HttpSecurity,
         authorizationService: OAuth2AuthorizationService,
         userAccessCache: UserAccessCache,
+        objectMapper: ObjectMapper,
+        rateLimits: RateLimitConfig,
     ): SecurityFilterChain {
-        val entryPoint = McpBearerEntryPoint("$issuer$PROTECTED_RESOURCE_METADATA_PATH$MCP_PATH")
+        val resourceMetadataUrl = "$issuer$PROTECTED_RESOURCE_METADATA_PATH$MCP_PATH"
+        val entryPoint = McpBearerEntryPoint(resourceMetadataUrl)
         http
             .securityMatcher(MCP_PATH, "$MCP_PATH/**")
+            .addFilterBefore(
+                McpOriginFilter(issuer, appProperties.mcp.allowedOrigins),
+                DisableEncodeUrlFilter::class.java,
+            )
+            .addFilterAfter(McpScopeFilter(objectMapper, resourceMetadataUrl), AuthorizationFilter::class.java)
+            .addFilterAfter(McpRateLimitFilter(rateLimits::getMcpCallBucket), McpScopeFilter::class.java)
             .csrf { it.disable() }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { it.anyRequest().authenticated() }
@@ -123,8 +174,18 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
     }
 
     @Bean
-    fun registeredClientRepository(jdbcTemplate: JdbcTemplate): RegisteredClientRepository =
-        JdbcRegisteredClientRepository(jdbcTemplate)
+    fun registeredClientRepository(
+        jdbcTemplate: JdbcTemplate,
+        metadataFetcher: McpClientMetadataFetcher,
+        objectMapper: ObjectMapper,
+        clock: Clock,
+    ): RegisteredClientRepository = McpRegisteredClientRepository(
+        stored = JdbcRegisteredClientRepository(jdbcTemplate),
+        fetcher = metadataFetcher,
+        defaults = McpClientDefaults(appProperties),
+        objectMapper = objectMapper,
+        clock = clock,
+    )
 
     @Bean
     fun authorizationService(
@@ -150,6 +211,8 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
     fun mcpTokenCustomizer(): OAuth2TokenCustomizer<JwtEncodingContext> = OAuth2TokenCustomizer { context ->
         if (context.tokenType == OAuth2TokenType.ACCESS_TOKEN) {
             context.claims.audience(listOf(mcpResource()))
+            // RFC 9068: which client the token was issued to (audit log, rate limits)
+            context.claims.claim(CLIENT_ID_CLAIM, context.registeredClient.clientId)
         }
     }
 
@@ -184,6 +247,9 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
         const val MCP_PATH = "/mcp"
         const val LOGIN_PATH = "/oauth/login"
         const val SESSION_PATH = "/oauth/session"
+        const val CONSENT_PATH = "/oauth/consent"
+        const val CLIENT_ID_CLAIM = "client_id"
+        const val TOKEN_PATH = "/oauth2/token"
         const val REGISTRATION_PATH = "/oauth/register"
         const val PROTECTED_RESOURCE_METADATA_PATH = "/.well-known/oauth-protected-resource"
     }
@@ -202,6 +268,8 @@ private class McpBearerEntryPoint(private val resourceMetadataUrl: String) : Aut
         val error = (exception as? OAuth2AuthenticationException)?.error
         val params = buildList {
             add("""resource_metadata="$resourceMetadataUrl"""")
+            // Which scopes to ask for (MCP scope selection): everything the tools can use
+            add("""scope="${McpScopes.asParameter(McpScopes.ALL)}"""")
             if (error != null) {
                 add("""error="${error.errorCode}"""")
                 error.description?.let { add("""error_description="${it.replace('"', '\'')}"""") }

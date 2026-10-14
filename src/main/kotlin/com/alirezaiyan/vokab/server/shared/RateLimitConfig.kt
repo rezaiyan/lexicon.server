@@ -104,6 +104,13 @@ class RateLimitConfig(private val appProperties: AppProperties) {
             Bucket.builder().addLimit(limit).build()
         }
 
+    /** MCP tool calls per learner and app: an abuse ceiling (300 a minute), not a usage limit. */
+    fun getMcpCallBucket(key: String): Bucket =
+        cache.computeIfAbsent("mcp_calls_$key") {
+            val limit = Bandwidth.builder().capacity(300).refillGreedy(300, Duration.ofMinutes(1)).build()
+            Bucket.builder().addLimit(limit).build()
+        }
+
     /**
      * Get rate limit bucket for public onboarding vocabulary (IP-based)
      * Limit: 5 requests per minute per IP to prevent abuse

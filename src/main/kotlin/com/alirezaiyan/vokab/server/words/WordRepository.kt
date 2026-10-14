@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.words
 
 import com.alirezaiyan.vokab.server.user.User
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -16,6 +17,36 @@ interface WordRepository : JpaRepository<Word, Long> {
     fun findAllByUser(user: User): List<Word>
 
     fun findAllByUserAndIdIn(user: User, ids: List<Long>): List<Word>
+
+    /**
+     * Ids of a user's words matching an optional text pattern (word or translation, lower-cased LIKE),
+     * learning language and tag. Empty [language] and 0 [tagId] mean "any".
+     */
+    @Query(
+        """
+        SELECT w.id FROM Word w
+        WHERE w.user.id = :userId
+          AND (:pattern = '%'
+               OR LOWER(w.originalWord) LIKE :pattern ESCAPE '#'
+               OR LOWER(w.translation) LIKE :pattern ESCAPE '#')
+          AND (:language = '' OR LOWER(w.targetLanguage) = :language)
+          AND (:tagId = 0 OR EXISTS (SELECT 1 FROM w.tags t WHERE t.id = :tagId))
+        ORDER BY w.id
+        """
+    )
+    fun searchIds(userId: Long, pattern: String, language: String, tagId: Long, page: Pageable): List<Long>
+
+    @Query(
+        "SELECT w.id FROM Word w WHERE w.user.id = :userId AND w.nextReviewDate <= :nowMs " +
+            "ORDER BY w.nextReviewDate, w.id"
+    )
+    fun findDueIds(userId: Long, nowMs: Long, page: Pageable): List<Long>
+
+    @Query("SELECT COUNT(w) FROM Word w WHERE w.user.id = :userId AND w.nextReviewDate <= :nowMs")
+    fun countDue(userId: Long, nowMs: Long): Long
+
+    @Query("SELECT DISTINCT w FROM Word w LEFT JOIN FETCH w.tags WHERE w.id IN :ids")
+    fun findAllByIdInWithTags(ids: List<Long>): List<Word>
 
     @Query("SELECT DISTINCT w FROM Word w LEFT JOIN FETCH w.tags WHERE w.user = :user")
     fun findAllByUserWithTags(user: User): List<Word>

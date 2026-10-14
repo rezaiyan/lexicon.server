@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.words
 
 import com.alirezaiyan.vokab.server.user.UserRepository
 import java.time.Clock
+import org.springframework.data.domain.PageRequest
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Instant
@@ -31,8 +32,35 @@ class WordService(
     /** Words due for review now, most overdue first. */
     @Transactional(readOnly = true)
     fun listDue(userId: Long, limit: Int): List<WordDto> {
-        val now = Instant.now(clock).toEpochMilli()
-        return list(userId).filter { it.nextReviewDate <= now }.sortedBy { it.nextReviewDate }.take(limit)
+        val ids = wordRepository.findDueIds(userId, Instant.now(clock).toEpochMilli(), PageRequest.of(0, limit))
+        return loadInOrder(ids)
+    }
+
+    @Transactional(readOnly = true)
+    fun countDue(userId: Long): Long = wordRepository.countDue(userId, Instant.now(clock).toEpochMilli())
+
+    /**
+     * A user's words whose term or translation contains [query] (case-insensitive), optionally only
+     * in learning language [language] and with tag [tagId]; at most [limit], filtered in the database.
+     */
+    @Transactional(readOnly = true)
+    fun search(userId: Long, query: String?, language: String?, tagId: Long?, limit: Int): List<WordDto> {
+        val needle = query?.trim()?.lowercase().orEmpty()
+        val pattern = "%" + needle.replace("#", "##").replace("%", "#%").replace("_", "#_") + "%"
+        val ids = wordRepository.searchIds(
+            userId = userId,
+            pattern = pattern,
+            language = language?.trim()?.lowercase().orEmpty(),
+            tagId = tagId ?: 0L,
+            page = PageRequest.of(0, limit),
+        )
+        return loadInOrder(ids)
+    }
+
+    private fun loadInOrder(ids: List<Long>): List<WordDto> {
+        if (ids.isEmpty()) return emptyList()
+        val byId = wordRepository.findAllByIdInWithTags(ids).associateBy { it.id }
+        return ids.mapNotNull { byId[it]?.toDto() }
     }
 
     /** Lower-cased terms the user already has in [targetLanguage] (stored as a language code, e.g. "de"). */

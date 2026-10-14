@@ -70,6 +70,7 @@ class McpConnectionsTest {
 
         assertEquals(1, list.size())
         assertEquals("Test client", list[0]["clientName"].asText())
+        assertEquals("client.example.com", list[0]["website"].asText())
         assertEquals(listOf(McpScopes.WORDS_READ), list[0]["scopes"].map { it.asText() })
         assertEquals(true, list[0]["connectedAt"].asLong() > 0)
     }

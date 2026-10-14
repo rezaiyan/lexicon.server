@@ -213,6 +213,7 @@ app:
   mcp:
     issuer: ${MCP_ISSUER:http://localhost:8080}
     signing-key-path: ${MCP_SIGNING_KEY_PATH:./keys/mcp-signing-key.json}
+    allowed-origins: ${MCP_ALLOWED_ORIGINS:}
     firebase-web-api-key: ${MCP_FIREBASE_WEB_API_KEY:}
     firebase-auth-domain: ${MCP_FIREBASE_AUTH_DOMAIN:}
     firebase-project-id: ${MCP_FIREBASE_PROJECT_ID:}

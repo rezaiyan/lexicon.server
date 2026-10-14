@@ -353,6 +353,7 @@ class WordServiceTest {
         val tagIds = listOf(5L, 6L)
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
         justRun { wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, 1L) }
+        every { wordRepository.touchByIdInAndUserId(wordIds, 1L, any()) } returns 2
 
         val result = wordService.batchAssignTags(user.requireId(), wordIds, tagIds)
 
@@ -366,6 +367,7 @@ class WordServiceTest {
         val user = createUser(id = 1L)
         val wordIds = listOf(10L, 11L)
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
+        every { wordRepository.touchByIdInAndUserId(wordIds, 1L, any()) } returns 2
 
         val result = wordService.batchAssignTags(user.requireId(), wordIds, emptyList())
 

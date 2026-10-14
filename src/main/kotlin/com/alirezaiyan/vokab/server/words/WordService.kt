@@ -125,6 +125,7 @@ class WordService(
         if (tagIds.isNotEmpty()) {
             wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, userId)
         }
+        wordRepository.touchByIdInAndUserId(wordIds, userId, Instant.now(clock))
         return wordIds.size
     }
 
@@ -135,6 +136,7 @@ class WordService(
         require(word.user?.id == user.id) { "Forbidden" }
         word.tags = if (tagIds.isEmpty()) mutableSetOf()
         else tagRepository.findAllByUserAndIdIn(user, tagIds).toMutableSet()
+        word.updatedAt = Instant.now(clock)
         wordRepository.save(word)
     }
 }

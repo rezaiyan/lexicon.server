@@ -2,7 +2,9 @@ package com.alirezaiyan.vokab.server.words
 
 import com.alirezaiyan.vokab.server.user.User
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import java.time.Instant
 
 interface TagRepository : JpaRepository<Tag, Long> {
 
@@ -28,4 +30,13 @@ interface TagRepository : JpaRepository<Tag, Long> {
         GROUP BY t.id, t.name, t.createdAt, t.updatedAt, t.user
     """)
     fun findAllWithWordCountByUser(user: User): List<Array<Any>>
+
+    /** Bumps `updated_at` on the user's words carrying [tagId], so incremental pulls see the tag change. */
+    @Modifying
+    @Query(
+        "UPDATE words SET updated_at = :now WHERE user_id = :userId " +
+            "AND id IN (SELECT word_id FROM word_tags WHERE tag_id = :tagId)",
+        nativeQuery = true
+    )
+    fun touchWordsByTagIdAndUserId(tagId: Long, userId: Long, now: Instant): Int
 }

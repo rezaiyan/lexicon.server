@@ -69,6 +69,11 @@ interface WordRepository : JpaRepository<Word, Long> {
     @Query("DELETE FROM Word w WHERE w.id IN :ids AND w.user.id = :userId")
     fun deleteAllByIdInAndUserId(ids: List<Long>, userId: Long): Int
 
+    /** Marks the words changed for incremental pulls when an edit (e.g. tags) doesn't touch the row itself. */
+    @Modifying
+    @Query("UPDATE Word w SET w.updatedAt = :now WHERE w.id IN :ids AND w.user.id = :userId")
+    fun touchByIdInAndUserId(ids: List<Long>, userId: Long, now: Instant): Int
+
     @Modifying
     @Query(
         "UPDATE Word w SET w.sourceLanguage = :sourceLanguage, w.targetLanguage = :targetLanguage, " +

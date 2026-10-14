@@ -56,14 +56,26 @@ internal object McpLoginPage {
     var button = document.getElementById('google');
     var errorBox = document.getElementById('error');
     firebase.initializeApp(__FIREBASE_CONFIG__);
+    var auth = firebase.auth();
+    // Popups don't work in the in-app browsers AI apps open on phones; go there and back instead.
+    var MOBILE = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent);
+    var POPUP_UNAVAILABLE = ['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment',
+      'auth/web-storage-unsupported', 'auth/internal-error'];
 
     function fail(message) { errorBox.textContent = message; button.disabled = false; }
+    function busy() { button.disabled = true; errorBox.textContent = ''; }
 
-    button.addEventListener('click', function () {
-      button.disabled = true;
-      errorBox.textContent = '';
-      firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
-        .then(function (result) { return result.user.getIdToken(); })
+    function failWith(error) {
+      var code = error && error.code ? error.code : 'unknown';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+        fail('Sign-in was cancelled. Try again.');
+      } else {
+        fail('Sign-in failed (' + code + '). Try again.');
+      }
+    }
+
+    function continueAs(user) {
+      return user.getIdToken()
         .then(function (idToken) {
           return fetch(__SESSION_PATH__, {
             method: 'POST',
@@ -76,12 +88,35 @@ internal object McpLoginPage {
           return response.json().then(function (body) { return { ok: response.ok, body: body }; });
         })
         .then(function (result) {
-          firebase.auth().signOut();
+          auth.signOut();
           if (!result.ok) { fail(result.body.error || 'Sign-in failed. Try again.'); return; }
           if (result.body.redirectUrl) { window.location.assign(result.body.redirectUrl); }
           else { fail('Signed in. Go back to your AI app and connect again.'); }
-        })
-        .catch(function () { fail('Sign-in was cancelled or failed. Try again.'); });
+        });
+    }
+
+    function redirectSignIn() {
+      auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()).catch(failWith);
+    }
+
+    // Back from Google after a redirect sign-in
+    busy();
+    auth.getRedirectResult()
+      .then(function (result) {
+        if (result && result.user) { return continueAs(result.user); }
+        button.disabled = false;
+      })
+      .catch(failWith);
+
+    button.addEventListener('click', function () {
+      busy();
+      if (MOBILE) { redirectSignIn(); return; }
+      auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+        .then(function (result) { return continueAs(result.user); })
+        .catch(function (error) {
+          if (error && POPUP_UNAVAILABLE.indexOf(error.code) >= 0) { redirectSignIn(); return; }
+          failWith(error);
+        });
     });
   })();
 </script>

@@ -110,7 +110,7 @@ class McpSignInController(
         const val LOGIN_PAGE_CSP = "default-src 'none'; " +
             "script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; " +
             "connect-src 'self' https://*.googleapis.com https://securetoken.googleapis.com; " +
-            "frame-src https://*.firebaseapp.com https://accounts.google.com; " +
+            "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com; " +
             "style-src 'unsafe-inline'; img-src 'self' data:; " +
             "frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
     }

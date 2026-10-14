@@ -13,10 +13,13 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException
 import org.springframework.security.oauth2.core.OAuth2Error
 import org.springframework.security.oauth2.core.OAuth2ErrorCodes
 import org.springframework.security.oauth2.core.OAuth2RefreshToken
+import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames
+import org.springframework.security.oauth2.core.endpoint.PkceParameterNames
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationToken
+import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2ClientAuthenticationToken
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.token.OAuth2TokenContext
@@ -32,6 +35,74 @@ import java.time.Clock
 import java.time.Instant
 import java.util.Base64
 import java.util.function.Consumer
+
+/**
+ * SAS's checks on an authorization request, except for the redirect URI. SAS matches redirect URIs
+ * exactly and refuses `localhost`, which locks out native clients: Claude Code registers
+ * `http://localhost/callback` and listens on a random port. RFC 8252 allows any port on a loopback
+ * redirect, so we match those with [McpRedirectUris.matches]. OpenID prompts don't apply (no openid scope).
+ */
+internal object McpAuthorizationRequestChecks {
+
+    fun validator(): Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> =
+        Consumer<OAuth2AuthorizationCodeRequestAuthenticationContext> { checkRedirectUri(it) }
+            .andThen { checkGrantType(it) }
+            .andThen(OAuth2AuthorizationCodeRequestAuthenticationValidator.DEFAULT_SCOPE_VALIDATOR)
+            .andThen { checkCodeChallenge(it) }
+
+    /** A bad redirect URI is answered here, never sent to that URI. */
+    private fun checkRedirectUri(context: OAuth2AuthorizationCodeRequestAuthenticationContext) {
+        val request = context.getAuthentication<OAuth2AuthorizationCodeRequestAuthenticationToken>()
+        val registered = context.registeredClient.redirectUris
+        val requested = request.redirectUri
+        val ok = if (requested.isNullOrBlank()) registered.size == 1
+            else McpRedirectUris.matches(requested, registered)
+        if (!ok) {
+            val withoutRedirect = OAuth2AuthorizationCodeRequestAuthenticationToken(
+                request.authorizationUri, request.clientId, request.principal as Authentication,
+                null, request.state, request.scopes, request.additionalParameters,
+            )
+            throw OAuth2AuthorizationCodeRequestAuthenticationException(
+                error(OAuth2ErrorCodes.INVALID_REQUEST, OAuth2ParameterNames.REDIRECT_URI), withoutRedirect,
+            )
+        }
+    }
+
+    private fun checkGrantType(context: OAuth2AuthorizationCodeRequestAuthenticationContext) {
+        if (AuthorizationGrantType.AUTHORIZATION_CODE !in context.registeredClient.authorizationGrantTypes) {
+            fail(context, OAuth2ErrorCodes.UNAUTHORIZED_CLIENT, OAuth2ParameterNames.CLIENT_ID)
+        }
+    }
+
+    /** PKCE with S256 only; required when the client says so (all of ours do). */
+    private fun checkCodeChallenge(context: OAuth2AuthorizationCodeRequestAuthenticationContext) {
+        val parameters =
+            context.getAuthentication<OAuth2AuthorizationCodeRequestAuthenticationToken>().additionalParameters
+        val challenge = parameters[PkceParameterNames.CODE_CHALLENGE] as? String
+        val method = parameters[PkceParameterNames.CODE_CHALLENGE_METHOD] as? String
+        when {
+            challenge.isNullOrBlank() && context.registeredClient.clientSettings.isRequireProofKey ->
+                fail(context, OAuth2ErrorCodes.INVALID_REQUEST, PkceParameterNames.CODE_CHALLENGE)
+            !challenge.isNullOrBlank() && method != S256 ->
+                fail(context, OAuth2ErrorCodes.INVALID_REQUEST, PkceParameterNames.CODE_CHALLENGE_METHOD)
+        }
+    }
+
+    /** Past the redirect check, errors go back to the client's redirect URI. */
+    private fun fail(
+        context: OAuth2AuthorizationCodeRequestAuthenticationContext,
+        code: String,
+        parameter: String,
+    ): Nothing =
+        throw OAuth2AuthorizationCodeRequestAuthenticationException(
+            error(code, parameter), context.getAuthentication<OAuth2AuthorizationCodeRequestAuthenticationToken>(),
+        )
+
+    private fun error(code: String, parameter: String) = OAuth2Error(code, "OAuth 2.0 Parameter: $parameter", ERROR_URI)
+
+    private const val S256 = "S256"
+    private const val ERROR_URI = "https://datatracker.ietf.org/doc/html/rfc6749#section-4.1.2.1"
+}
 
 /**
  * The `resource` parameter (RFC 8707). We protect exactly one resource, `/mcp`, and only issue

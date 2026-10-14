@@ -120,7 +120,10 @@ class McpOAuthFlowTest {
         val response = mockMvc.perform(get("/oauth/login")).andExpect(status().isOk).andReturn().response
 
         assertEquals("text/html;charset=UTF-8", response.contentType)
-        assertTrue(requireNotNull(response.getHeader("Content-Security-Policy")).contains("frame-ancestors 'none'"))
+        val csp = requireNotNull(response.getHeader("Content-Security-Policy"))
+        assertTrue(csp.contains("frame-ancestors 'none'"))
+        // Firebase's auth iframe is served from our own domain (authDomain is the issuer host)
+        assertTrue(csp.contains("frame-src 'self'"), csp)
         assertTrue("Continue with Google" in response.contentAsString)
     }
 
@@ -308,6 +311,43 @@ class McpOAuthFlowTest {
     }
 
     @Test
+    fun `authorization requests without S256 PKCE or with unknown scopes go back as errors`() {
+        val clientId = registerClient("none")["client_id"].asText()
+        val session = signedInSession()
+        fun errorFor(request: org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder): String? {
+            val redirect = mockMvc.perform(request.session(session)).andReturn().response.redirectedUrl
+            return redirect?.takeIf { it.startsWith(REDIRECT) }?.let { callbackParams(it).getFirst("error") }
+        }
+
+        assertEquals("invalid_request", errorFor(authorizeRequest(clientId, challengeMethod = null)))
+        assertEquals("invalid_request", errorFor(authorizeRequest(clientId, challengeMethod = "plain")))
+        assertEquals("invalid_scope", errorFor(authorizeRequest(clientId, scope = "admin:all")))
+    }
+
+    @Test
+    fun `a native client on a localhost redirect may use any port`() {
+        // Claude Code's real document (2026-10-15): it listens on a random port on whichever loopback host works
+        `when`(metadataFetcher.fetch(java.net.URI(CIMD_CLIENT))).thenReturn(objectMapper.writeValueAsString(mapOf(
+            "client_id" to CIMD_CLIENT,
+            "client_name" to "Claude Code",
+            "redirect_uris" to listOf("http://localhost/callback", "http://127.0.0.1/callback"),
+            "grant_types" to listOf("authorization_code", "refresh_token"),
+            "token_endpoint_auth_method" to "none",
+        )))
+
+        val tokens = authorize(CIMD_CLIENT, clientSecret = null, redirect = "http://localhost:57499/callback")
+
+        assertTrue(lastCallbackUrl.startsWith("http://localhost:57499/callback?"), lastCallbackUrl)
+        assertNotNull(tokens["access_token"]?.asText())
+        listOf("http://localhost:57499/elsewhere", "http://example.com:57499/callback").forEach { redirect ->
+            val response = mockMvc.perform(authorizeRequest(CIMD_CLIENT, redirect = redirect).session(signedInSession()))
+                .andReturn().response
+            assertEquals(400, response.status, redirect)
+            assertNull(response.redirectedUrl, "never redirect to an unregistered URI: $redirect")
+        }
+    }
+
+    @Test
     fun `a metadata document claiming another client id is refused`() {
         `when`(metadataFetcher.fetch(java.net.URI(CIMD_CLIENT))).thenReturn(metadataDocument("https://evil.example.com/client.json"))
 
@@ -349,18 +389,29 @@ class McpOAuthFlowTest {
 
     /** Query parameters the client got back on its redirect URI in the last [authorize]. */
     private lateinit var lastCallback: org.springframework.util.MultiValueMap<String, String>
+    private lateinit var lastCallbackUrl: String
 
     private val verifier = "verifier-" + "x".repeat(50)
 
-    private fun authorizeRequest(clientId: String, resource: String = "$ISSUER/mcp") = get("/oauth2/authorize")
+    private fun authorizeRequest(
+        clientId: String,
+        resource: String = "$ISSUER/mcp",
+        redirect: String = REDIRECT,
+        scope: String = "words:read",
+        challengeMethod: String? = "S256",
+    ) = get("/oauth2/authorize")
         .queryParam("response_type", "code")
         .queryParam("client_id", clientId)
-        .queryParam("redirect_uri", REDIRECT)
-        .queryParam("scope", "words:read")
+        .queryParam("redirect_uri", redirect)
+        .queryParam("scope", scope)
         .queryParam("state", "client-state")
-        .queryParam("code_challenge", Base64.getUrlEncoder().withoutPadding()
-            .encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())))
-        .queryParam("code_challenge_method", "S256")
+        .apply {
+            if (challengeMethod != null) {
+                queryParam("code_challenge", Base64.getUrlEncoder().withoutPadding()
+                    .encodeToString(MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray())))
+                queryParam("code_challenge_method", challengeMethod)
+            }
+        }
         .queryParam("resource", resource)
 
     private fun signedInSession(): MockHttpSession = MockHttpSession().also { session ->
@@ -368,9 +419,9 @@ class McpOAuthFlowTest {
     }
 
     /** Runs authorize → login → consent → token and returns the token response. */
-    private fun authorize(clientId: String, clientSecret: String?): JsonNode {
+    private fun authorize(clientId: String, clientSecret: String?, redirect: String = REDIRECT): JsonNode {
         val session = MockHttpSession()
-        val authorize = authorizeRequest(clientId)
+        val authorize = authorizeRequest(clientId, redirect = redirect)
 
         // Not signed in yet: off to our login page
         val toLogin = mockMvc.perform(authorize.session(session).accept(MediaType.TEXT_HTML)).andReturn().response
@@ -395,7 +446,8 @@ class McpOAuthFlowTest {
                 .param("scope", "words:read")
         ).andReturn().response
         assertEquals(302, approved.status, "consent answered ${approved.status}: ${approved.errorMessage} ${approved.contentAsString}")
-        lastCallback = callbackParams(requireNotNull(approved.redirectedUrl))
+        lastCallbackUrl = requireNotNull(approved.redirectedUrl)
+        lastCallback = callbackParams(lastCallbackUrl)
         assertEquals("client-state", lastCallback.getFirst("state"))
         val code = requireNotNull(lastCallback.getFirst("code"))
 
@@ -403,7 +455,7 @@ class McpOAuthFlowTest {
             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
             .param("grant_type", "authorization_code")
             .param("code", code)
-            .param("redirect_uri", REDIRECT)
+            .param("redirect_uri", redirect)
             .param("code_verifier", verifier)
             .param("resource", "$ISSUER/mcp")
         if (clientSecret == null) token.param("client_id", clientId)

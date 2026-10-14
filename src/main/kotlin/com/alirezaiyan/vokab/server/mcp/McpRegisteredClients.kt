@@ -50,6 +50,24 @@ internal object McpRedirectUris {
             else -> false
         }
     }
+
+    /**
+     * Whether [requested] is one of [registered]. A loopback http redirect matches on any port
+     * (RFC 8252 section 7.3): native apps such as Claude Code register `http://localhost/callback`
+     * and listen on whatever port is free.
+     */
+    fun matches(requested: String, registered: Collection<String>): Boolean {
+        if (requested in registered) return true
+        val wanted = loopback(requested) ?: return false
+        return registered.any { candidate ->
+            val known = loopback(candidate)
+            known != null && known.host == wanted.host &&
+                known.rawPath == wanted.rawPath && known.rawQuery == wanted.rawQuery
+        }
+    }
+
+    private fun loopback(value: String): URI? = runCatching { URI(value) }.getOrNull()
+        ?.takeIf { isAllowed(value) && it.scheme == "http" && it.host in LOOPBACK_HOSTS && it.rawUserInfo == null }
 }
 
 /**

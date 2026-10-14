@@ -38,7 +38,6 @@ import org.springframework.security.oauth2.server.authorization.OAuth2Authorizat
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider
-import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationValidator
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer
@@ -110,7 +109,7 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
                     endpoint.authenticationProviders { providers ->
                         providers.filterIsInstance<OAuth2AuthorizationCodeRequestAuthenticationProvider>().forEach {
                             it.setAuthenticationValidator(
-                                OAuth2AuthorizationCodeRequestAuthenticationValidator()
+                                McpAuthorizationRequestChecks.validator()
                                     .andThen(resource.authorizationRequestValidator())
                             )
                         }

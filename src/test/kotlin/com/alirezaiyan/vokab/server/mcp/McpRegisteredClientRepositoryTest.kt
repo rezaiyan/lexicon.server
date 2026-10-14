@@ -53,6 +53,27 @@ class McpRegisteredClientRepositoryTest {
     }
 
     @Test
+    fun `loopback redirects match on any port, everything else exactly`() {
+        val registered = listOf("http://localhost/callback", "http://127.0.0.1/callback", "https://claude.ai/api/mcp/auth_callback")
+
+        listOf(
+            "http://localhost:57499/callback",
+            "http://127.0.0.1:8123/callback",
+            "http://localhost/callback",
+            "https://claude.ai/api/mcp/auth_callback",
+        ).forEach { assertTrue(McpRedirectUris.matches(it, registered), it) }
+        listOf(
+            "http://localhost:57499/other",
+            "http://localhost:57499/callback?x=1",
+            "http://[::1]:57499/callback",
+            "https://localhost:57499/callback",
+            "https://claude.ai:8443/api/mcp/auth_callback",
+            "http://evil.example.com:57499/callback",
+            "http://user@localhost:57499/callback",
+        ).forEach { assertFalse(McpRedirectUris.matches(it, registered), it) }
+    }
+
+    @Test
     fun `a valid document becomes a public client with refresh and PKCE`() {
         documents[URI(CLIENT)] = document()
 

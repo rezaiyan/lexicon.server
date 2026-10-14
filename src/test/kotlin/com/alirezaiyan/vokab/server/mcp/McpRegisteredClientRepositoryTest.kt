@@ -64,8 +64,28 @@ class McpRegisteredClientRepositoryTest {
     }
 
     @Test
+    fun `grant types we don't offer are ignored rather than refused`() {
+        // Claude's real document (2026-10-15) also lists the JWT bearer grant.
+        documents[URI(CLIENT)] = document(
+            extra = mapOf(
+                "grant_types" to listOf(
+                    "authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                ),
+            ),
+        )
+
+        val client = requireNotNull(repository.findByClientId(CLIENT))
+
+        assertEquals(
+            setOf(AuthorizationGrantType.AUTHORIZATION_CODE, AuthorizationGrantType.REFRESH_TOKEN),
+            client.authorizationGrantTypes,
+        )
+    }
+
+    @Test
     fun `documents that don't hold up are refused`() {
         listOf(
+            document(extra = mapOf("grant_types" to listOf("client_credentials"))),
             document(clientId = "https://other.example.com/client.json"),
             document(redirects = listOf("http://evil.example.com/cb")),
             document(redirects = emptyList()),

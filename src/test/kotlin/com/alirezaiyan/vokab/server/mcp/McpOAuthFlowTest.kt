@@ -142,6 +142,24 @@ class McpOAuthFlowTest {
         assertEquals("none", client["token_endpoint_auth_method"].asText())
     }
 
+    @Test
+    fun `registration drops grant types we don't offer and needs authorization_code`() {
+        fun registerWithGrants(grants: List<String>) = post("/oauth/register").withFreshIp()
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(mapOf(
+                "redirect_uris" to listOf(REDIRECT),
+                "token_endpoint_auth_method" to "none",
+                "grant_types" to grants,
+            )))
+
+        val client = json(mockMvc.perform(
+            registerWithGrants(listOf("authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"))
+        ).andExpect(status().isCreated))
+        assertEquals(setOf("authorization_code", "refresh_token"), client["grant_types"].map { it.asText() }.toSet())
+
+        mockMvc.perform(registerWithGrants(listOf("client_credentials"))).andExpect(status().isBadRequest)
+    }
+
     // ── the whole flow ───────────────────────────────────────────────────────
 
     @Test

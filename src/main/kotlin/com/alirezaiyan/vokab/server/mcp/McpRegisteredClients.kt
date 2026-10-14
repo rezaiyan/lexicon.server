@@ -111,7 +111,7 @@ internal class McpRegisteredClientRepository(
     private fun problemWith(clientId: String, document: JsonNode): String {
         val redirects = document["redirect_uris"]
         val authMethod = document["token_endpoint_auth_method"]?.asText() ?: NONE
-        val grantTypes = document["grant_types"]?.map { it.asText() } ?: listOf("authorization_code")
+        val grantTypes = document["grant_types"]?.map { it.asText() } ?: listOf(AUTHORIZATION_CODE)
         return when {
             document["client_id"]?.asText() != clientId -> "client_id does not match its URL"
             redirects == null || !redirects.isArray || redirects.isEmpty || redirects.size() > MAX_REDIRECT_URIS ->
@@ -119,14 +119,15 @@ internal class McpRegisteredClientRepository(
             redirects.any { !McpRedirectUris.isAllowed(it.asText()) } -> "redirect_uris must be https or loopback"
             authMethod != NONE -> "only public clients (token_endpoint_auth_method none) are supported"
             document.has("client_secret") -> "metadata documents must not carry a client_secret"
-            !GRANT_TYPES.containsAll(grantTypes) -> "only authorization_code and refresh_token grants"
+            // Grants we don't offer are ignored (Claude also lists jwt-bearer); the client gets ours.
+            AUTHORIZATION_CODE !in grantTypes -> "the authorization_code grant is required"
             else -> ""
         }
     }
 
     internal companion object {
         const val NONE = "none"
-        val GRANT_TYPES = setOf("authorization_code", "refresh_token")
+        const val AUTHORIZATION_CODE = "authorization_code"
         const val MAX_REDIRECT_URIS = 5
         const val MAX_CLIENT_NAME = 100
         const val MAX_URL_LENGTH = 1000

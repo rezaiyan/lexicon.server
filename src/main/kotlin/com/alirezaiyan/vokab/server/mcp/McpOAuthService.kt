@@ -122,8 +122,9 @@ class McpOAuthService(
             "invalid_redirect_uri" to "Redirect URIs must be https, or http on a loopback address"
         tokenEndpointAuthMethod != null && tokenEndpointAuthMethod !in AUTH_METHODS ->
             "invalid_client_metadata" to "token_endpoint_auth_method must be one of $AUTH_METHODS"
-        grantTypes != null && !GRANT_TYPES.containsAll(grantTypes) ->
-            "invalid_client_metadata" to "Only authorization_code and refresh_token grants are supported"
+        // Grants we don't offer are dropped, not refused: the response lists the ones the client gets.
+        grantTypes != null && AUTHORIZATION_CODE !in grantTypes ->
+            "invalid_client_metadata" to "The authorization_code grant is required"
         responseTypes != null && responseTypes != listOf(CODE) ->
             "invalid_client_metadata" to "Only the code response type is supported"
         (clientName?.length ?: 0) > MAX_CLIENT_NAME ->
@@ -139,7 +140,8 @@ class McpOAuthService(
         const val CODE = "code"
         const val CLIENT_SECRET_BASIC = "client_secret_basic"
         val AUTH_METHODS = setOf(NONE, CLIENT_SECRET_BASIC, "client_secret_post")
-        val GRANT_TYPES = setOf("authorization_code", "refresh_token")
+        const val AUTHORIZATION_CODE = "authorization_code"
+        val GRANT_TYPES = setOf(AUTHORIZATION_CODE, "refresh_token")
         const val DEFAULT_CLIENT_NAME = "MCP client"
         const val MAX_REDIRECT_URIS = 5
         const val MAX_CLIENT_NAME = 100

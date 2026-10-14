@@ -34,6 +34,10 @@ class UserDataPurgerTest {
         assertEquals(1, wordTagCount(bystander))
         assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM email_log WHERE user_id IS NULL", Int::class.java))
         assertEquals(1, count("email_log", bystander))
+        OAUTH_TABLES.forEach { table ->
+            assertEquals(0, grantCount(table, victim), "$table still has grants of the purged user")
+            assertEquals(1, grantCount(table, bystander), "$table lost grants of another user")
+        }
 
         // With all children gone, the user row deletes cleanly.
         assertEquals(1, jdbc.update("DELETE FROM users WHERE id = ?", victim))
@@ -71,6 +75,9 @@ class UserDataPurgerTest {
 
     private fun count(table: String, userId: Long): Int =
         jdbc.queryForObject("SELECT COUNT(*) FROM $table WHERE user_id = ?", Int::class.java, userId) ?: -1
+
+    private fun grantCount(table: String, userId: Long): Int =
+        jdbc.queryForObject("SELECT COUNT(*) FROM $table WHERE principal_name = ?", Int::class.java, userId.toString()) ?: -1
 
     private fun wordTagCount(userId: Long): Int = jdbc.queryForObject(
         "SELECT COUNT(*) FROM word_tags wt JOIN words w ON w.id = wt.word_id WHERE w.user_id = ?",
@@ -128,6 +135,19 @@ class UserDataPurgerTest {
             "INSERT INTO email_log (user_id, recipient_email, category, template_id, subject) VALUES (?, ?, 'c', 't', 's')",
             id, email,
         )
+        jdbc.update(
+            "INSERT INTO oauth2_authorization (id, registered_client_id, principal_name, authorization_grant_type) " +
+                "VALUES (?, 'client', ?, 'authorization_code')",
+            "grant-$email", id.toString(),
+        )
+        jdbc.update(
+            "INSERT INTO oauth2_authorization_consent (registered_client_id, principal_name, authorities) VALUES ('client', ?, 'SCOPE_words:read')",
+            id.toString(),
+        )
         return id
+    }
+
+    private companion object {
+        val OAUTH_TABLES = listOf("oauth2_authorization", "oauth2_authorization_consent")
     }
 }

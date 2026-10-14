@@ -612,6 +612,27 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListMcpConnectionDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/McpConnectionDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListMonthlyStatsResponse" : {
         "properties" : {
           "code" : {
@@ -2602,6 +2623,28 @@
           }
         },
         "required" : [ "caption", "demotedThisWeek", "levels", "promotedThisWeek" ],
+        "type" : "object"
+      },
+      "McpConnectionDto" : {
+        "properties" : {
+          "clientName" : {
+            "type" : "string"
+          },
+          "connectedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "clientName", "connectedAt", "id", "scopes" ],
         "type" : "object"
       },
       "MetricDto" : {
@@ -4805,7 +4848,7 @@
   "paths" : {
     "/admin/config" : {
       "get" : {
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "responses" : {
           "200" : {
             "content" : {
@@ -6665,6 +6708,44 @@
           }
         },
         "tags" : [ "listening-controller" ]
+      }
+    },
+    "/api/v1/mcp/connections" : {
+      "get" : {
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMcpConnectionDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "mcp-connections-controller" ]
+      }
+    },
+    "/api/v1/mcp/connections/{id}" : {
+      "delete" : {
+        "operationId" : "disconnect",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : { },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "mcp-connections-controller" ]
       }
     },
     "/api/v1/notifications/register-token" : {

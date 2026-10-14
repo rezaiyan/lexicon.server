@@ -36,6 +36,7 @@ internal class McpTestTokens(
     fun accessToken(userId: Long, scopes: Set<String> = McpScopes.ALL): String {
         val client = RegisteredClient.withId(UUID.randomUUID().toString())
             .clientId("test_" + UUID.randomUUID())
+            .clientName("Test client")
             .clientAuthenticationMethod(ClientAuthenticationMethod.NONE)
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
             .redirectUri("https://client.example.com/callback")

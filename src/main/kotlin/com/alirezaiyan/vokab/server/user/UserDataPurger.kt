@@ -60,6 +60,11 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "notification_log" to "DELETE FROM notification_log WHERE user_id = :userId",
             "email_subscriptions" to "DELETE FROM email_subscriptions WHERE user_id = :userId",
             "email_log" to "UPDATE email_log SET user_id = NULL WHERE user_id = :userId",
+            // MCP grants: keyed by principal_name (the user id as text), no FK to users
+            "oauth2_authorization" to
+                "DELETE FROM oauth2_authorization WHERE principal_name = CAST(:userId AS varchar)",
+            "oauth2_authorization_consent" to
+                "DELETE FROM oauth2_authorization_consent WHERE principal_name = CAST(:userId AS varchar)",
         )
     }
 }

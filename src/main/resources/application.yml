@@ -209,6 +209,14 @@ app:
   geolocation:
     database-path: ${GEOLITE2_COUNTRY_DB_PATH:}
 
+  # OAuth 2.1 for MCP clients (only active with MCP_ENABLED=true)
+  mcp:
+    issuer: ${MCP_ISSUER:http://localhost:8080}
+    signing-key-path: ${MCP_SIGNING_KEY_PATH:./keys/mcp-signing-key.json}
+    firebase-web-api-key: ${MCP_FIREBASE_WEB_API_KEY:}
+    firebase-auth-domain: ${MCP_FIREBASE_AUTH_DOMAIN:}
+    firebase-project-id: ${MCP_FIREBASE_PROJECT_ID:}
+
 logging:
   level:
     root: INFO

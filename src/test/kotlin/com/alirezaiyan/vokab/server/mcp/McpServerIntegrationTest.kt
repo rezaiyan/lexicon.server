@@ -1,6 +1,5 @@
 package com.alirezaiyan.vokab.server.mcp
 
-import com.alirezaiyan.vokab.server.auth.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
 import com.alirezaiyan.vokab.server.user.requireId
@@ -10,12 +9,16 @@ import com.alirezaiyan.vokab.server.words.WordRepository
 import com.alirezaiyan.vokab.server.words.WordService
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.nimbusds.jose.jwk.source.JWKSource
+import com.nimbusds.jose.proc.SecurityContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
@@ -23,8 +26,9 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.transaction.annotation.Transactional
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
-@SpringBootTest(properties = ["spring.ai.mcp.server.enabled=true"])
+@SpringBootTest(properties = [MCP_ENABLED, MCP_TEST_ISSUER_PROPERTY, MCP_TEST_KEY_PROPERTY])
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
@@ -36,7 +40,9 @@ class McpServerIntegrationTest {
     @Autowired private lateinit var wordRepository: WordRepository
     @Autowired private lateinit var wordService: WordService
     @Autowired private lateinit var tagService: TagService
-    @Autowired private lateinit var tokenProvider: RS256JwtTokenProvider
+    @Autowired private lateinit var clients: RegisteredClientRepository
+    @Autowired private lateinit var authorizations: OAuth2AuthorizationService
+    @Autowired private lateinit var jwkSource: JWKSource<SecurityContext>
 
     private lateinit var learner: User
     private lateinit var token: String
@@ -52,13 +58,23 @@ class McpServerIntegrationTest {
         val fruit = tagService.create(learner.requireId(), "fruit")
         // Entity path, not batchAssignTags: its native insert bypasses this test transaction's cached Word
         wordService.updateWordTags(learner.requireId(), requireNotNull(apfel.id), listOf(fruit.id))
-        token = tokenProvider.generateAccessToken(learner.requireId(), learner.email)
+        token = tokens().accessToken(learner.requireId())
     }
 
     @Test
     fun `mcp endpoint without a token is rejected`() {
         mockMvc.perform(mcpRequest(rpc("tools/list"), bearer = null))
             .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `a client without words read access gets a tool error, not the words`() {
+        token = tokens().accessToken(learner.requireId(), scopes = setOf(McpScopes.PROGRESS_READ))
+
+        val result = call(rpc("tools/call", mapOf("name" to "search_words", "arguments" to emptyMap<String, Any>())))["result"]
+
+        assertTrue(result["isError"].asBoolean())
+        assertTrue("words:read" in result["content"][0]["text"].asText())
     }
 
     @Test
@@ -126,4 +142,6 @@ class McpServerIntegrationTest {
         sourceLanguage = language,
         targetLanguage = "en",
     )
+
+    private fun tokens() = McpTestTokens(clients, authorizations, jwkSource)
 }

@@ -20,7 +20,25 @@ data class AppProperties(
     var notifications: NotificationsConfig = NotificationsConfig(),
     var geolocation: GeoLocationConfig = GeoLocationConfig(),
     var rateLimit: RateLimitProperties = RateLimitProperties(),
-    var aiInstructions: AiInstructionsConfig = AiInstructionsConfig()
+    var aiInstructions: AiInstructionsConfig = AiInstructionsConfig(),
+    var mcp: McpConfig = McpConfig(),
+)
+
+/** OAuth for MCP clients; only read while `spring.ai.mcp.server.enabled` is true. */
+data class McpConfig(
+    /** Public origin clients reach us at; the issuer of MCP tokens and base of every OAuth URL. */
+    var issuer: String = "http://localhost:8080",
+    /** RSA JWK (with private part) signing MCP tokens; created on first start. Never the app's JWT key. */
+    var signingKeyPath: String = "./keys/mcp-signing-key.json",
+    /** Clients with a secret get short access tokens plus refresh tokens. */
+    var confidentialAccessTokenMinutes: Long = 60,
+    /** SAS 1.x issues no refresh token to public clients, so their access tokens live longer. */
+    var publicAccessTokenHours: Long = 24 * 7,
+    var refreshTokenDays: Long = 30,
+    /** Firebase web config for the sign-in page (the same public values the web app ships). */
+    var firebaseWebApiKey: String = "",
+    var firebaseAuthDomain: String = "",
+    var firebaseProjectId: String = "",
 )
 
 data class JwtConfig(

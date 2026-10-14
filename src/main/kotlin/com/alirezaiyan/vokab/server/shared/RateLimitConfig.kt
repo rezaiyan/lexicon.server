@@ -97,6 +97,13 @@ class RateLimitConfig(private val appProperties: AppProperties) {
         }
     }
 
+    /** Open MCP client registration (IP-based): 10 per hour, so nobody can fill the client table. */
+    fun getMcpClientRegistrationBucket(ipAddress: String): Bucket =
+        cache.computeIfAbsent("mcp_register_$ipAddress") {
+            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofHours(1)).build()
+            Bucket.builder().addLimit(limit).build()
+        }
+
     /**
      * Get rate limit bucket for public onboarding vocabulary (IP-based)
      * Limit: 5 requests per minute per IP to prevent abuse

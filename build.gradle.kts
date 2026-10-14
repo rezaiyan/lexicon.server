@@ -58,6 +58,9 @@ dependencies {
 	// MCP server (/mcp): learner tools over the word services, for AI clients
 	implementation(platform(libs.spring.ai.bom))
 	implementation(libs.spring.ai.starter.mcp.server.webmvc)
+	// OAuth 2.1 for MCP clients: we are the authorization server, /mcp is the resource server
+	implementation(libs.spring.security.oauth2.authorization.server)
+	implementation(libs.spring.security.oauth2.resource.server)
 
 	// Metrics, scraped from the internal management port
 	implementation(libs.micrometer.registry.prometheus)

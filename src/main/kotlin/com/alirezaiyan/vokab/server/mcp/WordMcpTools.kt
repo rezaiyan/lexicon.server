@@ -34,7 +34,7 @@ class WordMcpTools(
         @McpToolParam(description = "Max results, 1-$MAX_LIMIT (default $DEFAULT_LIMIT)", required = false)
         limit: Int?,
     ): List<WordResult> {
-        val userId = context.userId()
+        val userId = context.userIdWithScope(McpScopes.WORDS_READ)
         val tagId = tag?.takeIf { it.isNotBlank() }?.let { name ->
             tagService.list(userId).firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }?.id
                 ?: return emptyList()
@@ -68,7 +68,7 @@ class WordMcpTools(
         annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false),
     )
     fun listTags(context: McpTransportContext): List<TagResult> =
-        tagService.list(context.userId()).map { TagResult(it.id, it.name, it.wordCount) }
+        tagService.list(context.userIdWithScope(McpScopes.WORDS_READ)).map { TagResult(it.id, it.name, it.wordCount) }
 
     data class WordResult(
         val id: Long?,

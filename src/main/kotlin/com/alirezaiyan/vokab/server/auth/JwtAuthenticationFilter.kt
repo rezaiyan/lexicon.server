@@ -37,7 +37,12 @@ class JwtAuthenticationFilter(
         // Admin auth (key or dashboard session) is AdminAuthenticationFilter's job
         ADMIN_PATH_PREFIX,
         "/actuator/",
-        "/error"
+        "/error",
+        // MCP and its OAuth server have their own filter chains and token types (McpAuthorizationServerConfig)
+        "/mcp",
+        "/oauth/",
+        "/oauth2/",
+        "/.well-known/",
     )
     
     override fun shouldNotFilter(request: HttpServletRequest): Boolean {

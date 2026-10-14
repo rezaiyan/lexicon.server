@@ -67,7 +67,7 @@ class McpOAuthFlowTest {
     @BeforeEach
     fun setUp() {
         learner = userRepository.save(User(email = "oauth-learner@example.com", name = "Learner", googleId = "google-uid-1"))
-        wordRepository.save(Word(user = learner, originalWord = "Apfel", translation = "apple", sourceLanguage = "de", targetLanguage = "en"))
+        wordRepository.save(Word(user = learner, originalWord = "Apfel", translation = "apple", sourceLanguage = "en", targetLanguage = "de"))
         `when`(firebase.verify("good-id-token")).thenReturn(FirebaseIdClaims("google-uid-1", learner.email, "Learner"))
         `when`(firebase.verify("stranger-id-token")).thenReturn(FirebaseIdClaims("google-uid-404", "stranger@example.com", "Stranger"))
     }

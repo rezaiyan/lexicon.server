@@ -30,9 +30,9 @@ class ModularityTest {
         "credits" to setOf("subscription"),
         "email" to setOf(),
         "listening" to setOf("user"),
-        // MCP tools are a second front door onto the word services, like the REST controllers; its
-        // OAuth sign-in verifies Google ID tokens and finds the existing account
-        "mcp" to setOf("auth", "user", "words"),
+        // MCP tools are a second front door onto the word and progress services, like the REST
+        // controllers; its OAuth sign-in verifies Google ID tokens and finds the existing account
+        "mcp" to setOf("analytics", "auth", "user", "words"),
         "notification" to setOf("ai", "analytics", "study", "subscription", "user"),
         "shared" to setOf(),
         "study" to setOf("notification", "user", "words"),
@@ -58,6 +58,19 @@ class ModularityTest {
         assertEquals(allowedDependencies, actualDependencies().toSortedMap()) {
             "Cross-feature dependencies changed. A new edge needs a reason (prefer an event); " +
                 "a removed edge means this map can be tightened."
+        }
+    }
+
+    /**
+     * MCP tools are free to use: the AI client does any extracting or translating itself. So neither
+     * the tools nor the services they call (words, analytics) may touch the paid AI calls or credits.
+     */
+    @Test
+    fun `mcp tools never reach the AI or credits modules`() {
+        val actual = actualDependencies()
+        for (module in listOf("mcp", "words", "analytics")) {
+            val paid = actual.getValue(module).intersect(setOf("ai", "credits"))
+            assertTrue(paid.isEmpty(), "$module depends on $paid: MCP tools must not trigger AI calls")
         }
     }
 

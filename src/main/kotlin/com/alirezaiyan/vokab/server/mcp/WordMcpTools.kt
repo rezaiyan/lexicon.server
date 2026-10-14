@@ -1,33 +1,43 @@
 package com.alirezaiyan.vokab.server.mcp
 
+import com.alirezaiyan.vokab.server.words.NewWord
 import com.alirezaiyan.vokab.server.words.TagService
+import com.alirezaiyan.vokab.server.words.WordAdditionService
 import com.alirezaiyan.vokab.server.words.WordDto
 import com.alirezaiyan.vokab.server.words.WordService
+import com.fasterxml.jackson.annotation.JsonCreator
+import com.fasterxml.jackson.annotation.JsonProperty
+import com.fasterxml.jackson.annotation.JsonPropertyDescription
 import io.modelcontextprotocol.common.McpTransportContext
 import org.springaicommunity.mcp.annotation.McpTool
 import org.springaicommunity.mcp.annotation.McpToolParam
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
-/** Read-only vocabulary tools for AI clients. Thin: all logic lives in the word services. */
+/**
+ * Vocabulary tools for AI clients. Thin: all logic lives in the word services.
+ * Nothing here calls the backend's AI endpoints: the AI client does any extracting or translating
+ * itself, so these tools cost no AI credits.
+ */
 @Component
 @ConditionalOnProperty("spring.ai.mcp.server.enabled", havingValue = "true")
 class WordMcpTools(
     private val wordService: WordService,
+    private val wordAdditionService: WordAdditionService,
     private val tagService: TagService,
 ) {
 
     @McpTool(
         name = "search_words",
         description = "Search the learner's saved vocabulary. Matches the word or its translation " +
-            "(case-insensitive). Optionally narrow by language code (e.g. \"de\") or tag name.",
+            "(case-insensitive). Optionally narrow by the language being learned (code, e.g. \"de\") or a tag name.",
         annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false),
     )
     fun searchWords(
         context: McpTransportContext,
         @McpToolParam(description = "Text to find in the word or translation; empty lists all", required = false)
         query: String?,
-        @McpToolParam(description = "Language code the word is in, e.g. \"de\"", required = false)
+        @McpToolParam(description = "Code of the language being learned, e.g. \"de\"", required = false)
         language: String?,
         @McpToolParam(description = "Only words with this tag name", required = false)
         tag: String?,
@@ -45,22 +55,12 @@ class WordMcpTools(
             .filter { word ->
                 needle.isEmpty() || needle in word.originalWord.lowercase() || needle in word.translation.lowercase()
             }
-            .filter { lang == null || it.sourceLanguage.equals(lang, true) || it.targetLanguage.equals(lang, true) }
+            .filter { lang == null || it.targetLanguage.equals(lang, true) }
             .filter { tagId == null || tagId in it.tagIds }
-            .take((limit ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT))
+            .take(limit.clamped())
             .map { it.toResult() }
             .toList()
     }
-
-    private fun WordDto.toResult() = WordResult(
-        id = id,
-        word = originalWord,
-        translation = translation,
-        sourceLanguage = sourceLanguage,
-        targetLanguage = targetLanguage,
-        level = level,
-        note = description.ifBlank { null },
-    )
 
     @McpTool(
         name = "list_tags",
@@ -70,20 +70,147 @@ class WordMcpTools(
     fun listTags(context: McpTransportContext): List<TagResult> =
         tagService.list(context.userIdWithScope(McpScopes.WORDS_READ)).map { TagResult(it.id, it.name, it.wordCount) }
 
+    @McpTool(
+        name = "get_due_words",
+        description = "Words due for review now, most overdue first, plus how many are due in total. " +
+            "Use them to quiz the learner. Answers given in chat don't count as reviews in the app.",
+        annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false),
+    )
+    fun getDueWords(
+        context: McpTransportContext,
+        @McpToolParam(description = "Max words, 1-$MAX_LIMIT (default $DEFAULT_LIMIT)", required = false)
+        limit: Int?,
+    ): DueWords {
+        val due = wordService.listDue(context.userIdWithScope(McpScopes.WORDS_READ), Int.MAX_VALUE)
+        return DueWords(dueCount = due.size, words = due.take(limit.clamped()).map { it.toResult() })
+    }
+
+    @McpTool(
+        name = "add_words",
+        description = "Add words to the learner's vocabulary as new flashcards, due for review right away. " +
+            "Words they already have (same word and translation in the same language) are skipped and keep " +
+            "their progress. Tags are names; missing tags are created. The app shows new words the next time " +
+            "it opens.",
+        annotations = McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true),
+    )
+    fun addWords(
+        context: McpTransportContext,
+        @McpToolParam(description = "Words to add, at most $MAX_BATCH per call") words: List<WordInput>,
+    ): AddedWords {
+        val userId = context.userIdWithScope(McpScopes.WORDS_WRITE)
+        require(words.isNotEmpty() && words.size <= MAX_BATCH) { "Send between 1 and $MAX_BATCH words" }
+        val result = wordAdditionService.addNew(userId, words.map { it.toNewWord() })
+        return AddedWords(
+            added = result.added.map { AddedWord(requireNotNull(it.id), it.originalWord, it.translation) },
+            skipped = result.skipped,
+        )
+    }
+
+    @McpTool(
+        name = "tag_words",
+        description = "Add tags (by name) to some of the learner's words, keeping the tags they already have. " +
+            "Missing tags are created. Get word ids from search_words or get_due_words.",
+        annotations = McpTool.McpAnnotations(readOnlyHint = false, destructiveHint = false, idempotentHint = true),
+    )
+    fun tagWords(
+        context: McpTransportContext,
+        @McpToolParam(description = "Ids of the words to tag, at most $MAX_BATCH") wordIds: List<Long>,
+        @McpToolParam(description = "Tag names to add, at most $MAX_TAGS") tags: List<String>,
+    ): TaggedWords {
+        val userId = context.userIdWithScope(McpScopes.WORDS_WRITE)
+        require(wordIds.isNotEmpty() && wordIds.size <= MAX_BATCH) { "Send between 1 and $MAX_BATCH word ids" }
+        return TaggedWords(tagged = wordAdditionService.addTags(userId, wordIds, validTags(tags)))
+    }
+
+    private fun WordInput.toNewWord(): NewWord {
+        require(word.isNotBlank() && word.length <= MAX_TEXT) { "Each word needs 1-$MAX_TEXT characters" }
+        require(translation.isNotBlank() && translation.length <= MAX_TEXT) {
+            "Each translation needs 1-$MAX_TEXT characters (word \"$word\")"
+        }
+        require((note?.length ?: 0) <= MAX_NOTE) { "Notes are limited to $MAX_NOTE characters (word \"$word\")" }
+        return NewWord(
+            term = word,
+            translation = translation,
+            note = note.orEmpty(),
+            learningLanguage = McpLanguages.require(language, "language"),
+            nativeLanguage = translationLanguage?.takeIf { it.isNotBlank() }
+                ?.let { McpLanguages.require(it, "translationLanguage") },
+            tagNames = validTags(tags.orEmpty()),
+        )
+    }
+
+    private fun validTags(tags: List<String>): List<String> {
+        val names = tags.map { it.trim() }.filter { it.isNotEmpty() }
+        require(names.size <= MAX_TAGS) { "At most $MAX_TAGS tags at once" }
+        require(names.all { it.length <= MAX_TAG_NAME }) { "Tag names are limited to $MAX_TAG_NAME characters" }
+        return names
+    }
+
+    private fun Int?.clamped() = (this ?: DEFAULT_LIMIT).coerceIn(1, MAX_LIMIT)
+
+    private fun WordDto.toResult() = WordResult(
+        id = id,
+        word = originalWord,
+        translation = translation,
+        language = targetLanguage,
+        translationLanguage = sourceLanguage,
+        level = level,
+        note = description.ifBlank { null },
+    )
+
+    /**
+     * One word to add. [language] is the language being learned, the one [word] is in.
+     * Explicit creator: the MCP library parses arguments with its own Jackson mapper, which has no
+     * Kotlin module. The field annotations drive the JSON schema clients see (required unless marked).
+     */
+    data class WordInput @JsonCreator constructor(
+        @param:JsonProperty("word", required = true)
+        @field:JsonPropertyDescription("The word or phrase, in the language being learned")
+        val word: String,
+        @param:JsonProperty("translation", required = true)
+        @field:JsonPropertyDescription("Its meaning in the learner's own language")
+        val translation: String,
+        @param:JsonProperty("language", required = true)
+        @field:JsonPropertyDescription("Code of the language being learned, e.g. \"de\"")
+        val language: String,
+        @param:JsonProperty("translationLanguage")
+        @field:JsonProperty("translationLanguage", required = false)
+        @field:JsonPropertyDescription("Code of the translation's language; defaults to the learner's usual one")
+        val translationLanguage: String? = null,
+        @param:JsonProperty("note")
+        @field:JsonProperty("note", required = false)
+        @field:JsonPropertyDescription("Optional note: example sentence, gender, grammar")
+        val note: String? = null,
+        @param:JsonProperty("tags")
+        @field:JsonProperty("tags", required = false)
+        @field:JsonPropertyDescription("Optional tag names")
+        val tags: List<String>? = null,
+    )
+
+    /** [language] is the language being learned; [level] runs from 0 (new) to 6 (mastered). */
     data class WordResult(
         val id: Long?,
         val word: String,
         val translation: String,
-        val sourceLanguage: String,
-        val targetLanguage: String,
+        val language: String,
+        val translationLanguage: String,
         val level: Int,
         val note: String?,
     )
 
     data class TagResult(val id: Long, val name: String, val wordCount: Long)
+    data class DueWords(val dueCount: Int, val words: List<WordResult>)
+    data class AddedWord(val id: Long, val word: String, val translation: String)
+    data class AddedWords(val added: List<AddedWord>, val skipped: List<String>)
+    data class TaggedWords(val tagged: Int)
 
     private companion object {
         const val DEFAULT_LIMIT = 25
         const val MAX_LIMIT = 100
+        const val MAX_BATCH = 100
+        const val MAX_TAGS = 10
+        const val MAX_TAG_NAME = 100
+        const val MAX_TEXT = 200
+        const val MAX_NOTE = 1000
     }
 }

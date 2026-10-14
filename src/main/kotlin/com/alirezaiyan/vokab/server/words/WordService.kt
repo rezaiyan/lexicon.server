@@ -28,6 +28,13 @@ class WordService(
         return words.map { it.toDto() }
     }
 
+    /** Words due for review now, most overdue first. */
+    @Transactional(readOnly = true)
+    fun listDue(userId: Long, limit: Int): List<WordDto> {
+        val now = Instant.now(clock).toEpochMilli()
+        return list(userId).filter { it.nextReviewDate <= now }.sortedBy { it.nextReviewDate }.take(limit)
+    }
+
     /** Lower-cased terms the user already has in [targetLanguage] (stored as a language code, e.g. "de"). */
     @Transactional(readOnly = true)
     fun getExistingTermKeys(userId: Long, targetLanguage: String): Set<String> {
@@ -141,7 +148,7 @@ class WordService(
     }
 }
 
-private fun Word.toDto(): WordDto = WordDto(
+internal fun Word.toDto(): WordDto = WordDto(
     id = id,
     originalWord = originalWord,
     translation = translation,

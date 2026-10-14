@@ -78,12 +78,27 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    fun `tools list exposes the read-only word tools`() {
-        val tools = call(rpc("tools/list"))["result"]["tools"]
-        val byName = tools.associateBy { it["name"].asText() }
+    fun `tools list marks which tools only read and which add`() {
+        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asText() }
 
-        assertEquals(setOf("search_words", "list_tags"), byName.keys)
-        assertEquals(true, byName.getValue("search_words")["annotations"]["readOnlyHint"].asBoolean())
+        assertEquals(READ_TOOLS + WRITE_TOOLS, tools.keys)
+        READ_TOOLS.forEach { assertTrue(tools.getValue(it)["annotations"]["readOnlyHint"].asBoolean(), it) }
+        WRITE_TOOLS.forEach {
+            assertFalse(tools.getValue(it)["annotations"]["readOnlyHint"].asBoolean(), it)
+            assertFalse(tools.getValue(it)["annotations"]["destructiveHint"].asBoolean(), it)
+        }
+    }
+
+    @Test
+    fun `add_words tells the AI client exactly what a word needs`() {
+        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asText() }
+        val item = tools.getValue("add_words")["inputSchema"]["properties"]["words"]["items"]
+
+        assertEquals(
+            setOf("word", "translation", "language", "translationLanguage", "note", "tags"),
+            item["properties"].fieldNames().asSequence().toSet(),
+        )
+        assertEquals(setOf("word", "translation", "language"), item["required"].map { it.asText() }.toSet())
     }
 
     @Test
@@ -91,6 +106,9 @@ class McpServerIntegrationTest {
         val words = toolResult("search_words", mapOf("query" to "apple"))
 
         assertEquals(setOf("Apfel", "manzana"), words.map { it["word"].asText() }.toSet())
+        val apfel = words.single { it["word"].asText() == "Apfel" }
+        assertEquals("de", apfel["language"].asText())
+        assertEquals("en", apfel["translationLanguage"].asText())
     }
 
     @Test
@@ -113,10 +131,83 @@ class McpServerIntegrationTest {
         assertEquals(1, tags[0]["wordCount"].asLong())
     }
 
+    @Test
+    fun `add_words adds new words, skips known ones and tags them`() {
+        val result = toolResult("add_words", mapOf("words" to listOf(
+            mapOf("word" to "Apfel", "translation" to "apple", "language" to "de"),
+            mapOf("word" to "Kirsche", "translation" to "cherry", "language" to "de", "note" to "die Kirsche",
+                "tags" to listOf("fruit", "news")),
+        )))
+
+        assertEquals(listOf("Kirsche"), result["added"].map { it["word"].asText() })
+        assertEquals(listOf("Apfel"), result["skipped"].map { it.asText() })
+        val kirsche = wordRepository.findAllByUserWithTags(learner).single { it.originalWord == "Kirsche" }
+        assertEquals("de", kirsche.targetLanguage)
+        assertEquals("en", kirsche.sourceLanguage, "translation language defaults to the learner's usual one")
+        assertEquals("die Kirsche", kirsche.description)
+        assertEquals(setOf("fruit", "news"), kirsche.tags.map { it.name }.toSet())
+    }
+
+    @Test
+    fun `add_words rejects a language the app doesn't support and stores nothing`() {
+        val count = wordRepository.findAllByUser(learner).size
+
+        val result = toolError("add_words", mapOf("words" to listOf(
+            mapOf("word" to "Kirsche", "translation" to "cherry", "language" to "klingon"),
+        )))
+
+        assertTrue("klingon" in result)
+        assertEquals(count, wordRepository.findAllByUser(learner).size)
+    }
+
+    @Test
+    fun `add_words needs words write access`() {
+        token = tokens().accessToken(learner.requireId(), scopes = setOf(McpScopes.WORDS_READ))
+
+        val result = toolError("add_words", mapOf("words" to listOf(
+            mapOf("word" to "Kirsche", "translation" to "cherry", "language" to "de"),
+        )))
+
+        assertTrue("words:write" in result)
+    }
+
+    @Test
+    fun `tag_words adds a tag to the caller's words`() {
+        val birne = wordRepository.findAllByUser(learner).single { it.originalWord == "Birne" }
+
+        val result = toolResult("tag_words", mapOf("wordIds" to listOf(birne.id), "tags" to listOf("fruit")))
+
+        assertEquals(1, result["tagged"].asInt())
+        assertEquals(setOf("Apfel", "Birne"), toolResult("search_words", mapOf("tag" to "fruit")).map { it["word"].asText() }.toSet())
+    }
+
+    @Test
+    fun `get_due_words lists due words, most overdue first`() {
+        wordRepository.save(word(learner, "Morgen", "tomorrow", "de").apply { nextReviewDate = Long.MAX_VALUE })
+
+        val due = toolResult("get_due_words", emptyMap())
+
+        assertEquals(3, due["dueCount"].asInt())
+        assertTrue("Morgen" !in due["words"].map { it["word"].asText() })
+    }
+
+    @Test
+    fun `progress tools answer for a learner without reviews`() {
+        assertEquals(0, toolResult("get_difficult_words", emptyMap()).size())
+        assertEquals(0, toolResult("get_weekly_report", emptyMap())["cardsReviewed"].asInt())
+    }
+
     private fun toolResult(name: String, arguments: Map<String, Any>): JsonNode {
         val result = call(rpc("tools/call", mapOf("name" to name, "arguments" to arguments)))["result"]
         assertFalse(result["isError"]?.asBoolean() ?: false, "tool error: $result")
         return objectMapper.readTree(result["content"][0]["text"].asText())
+    }
+
+    /** Calls a tool that must fail and returns its error text. */
+    private fun toolError(name: String, arguments: Map<String, Any>): String {
+        val result = call(rpc("tools/call", mapOf("name" to name, "arguments" to arguments)))["result"]
+        assertTrue(result["isError"]?.asBoolean() ?: false, "expected a tool error: $result")
+        return result["content"][0]["text"].asText()
     }
 
     private fun call(body: String): JsonNode {
@@ -139,9 +230,14 @@ class McpServerIntegrationTest {
         user = user,
         originalWord = original,
         translation = translation,
-        sourceLanguage = language,
-        targetLanguage = "en",
+        sourceLanguage = "en",
+        targetLanguage = language,
     )
 
     private fun tokens() = McpTestTokens(clients, authorizations, jwkSource)
+
+    private companion object {
+        val READ_TOOLS = setOf("search_words", "list_tags", "get_due_words", "get_difficult_words", "get_weekly_report")
+        val WRITE_TOOLS = setOf("add_words", "tag_words")
+    }
 }

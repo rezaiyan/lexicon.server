@@ -213,8 +213,8 @@ The first time, turning it on is not enough: see the checklist below.
    `https://lexicon.alirezaiyan.com` and the signing key to `/app/keys/mcp-signing-key.json` on the persistent
    `jwt_keys` volume.
 3. Firebase console: add `lexicon.alirezaiyan.com` to Authorized domains (the sign-in popup).
-4. Secure session cookie: behind Caddy Spring sees plain http. Set `server.forward-headers-strategy=framework`
-   (or `server.servlet.session.cookie.secure=true`).
+4. Secure session cookie: `docker-compose.yml` sets `SERVER_FORWARD_HEADERS_STRATEGY=native`, so Spring trusts
+   Caddy's `X-Forwarded-Proto` and the session cookie is `Secure`.
 5. Deploy (`ali server`), then connect from Claude Code and claude.ai with a real account and walk the whole flow:
    connect, each tool, a scope you didn't grant, disconnect from the app.
 6. Deploy the website (`ali site`) so the user guide and the privacy section go live.

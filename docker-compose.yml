@@ -101,6 +101,9 @@ services:
       MCP_FIREBASE_WEB_API_KEY: ${MCP_FIREBASE_WEB_API_KEY:-}
       MCP_FIREBASE_AUTH_DOMAIN: ${MCP_FIREBASE_AUTH_DOMAIN:-}
       MCP_FIREBASE_PROJECT_ID: ${MCP_FIREBASE_PROJECT_ID:-}
+      # Trust Caddy's X-Forwarded-Proto/For (Tomcat RemoteIpValve): requests are seen as https, so the
+      # MCP sign-in session cookie is Secure and redirects stay on https. remoteAddr becomes the client IP.
+      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-native}
       PORT: 8080
     volumes:
       # Persist JWT keys across container restarts

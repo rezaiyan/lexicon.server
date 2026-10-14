@@ -13,6 +13,8 @@ detekt = "1.23.8"
 springdoc = "2.8.17"
 spring-modulith = "1.4.13"
 konsist = "0.17.3"
+# 1.1.x is the Spring Boot 3.5 line; 2.x needs Boot 4
+spring-ai = "1.1.8"
 
 [libraries]
 # Versions managed by the Spring Boot BOM
@@ -48,7 +50,9 @@ kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = 
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 spring-modulith-starter-jdbc = { module = "org.springframework.modulith:spring-modulith-starter-jdbc", version.ref = "spring-modulith" }
-spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+spring-ai-starter-mcp-server-webmvc = { module = "org.springframework.ai:spring-ai-starter-mcp-server-webmvc" }
+spring-modulith-starter-test ={ module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

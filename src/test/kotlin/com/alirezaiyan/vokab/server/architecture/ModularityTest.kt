@@ -30,6 +30,8 @@ class ModularityTest {
         "credits" to setOf("subscription"),
         "email" to setOf(),
         "listening" to setOf("user"),
+        // MCP tools are a second front door onto the word services, like the REST controllers
+        "mcp" to setOf("words"),
         "notification" to setOf("ai", "analytics", "study", "subscription", "user"),
         "shared" to setOf(),
         "study" to setOf("notification", "user", "words"),

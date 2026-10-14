@@ -56,6 +56,19 @@ spring:
         query:
           fail_on_pagination_over_collection_fetch: true
 
+  # MCP server for AI clients at POST /mcp (JWT-protected like the rest of the API).
+  # Off until OAuth for third-party clients exists; MCP_ENABLED=true for local spikes.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:false}
+        name: lexicon
+        version: 0.1.0
+        protocol: STATELESS
+        instructions: >-
+          Lexicon is the learner's vocabulary notebook. Use these tools to look up the words and
+          tags they have saved. Word levels run from 0 (new) to 6 (mastered).
+
   h2:
     console:
       enabled: false   # only the h2 profile turns it on

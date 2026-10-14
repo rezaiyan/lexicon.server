@@ -55,6 +55,9 @@ dependencies {
 	implementation(libs.spring.boot.starter.validation)
 	implementation(libs.spring.boot.starter.actuator)
 	implementation(libs.spring.boot.starter.mail)
+	// MCP server (/mcp): learner tools over the word services, for AI clients
+	implementation(platform(libs.spring.ai.bom))
+	implementation(libs.spring.ai.starter.mcp.server.webmvc)
 
 	// Metrics, scraped from the internal management port
 	implementation(libs.micrometer.registry.prometheus)

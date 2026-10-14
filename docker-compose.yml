@@ -92,6 +92,15 @@ services:
       # X-Admin-Key for /admin/** and the dashboard at /admin-ui/notifications.
       # Empty disables admin access; dashboard sign-in needs 32+ chars (openssl rand -base64 36)
       APP_SECURITY_ADMINAPIKEY: ${APP_SECURITY_ADMINAPIKEY:-}
+      # MCP server for AI apps (docs/mcp.md). Off unless MCP_ENABLED=true in .env.
+      # The signing key sits on the jwt_keys volume so connected apps survive redeploys.
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_ISSUER: ${MCP_ISSUER:-https://lexicon.alirezaiyan.com}
+      MCP_SIGNING_KEY_PATH: ${MCP_SIGNING_KEY_PATH:-/app/keys/mcp-signing-key.json}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_FIREBASE_WEB_API_KEY: ${MCP_FIREBASE_WEB_API_KEY:-}
+      MCP_FIREBASE_AUTH_DOMAIN: ${MCP_FIREBASE_AUTH_DOMAIN:-}
+      MCP_FIREBASE_PROJECT_ID: ${MCP_FIREBASE_PROJECT_ID:-}
       PORT: 8080
     volumes:
       # Persist JWT keys across container restarts

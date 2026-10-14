@@ -184,12 +184,34 @@ JAVA_HOME=$(/usr/libexec/java_home -v 21) ./gradlew test --tests '*.mcp.*'
 
 Changing an endpoint shape? Regenerate the contract: `./gradlew test --tests '*OpenApiContractTest' -PupdateOpenApi=true`.
 
+## Turning it on and off
+
+One switch: `MCP_ENABLED` in the VPS `.env` (`/var/www/lexicon-server/.env`). `docker-compose.yml` passes it
+and the other `MCP_*` values to the container, defaulting to off.
+
+```bash
+ali ssh
+cd /var/www/lexicon-server
+sed -i '/^MCP_ENABLED=/d' .env && echo 'MCP_ENABLED=true' >> .env   # or false to turn off
+docker compose up -d app                                            # recreates the container with the new env
+```
+
+Use `docker compose up -d`, not `ali restart server`: `docker compose restart` keeps the old environment.
+
+**Off** removes `/mcp`, all OAuth endpoints, the MCP beans and the nightly cleanup, so connected apps can no longer reach Lexicon.
+Grants stay in the database, so turning it back on reconnects everyone whose refresh token hasn't expired.
+To cut every app off for good, also `DELETE FROM oauth2_authorization;`.
+`/api/v1/mcp/connections` stays up either way, so learners can still see and disconnect apps.
+
+The first time, turning it on is not enough: see the checklist below.
+
 ## Enabling in production
 
 1. Caddy: route `/mcp`, `/oauth/*`, `/oauth2/*` and `/.well-known/oauth-*` on `lexicon.alirezaiyan.com` to :8080.
    Today only `/api/*` goes to the server, so these fall through to the web app.
-2. VPS `.env`: `MCP_ENABLED=true`, `MCP_ISSUER=https://lexicon.alirezaiyan.com`,
-   `MCP_SIGNING_KEY_PATH=/app/keys/mcp-signing-key.json` (on a persistent volume), the three `MCP_FIREBASE_*` values.
+2. VPS `.env`: `MCP_ENABLED=true` and the three `MCP_FIREBASE_*` values. `MCP_ISSUER` defaults to
+   `https://lexicon.alirezaiyan.com` and the signing key to `/app/keys/mcp-signing-key.json` on the persistent
+   `jwt_keys` volume.
 3. Firebase console: add `lexicon.alirezaiyan.com` to Authorized domains (the sign-in popup).
 4. Secure session cookie: behind Caddy Spring sees plain http. Set `server.forward-headers-strategy=framework`
    (or `server.servlet.session.cookie.secure=true`).

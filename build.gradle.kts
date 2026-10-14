@@ -58,6 +58,12 @@ dependencies {
 	// MCP server (/mcp): learner tools over the word services, for AI clients
 	implementation(platform(libs.spring.ai.bom))
 	implementation(libs.spring.ai.starter.mcp.server.webmvc)
+	// Spring AI 1.1.8 pins MCP SDK 0.18.3; 0.18.4 bounds HTTP request reads (security backport)
+	constraints {
+		listOf("mcp", "mcp-core", "mcp-json-jackson2", "mcp-spring-webmvc").forEach {
+			implementation("io.modelcontextprotocol.sdk:$it:0.18.4")
+		}
+	}
 	// OAuth 2.1 for MCP clients: we are the authorization server, /mcp is the resource server
 	implementation(libs.spring.security.oauth2.authorization.server)
 	implementation(libs.spring.security.oauth2.resource.server)

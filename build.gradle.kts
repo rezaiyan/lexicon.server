@@ -181,6 +181,8 @@ tasks.jar {
 
 tasks.test {
 	useJUnitPlatform()
+	// Spring caches one context per test configuration; the default 512m worker heap ran out (2026-10-15)
+	maxHeapSize = "1g"
 	finalizedBy(tasks.jacocoTestReport)
 	// `./gradlew test -PupdateOpenApi=true` rewrites openapi.json instead of failing on a diff
 	systemProperty("openapi.update", providers.gradleProperty("updateOpenApi").getOrElse("false"))

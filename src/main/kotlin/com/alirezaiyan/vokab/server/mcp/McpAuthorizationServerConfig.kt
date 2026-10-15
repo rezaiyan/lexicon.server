@@ -34,6 +34,7 @@ import org.springframework.security.oauth2.jwt.JwtValidators
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationConsentService
 import org.springframework.security.oauth2.server.authorization.JdbcOAuth2AuthorizationService
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationConsentService
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
@@ -190,13 +191,21 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
     fun authorizationService(
         jdbcTemplate: JdbcTemplate,
         clients: RegisteredClientRepository,
-    ): OAuth2AuthorizationService = JdbcOAuth2AuthorizationService(jdbcTemplate, clients)
+        transactionManager: PlatformTransactionManager,
+    ): OAuth2AuthorizationService = TransactionalAuthorizationService(
+        JdbcOAuth2AuthorizationService(jdbcTemplate, clients),
+        McpTransactions(transactionManager),
+    )
 
     @Bean
     fun authorizationConsentService(
         jdbcTemplate: JdbcTemplate,
         clients: RegisteredClientRepository,
-    ): OAuth2AuthorizationConsentService = JdbcOAuth2AuthorizationConsentService(jdbcTemplate, clients)
+        transactionManager: PlatformTransactionManager,
+    ): OAuth2AuthorizationConsentService = TransactionalAuthorizationConsentService(
+        JdbcOAuth2AuthorizationConsentService(jdbcTemplate, clients),
+        McpTransactions(transactionManager),
+    )
 
     @Bean
     fun mcpJwkSource(): JWKSource<SecurityContext> = ImmutableJWKSet(JWKSet(signingKey))

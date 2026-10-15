@@ -105,15 +105,16 @@ class McpServerIntegrationTest {
     }
 
     @Test
-    fun `tools list marks which tools only read and which add`() {
+    fun `tools list marks which tools only read, which add and which destroy`() {
         val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asText() }
 
-        assertEquals(READ_TOOLS + WRITE_TOOLS, tools.keys)
+        assertEquals(READ_TOOLS + WRITE_TOOLS + DESTRUCTIVE_TOOLS, tools.keys)
         READ_TOOLS.forEach { assertTrue(tools.getValue(it)["annotations"]["readOnlyHint"].asBoolean(), it) }
         WRITE_TOOLS.forEach {
             assertFalse(tools.getValue(it)["annotations"]["readOnlyHint"].asBoolean(), it)
             assertFalse(tools.getValue(it)["annotations"]["destructiveHint"].asBoolean(), it)
         }
+        DESTRUCTIVE_TOOLS.forEach { assertTrue(tools.getValue(it)["annotations"]["destructiveHint"].asBoolean(), it) }
     }
 
     @Test
@@ -248,6 +249,36 @@ class McpServerIntegrationTest {
     }
 
     @Test
+    fun `delete_words deletes only the caller's words, leaves tombstones for their devices and is audited`() {
+        val mine = requireNotNull(wordRepository.findAllByUser(learner).first { it.originalWord == "Birne" }.id)
+        val theirs = requireNotNull(wordRepository.findAll().first { it.originalWord == "Apfelsaft" }.id)
+
+        val result = toolResult("delete_words", mapOf("wordIds" to listOf(mine, theirs)))
+
+        assertEquals(listOf(mine), result["deleted"].map { it.asLong() })
+        assertEquals(listOf(theirs), result["notFound"].map { it.asLong() })
+        assertFalse(wordRepository.existsById(mine))
+        assertTrue(wordRepository.existsById(theirs), "another learner's word is untouched")
+        assertEquals(listOf(mine), wordService.deletedSince(learner.requireId(), java.time.Instant.EPOCH))
+        val entry = auditLogRepository.findAll().single { it.userId == learner.id && it.eventType == AuditEventType.MCP_WRITE }
+        assertEquals("delete_words", objectMapper.readTree(entry.metadata)["tool"].asText())
+    }
+
+    @Test
+    fun `delete_words needs the opt-in delete scope`() {
+        token = tokens().accessToken(
+            learner.requireId(), scopes = setOf(McpScopes.WORDS_READ, McpScopes.WORDS_WRITE, McpScopes.PROGRESS_READ),
+        )
+
+        val response = mockMvc.perform(mcpRequest(toolCall("delete_words"), token))
+            .andExpect(status().isForbidden)
+            .andReturn().response
+
+        assertTrue("words:delete" in requireNotNull(response.getHeader("WWW-Authenticate")))
+        assertEquals(3, wordRepository.findAllByUser(learner).size, "nothing deleted")
+    }
+
+    @Test
     fun `add_words rejects a language the app doesn't support and stores nothing`() {
         val count = wordRepository.findAllByUser(learner).size
 
@@ -340,5 +371,6 @@ class McpServerIntegrationTest {
     private companion object {
         val READ_TOOLS = setOf("search_words", "list_tags", "get_due_words", "get_difficult_words", "get_weekly_report")
         val WRITE_TOOLS = setOf("add_words", "tag_words")
+        val DESTRUCTIVE_TOOLS = setOf("delete_words")
     }
 }

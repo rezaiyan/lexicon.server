@@ -23,7 +23,8 @@ internal object McpConsentPage {
         val publisher = client.publisher?.let { "<p>Published by <strong>${escape(it)}</strong>.</p>" }.orEmpty()
         val hosts = client.returnHosts.joinToString(", ") { "<strong>${escape(it)}</strong>" }
         val scopes = requestedScopes.filter { it in McpScopes.ALL }.joinToString("\n") { scope ->
-            """<label><input type="checkbox" name="scope" value="${escape(scope)}" checked> """ +
+            val checked = if (scope in McpScopes.OPT_IN) "" else " checked"
+            """<label><input type="checkbox" name="scope" value="${escape(scope)}"$checked> """ +
                 """${escape(describe(scope))}</label>"""
         }
         val hidden = """<input type="hidden" name="client_id" value="${escape(clientId)}">""" +
@@ -41,6 +42,7 @@ internal object McpConsentPage {
         McpScopes.WORDS_READ -> "See your words and tags"
         McpScopes.WORDS_WRITE -> "Add words and tags (never deletes or changes your progress)"
         McpScopes.PROGRESS_READ -> "See your study progress"
+        McpScopes.WORDS_DELETE -> "Delete words (removes them from all your devices)"
         else -> scope
     }
 

@@ -87,11 +87,11 @@ internal class McpRegisteredClientRepository(
 
     override fun save(registeredClient: RegisteredClient) = stored.save(registeredClient)
 
-    override fun findById(id: String): RegisteredClient? = stored.findById(id)
+    override fun findById(id: String): RegisteredClient? = stored.findById(id)?.withCurrentScopes()
 
     override fun findByClientId(clientId: String): RegisteredClient? {
-        val url = metadataDocumentUrl(clientId) ?: return stored.findByClientId(clientId)
-        val known = stored.findByClientId(clientId)
+        val url = metadataDocumentUrl(clientId) ?: return stored.findByClientId(clientId)?.withCurrentScopes()
+        val known = stored.findByClientId(clientId)?.withCurrentScopes()
         val fresh = known?.clientIdIssuedAt?.isAfter(Instant.now(clock).minus(refreshAfter)) == true
         if (known != null && fresh) return known
         val fetched = fetcher.fetch(url)?.let { parse(clientId, it, known?.id) }
@@ -99,6 +99,14 @@ internal class McpRegisteredClientRepository(
         stored.save(fetched)
         return fetched
     }
+
+    /**
+     * Scopes are ours to define, not the client's: a client registered before a scope existed may
+     * still ask for it (the learner decides on the consent screen).
+     */
+    private fun RegisteredClient.withCurrentScopes(): RegisteredClient =
+        if (scopes.containsAll(McpScopes.ALL)) this
+        else RegisteredClient.from(this).scopes { it.addAll(McpScopes.ALL) }.build()
 
     /** The document's client, or null when it isn't one we can trust (logged, never thrown). */
     private fun parse(clientId: String, body: String, existingId: String?): RegisteredClient? {

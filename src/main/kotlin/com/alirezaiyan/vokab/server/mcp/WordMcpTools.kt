@@ -148,6 +148,28 @@ class WordMcpTools(
         return TaggedWords(tagged = tagged)
     }
 
+    @McpTool(
+        name = "delete_words",
+        description = "Permanently delete some of the learner's words, with their review progress, on all " +
+            "their devices. Ids that aren't the learner's are ignored. Confirm with the learner first. " +
+            "Get word ids from search_words or get_due_words.",
+        title = "Delete Lexicon words",
+        annotations = McpTool.McpAnnotations(
+            readOnlyHint = false, destructiveHint = true, idempotentHint = true, openWorldHint = false,
+        ),
+        generateOutputSchema = true,
+    )
+    fun deleteWords(
+        context: McpTransportContext,
+        @McpToolParam(description = "Ids of the words to delete, at most $MAX_BATCH") wordIds: List<Long>,
+    ): DeletedWordIds {
+        val userId = context.userIdWithScope(McpScopes.WORDS_DELETE)
+        require(wordIds.isNotEmpty() && wordIds.size <= MAX_BATCH) { "Send between 1 and $MAX_BATCH word ids" }
+        val deleted = wordService.deleteOwned(userId, wordIds)
+        if (deleted.isNotEmpty()) auditLog.logMcpWrite(userId, context.clientId(), "delete_words", deleted)
+        return DeletedWordIds(deleted = deleted, notFound = wordIds.distinct() - deleted.toSet())
+    }
+
     private fun WordInput.toNewWord(): NewWord {
         require(word.isNotBlank() && word.length <= MAX_TEXT) { "Each word needs 1-$MAX_TEXT characters" }
         require(translation.isNotBlank() && translation.length <= MAX_TEXT) {
@@ -242,6 +264,7 @@ class WordMcpTools(
     data class AddedWord(val id: Long, val word: String, val translation: String)
     data class AddedWords(val added: List<AddedWord>, val skipped: List<String>)
     data class TaggedWords(val tagged: Int)
+    data class DeletedWordIds(val deleted: List<Long>, val notFound: List<Long>)
 
     private companion object {
         const val DEFAULT_LIMIT = 25

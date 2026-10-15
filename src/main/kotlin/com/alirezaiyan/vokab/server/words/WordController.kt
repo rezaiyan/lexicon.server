@@ -23,6 +23,19 @@ class WordController(
         return ResponseEntity.ok(ApiResponse(success = true, data = words))
     }
 
+    /**
+     * Ids of the caller's words deleted after [since] (epoch ms). The list above only returns words
+     * that still exist, so a device syncing with `updatedAfter` calls this to drop deleted ones.
+     */
+    @GetMapping("/deleted")
+    fun deleted(
+        @AuthenticationPrincipal user: AuthUser,
+        @RequestParam since: Long,
+    ): ResponseEntity<ApiResponse<List<Long>>> {
+        val ids = wordService.deletedSince(user.id, Instant.ofEpochMilli(since))
+        return ResponseEntity.ok(ApiResponse(success = true, data = ids))
+    }
+
     @PostMapping
     fun upsert(
         @AuthenticationPrincipal user: AuthUser,

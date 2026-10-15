@@ -105,7 +105,7 @@ class McpOAuthFlowTest {
             .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
                 org.hamcrest.Matchers.containsString("resource_metadata=\"$ISSUER/.well-known/oauth-protected-resource/mcp\"")))
             .andExpect(header().string(HttpHeaders.WWW_AUTHENTICATE,
-                org.hamcrest.Matchers.containsString("scope=\"progress:read words:read words:write\"")))
+                org.hamcrest.Matchers.containsString("scope=\"progress:read words:delete words:read words:write\"")))
     }
 
     @Test
@@ -266,6 +266,22 @@ class McpOAuthFlowTest {
         assertTrue("Test MCP client" in page.contentAsString)
         assertTrue("client.example.com" in page.contentAsString)
         assertTrue(requireNotNull(page.getHeader("Content-Security-Policy")).contains("frame-ancestors 'none'"))
+    }
+
+    @Test
+    fun `deleting words is offered unticked, everything else ticked`() {
+        val clientId = registerClient("none")["client_id"].asText()
+        val session = signedInSession()
+
+        val toConsent = mockMvc.perform(
+            authorizeRequest(clientId, scope = "words:read words:delete").session(session).accept(MediaType.TEXT_HTML)
+        ).andReturn().response
+        val page = mockMvc.perform(get(java.net.URI(requireNotNull(toConsent.redirectedUrl))).session(session))
+            .andReturn().response.contentAsString
+
+        assertTrue("""value="words:read" checked>""" in page, page)
+        assertTrue("""value="words:delete">""" in page, page)
+        assertTrue("Delete words" in page)
     }
 
     @Test

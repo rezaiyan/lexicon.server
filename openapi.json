@@ -591,6 +591,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListLong" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListMasteredWordResponse" : {
         "properties" : {
           "code" : {
@@ -7766,6 +7788,33 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseBatchUpdateLanguagesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/deleted" : {
+      "get" : {
+        "operationId" : "deleted",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "since",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListLong"
                 }
               }
             },

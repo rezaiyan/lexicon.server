@@ -35,6 +35,7 @@ class WordTagChangeSyncTest {
     @Autowired lateinit var wordUpsertPreparer: WordUpsertPreparer
     @Autowired lateinit var testUserHelper: TestUserHelper
     @Autowired lateinit var entityManager: EntityManager
+    @Autowired lateinit var deletedWords: DeletedWords
 
     private lateinit var user: User
     private val clock = MutableClock()
@@ -54,7 +55,7 @@ class WordTagChangeSyncTest {
     @BeforeEach
     fun setUp() {
         clock.set(TEST_NOW)
-        wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock)
+        wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock, deletedWords)
         tagService = TagService(tagRepository, userRepository, clock)
     }
 

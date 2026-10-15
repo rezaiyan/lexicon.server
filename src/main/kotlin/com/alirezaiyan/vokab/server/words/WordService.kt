@@ -14,6 +14,7 @@ class WordService(
     private val wordUpsertPreparer: WordUpsertPreparer,
     private val userRepository: UserRepository,
     private val clock: Clock,
+    private val deletedWords: DeletedWords,
 ) {
     @Transactional(readOnly = true)
     fun list(userId: Long): List<WordDto> = list(userId, null)
@@ -134,13 +135,26 @@ class WordService(
     fun delete(userId: Long, id: Long) {
         val deleted = wordRepository.deleteByIdAndUserId(id, userId)
         require(deleted == 1) { "Word not found" }
+        deletedWords.record(userId, listOf(id))
+    }
+
+    /** Deletes those of [ids] the user owns and returns their ids; the rest are ignored. */
+    @Transactional
+    fun deleteOwned(userId: Long, ids: Collection<Long>): List<Long> {
+        if (ids.isEmpty()) return emptyList()
+        val owned = wordRepository.findOwnedIds(ids.distinct(), userId)
+        if (owned.isEmpty()) return emptyList()
+        wordRepository.deleteAllByIdInAndUserId(owned, userId)
+        deletedWords.record(userId, owned)
+        return owned
     }
 
     @Transactional
-    fun batchDelete(userId: Long, ids: List<Long>): Int {
-        if (ids.isEmpty()) return 0
-        return wordRepository.deleteAllByIdInAndUserId(ids, userId)
-    }
+    fun batchDelete(userId: Long, ids: List<Long>): Int = deleteOwned(userId, ids).size
+
+    /** Ids of the user's words deleted after [since], so a device can drop them too. */
+    @Transactional(readOnly = true)
+    fun deletedSince(userId: Long, since: Instant): List<Long> = deletedWords.since(userId, since)
 
     @Transactional
     fun batchUpdateLanguages(

@@ -5,8 +5,12 @@ object McpScopes {
     const val WORDS_READ = "words:read"
     const val WORDS_WRITE = "words:write"
     const val PROGRESS_READ = "progress:read"
+    const val WORDS_DELETE = "words:delete"
 
-    val ALL = setOf(WORDS_READ, WORDS_WRITE, PROGRESS_READ)
+    val ALL = setOf(WORDS_READ, WORDS_WRITE, PROGRESS_READ, WORDS_DELETE)
+
+    /** Destructive, so never pre-ticked on the consent screen: the learner opts in. */
+    val OPT_IN = setOf(WORDS_DELETE)
 
     /**
      * The scope each tool needs. `/mcp` checks it before the call reaches the tool, so a client
@@ -18,6 +22,7 @@ object McpScopes {
         "get_due_words" to WORDS_READ,
         "add_words" to WORDS_WRITE,
         "tag_words" to WORDS_WRITE,
+        "delete_words" to WORDS_DELETE,
         "get_difficult_words" to PROGRESS_READ,
         "get_weekly_report" to PROGRESS_READ,
     )

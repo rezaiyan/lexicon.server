@@ -33,7 +33,8 @@ class WordMcpTools(
     @McpTool(
         name = "search_words",
         description = "Search the learner's saved vocabulary. Matches the word or its translation " +
-            "(case-insensitive). Optionally narrow by the language being learned (code, e.g. \"de\") or a tag name.",
+            "(case-insensitive). Optionally narrow by the language being learned (code, e.g. \"de\") or a tag name. " +
+            "Results come in pages: when nextCursor is present, call again with cursor set to it for the rest.",
         title = "Search my Lexicon words",
         annotations = McpTool.McpAnnotations(readOnlyHint = true, destructiveHint = false, openWorldHint = false),
         generateOutputSchema = true,
@@ -46,16 +47,26 @@ class WordMcpTools(
         language: String?,
         @McpToolParam(description = "Only words with this tag name", required = false)
         tag: String?,
-        @McpToolParam(description = "Max results, 1-$MAX_LIMIT (default $DEFAULT_LIMIT)", required = false)
+        @McpToolParam(description = "Max results per page, 1-$MAX_LIMIT (default $DEFAULT_LIMIT)", required = false)
         limit: Int?,
+        @McpToolParam(
+            description = "true for the most recently saved words first (default oldest first)",
+            required = false,
+        )
+        newestFirst: Boolean?,
+        @McpToolParam(
+            description = "nextCursor from the previous result, to get the next page (same other arguments)",
+            required = false,
+        )
+        cursor: Long?,
     ): WordList {
         val userId = context.userIdWithScope(McpScopes.WORDS_READ)
         val tagId = tag?.takeIf { it.isNotBlank() }?.let { name ->
             tagService.list(userId).firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }?.id
-                ?: return WordList(emptyList())
+                ?: return WordList(emptyList(), nextCursor = null)
         }
-        val words = wordService.search(userId, query, language, tagId, limit.clamped()).map { it.toResult() }
-        return WordList(words)
+        val page = wordService.search(userId, query, language, tagId, limit.clamped(), cursor, newestFirst == true)
+        return WordList(page.words.map { it.toResult() }, page.nextCursor)
     }
 
     @McpTool(
@@ -218,7 +229,13 @@ class WordMcpTools(
         val note: String?,
     )
 
-    data class WordList(val words: List<WordResult>)
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    data class WordList(
+        val words: List<WordResult>,
+        /** Present when more words match: pass it back as `cursor` for the next page. */
+        @field:JsonProperty(required = false)
+        val nextCursor: Long?,
+    )
     data class TagResult(val id: Long, val name: String, val wordCount: Long)
     data class TagList(val tags: List<TagResult>)
     data class DueWords(val dueCount: Int, val words: List<WordResult>)

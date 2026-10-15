@@ -170,6 +170,21 @@ class McpServerIntegrationTest {
     }
 
     @Test
+    fun `search_words pages through every match with a cursor, oldest or newest first`() {
+        val first = toolResult("search_words", mapOf("limit" to 2))
+        val rest = toolResult("search_words", mapOf("limit" to 2, "cursor" to first["nextCursor"].asLong()))
+        val newest = toolResult("search_words", mapOf("limit" to 1, "newestFirst" to true))
+        val older = toolResult("search_words", mapOf("limit" to 2, "newestFirst" to true, "cursor" to newest["nextCursor"].asLong()))
+
+        assertEquals(listOf("Apfel", "Birne"), first["words"].map { it["word"].asText() })
+        assertEquals(listOf("manzana"), rest["words"].map { it["word"].asText() })
+        assertFalse(rest.has("nextCursor"), "last page has no cursor")
+        assertEquals(listOf("manzana"), newest["words"].map { it["word"].asText() })
+        assertEquals(listOf("Birne", "Apfel"), older["words"].map { it["word"].asText() })
+        assertFalse(older.has("nextCursor"))
+    }
+
+    @Test
     fun `search_words treats wildcards in the query literally and honours the limit`() {
         wordRepository.save(word(learner, "100% sicher", "100% sure", "de"))
 

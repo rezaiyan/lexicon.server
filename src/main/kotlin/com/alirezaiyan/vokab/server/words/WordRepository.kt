@@ -26,15 +26,28 @@ interface WordRepository : JpaRepository<Word, Long> {
         """
         SELECT w.id FROM Word w
         WHERE w.user.id = :userId
-          AND (:pattern = '%'
-               OR LOWER(w.originalWord) LIKE :pattern ESCAPE '#'
-               OR LOWER(w.translation) LIKE :pattern ESCAPE '#')
-          AND (:language = '' OR LOWER(w.targetLanguage) = :language)
-          AND (:tagId = 0 OR EXISTS (SELECT 1 FROM w.tags t WHERE t.id = :tagId))
+          AND w.id > :afterId
+          AND $SEARCH_FILTER
         ORDER BY w.id
         """
     )
-    fun searchIds(userId: Long, pattern: String, language: String, tagId: Long, page: Pageable): List<Long>
+    fun searchIds(
+        userId: Long, pattern: String, language: String, tagId: Long, afterId: Long, page: Pageable,
+    ): List<Long>
+
+    /** [searchIds], newest first; [beforeId] 0 starts from the newest. */
+    @Query(
+        """
+        SELECT w.id FROM Word w
+        WHERE w.user.id = :userId
+          AND (:beforeId = 0 OR w.id < :beforeId)
+          AND $SEARCH_FILTER
+        ORDER BY w.id DESC
+        """
+    )
+    fun searchIdsNewestFirst(
+        userId: Long, pattern: String, language: String, tagId: Long, beforeId: Long, page: Pageable,
+    ): List<Long>
 
     @Query(
         "SELECT w.id FROM Word w WHERE w.user.id = :userId AND w.nextReviewDate <= :nowMs " +
@@ -166,3 +179,10 @@ interface WordRepository : JpaRepository<Word, Long> {
     )
     fun insertWordTagsBulkByWordIdsAndUserId(wordIds: List<Long>, tagIds: List<Long>, userId: Long)
 }
+
+/** Shared WHERE clause of the word searches (JPQL); empty pattern/language and tag 0 mean "any". */
+private const val SEARCH_FILTER = """(:pattern = '%'
+               OR LOWER(w.originalWord) LIKE :pattern ESCAPE '#'
+               OR LOWER(w.translation) LIKE :pattern ESCAPE '#')
+          AND (:language = '' OR LOWER(w.targetLanguage) = :language)
+          AND (:tagId = 0 OR EXISTS (SELECT 1 FROM w.tags t WHERE t.id = :tagId))"""

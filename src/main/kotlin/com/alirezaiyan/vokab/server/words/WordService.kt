@@ -44,17 +44,34 @@ class WordService(
      * in learning language [language] and with tag [tagId]; at most [limit], filtered in the database.
      */
     @Transactional(readOnly = true)
-    fun search(userId: Long, query: String?, language: String?, tagId: Long?, limit: Int): List<WordDto> {
+    /** One page of a search plus where the next page starts, null on the last page. */
+    data class SearchPage(val words: List<WordDto>, val nextCursor: Long?)
+
+    /**
+     * Words matching [query] (word or translation), [language] and [tagId], [limit] at a time in id
+     * order. [cursor] is the previous page's [SearchPage.nextCursor]; ids only ever grow, so pages
+     * stay stable while words are added.
+     */
+    fun search(
+        userId: Long,
+        query: String?,
+        language: String?,
+        tagId: Long?,
+        limit: Int,
+        cursor: Long? = null,
+        newestFirst: Boolean = false,
+    ): SearchPage {
         val needle = query?.trim()?.lowercase().orEmpty()
         val pattern = "%" + needle.replace("#", "##").replace("%", "#%").replace("_", "#_") + "%"
-        val ids = wordRepository.searchIds(
-            userId = userId,
-            pattern = pattern,
-            language = language?.trim()?.lowercase().orEmpty(),
-            tagId = tagId ?: 0L,
-            page = PageRequest.of(0, limit),
-        )
-        return loadInOrder(ids)
+        val lang = language?.trim()?.lowercase().orEmpty()
+        val page = PageRequest.of(0, limit + 1)
+        val ids = if (newestFirst) {
+            wordRepository.searchIdsNewestFirst(userId, pattern, lang, tagId ?: 0L, cursor ?: 0L, page)
+        } else {
+            wordRepository.searchIds(userId, pattern, lang, tagId ?: 0L, cursor ?: 0L, page)
+        }
+        val pageIds = ids.take(limit)
+        return SearchPage(loadInOrder(pageIds), nextCursor = pageIds.lastOrNull()?.takeIf { ids.size > limit })
     }
 
     private fun loadInOrder(ids: List<Long>): List<WordDto> {

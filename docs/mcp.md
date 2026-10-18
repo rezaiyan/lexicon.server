@@ -20,8 +20,9 @@ These are product rules, not style preferences. Breaking one is a bug.
 2. **No plan gating, no per-user quotas.** Only features that cost us AI money are restricted. The only limits are
    sanity caps (100 words per call, field lengths) and an abuse ceiling of 300 calls/min per learner and app.
 3. **Never record reviews or change levels.** A chat quiz is not a review. Only the app moves words through the SRS.
-4. **No delete tool yet.** The server hard-deletes and deletions don't sync across devices, so a word deleted over
-   MCP would come back from another device.
+4. **Deleting words leaves a tombstone.** `WordService.delete`/`deleteOwned` record every deleted id in
+   `deleted_words`; devices fetch them from `GET /api/v1/words/deleted?since=` on each sync and drop those words.
+   Delete words only through `WordService`, or other devices keep them. `delete_words` needs its own opt-in scope.
 5. **`add_words` never goes through `WordService.upsert`.** Upserting a word that already exists resets its SRS
    progress. Use `WordAdditionService`.
 
@@ -78,6 +79,7 @@ and `McpRegisteredClients.kt`):
 | `resource` (RFC 8707) | `McpResourceParameter`: must be `<issuer>/mcp` on authorize and token requests, else `invalid_target`. |
 | `iss` in the authorization response (RFC 9207) | `McpAuthorizationResponses`. |
 | `client_id` claim (RFC 9068) | Token customizer; used by the rate limit and the audit log. |
+| Connection pool safety | SAS's JDBC authorization/consent services look up the client while reading a row (a second connection inside the first). `TransactionalAuthorizationService`/`...ConsentService` run each call in one transaction so the lookup reuses it. Without this, concurrent `/mcp` calls deadlocked the pool and froze production (2026-10-15); `McpConcurrentCallsTest` guards it. |
 | Consent | Our own page (`McpConsentPage`): app name, where it returns to, who publishes it, one checkbox per scope. No JavaScript, strict CSP. |
 
 Sign-in (`/oauth/login`) is Google via the Firebase JS SDK and only accepts existing Lexicon accounts. Apple-only
@@ -90,8 +92,15 @@ accounts can't connect yet.
 | `words:read` | See your words and tags | `search_words`, `list_tags`, `get_due_words` |
 | `words:write` | Add words and tags | `add_words`, `tag_words` |
 | `progress:read` | See your study progress | `get_difficult_words`, `get_weekly_report` |
+| `words:delete` | Delete words (unticked by default) | `delete_words` |
 
-`add_words` and `tag_words` write an `MCP_WRITE` row to the audit log (user, client id, tool, word ids only).
+`add_words`, `tag_words` and `delete_words` write an `MCP_WRITE` row to the audit log (user, client id, tool,
+word ids only). Scopes are server-defined: `McpRegisteredClientRepository` gives every stored client the current
+`McpScopes.ALL`, so apps registered before a scope existed can still ask for it. `McpScopes.OPT_IN` scopes start
+unticked on the consent screen.
+
+`search_words` pages with a keyset cursor on word id: results carry `nextCursor` while more match;
+`newestFirst=true` lists the latest saved words first.
 
 ### Adding a tool
 

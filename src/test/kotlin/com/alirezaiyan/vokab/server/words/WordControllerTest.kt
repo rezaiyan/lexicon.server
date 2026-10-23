@@ -131,6 +131,32 @@ class WordControllerTest {
             .andExpect(jsonPath("$.success").value(false))
     }
 
+    @Test
+    fun `POST words should return 400 when a word's description is too long`() {
+        val word = createWordDto(description = "x".repeat(MAX_WORD_DESCRIPTION_LENGTH + 1))
+
+        mockMvc.perform(
+            post("/api/v1/words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(UpsertWordsRequest(words = listOf(word))))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST words should return 400 when a language code is longer than the column`() {
+        val word = createWordDto(targetLanguage = "x".repeat(MAX_LANGUAGE_CODE_LENGTH + 1))
+
+        mockMvc.perform(
+            post("/api/v1/words")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(UpsertWordsRequest(words = listOf(word))))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
     // ── PATCH /api/v1/words/{id} ──────────────────────────────────────────────
 
     @Test

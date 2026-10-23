@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.listening
 
 import jakarta.validation.Valid
+import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
@@ -16,16 +17,21 @@ data class SyncListeningRequest(
 
 data class SyncListeningSessionRequest(
     @field:NotBlank
+    @field:Size(max = 128)
     val clientSessionId: String,
     /** due | all | level | tag */
     @field:NotBlank
+    @field:Size(max = 32)
     val source: String,
     /** Stage name for `level`, tag id for `tag`; null otherwise. */
+    @field:Size(max = 128)
     val sourceDetail: String? = null,
     /** word_first | translation_first */
     @field:NotBlank
+    @field:Size(max = 32)
     val order: String,
     @field:Min(1)
+    @field:Max(100)
     val repeatCount: Int,
     @field:Min(0)
     val pauseMs: Long,
@@ -56,8 +62,10 @@ data class SyncListeningSessionRequest(
 data class SyncListeningWordRequest(
     val wordId: Long,
     @field:NotBlank
+    @field:Size(max = 20)
     val sourceLanguage: String,
     @field:NotBlank
+    @field:Size(max = 20)
     val targetLanguage: String,
     val heardAt: Long,
 )

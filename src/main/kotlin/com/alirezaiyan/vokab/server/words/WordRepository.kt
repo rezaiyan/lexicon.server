@@ -176,6 +176,7 @@ interface WordRepository : JpaRepository<Word, Long> {
         WHERE w.id IN :wordIds
           AND w.user_id = :userId
           AND t.id IN :tagIds
+          AND t.user_id = :userId
         ON CONFLICT DO NOTHING
         """,
         nativeQuery = true

@@ -150,6 +150,20 @@ class LeaderboardServiceTest {
         assertEquals(alias1, alias2)
     }
 
+    @Test
+    fun `alias generator does not expose the user id in the suffix`() {
+        val alias = aliasGenerator.generate(4242L)
+
+        assertFalse(alias.endsWith("4242"))
+    }
+
+    @Test
+    fun `alias generator keeps the adjective noun and four digit format`() {
+        val alias = aliasGenerator.generate(Long.MIN_VALUE)
+
+        assertTrue(Regex("^[A-Z][a-z]+[A-Z][a-z]+\\d{4}$").matches(alias))
+    }
+
     private fun createUser(
         id: Long,
         currentStreak: Int,

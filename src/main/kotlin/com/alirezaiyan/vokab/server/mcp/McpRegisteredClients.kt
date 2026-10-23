@@ -83,6 +83,7 @@ internal class McpRegisteredClientRepository(
     private val objectMapper: ObjectMapper,
     private val clock: Clock,
     private val refreshAfter: Duration = Duration.ofHours(DEFAULT_REFRESH_HOURS),
+    private val failureBackoff: Duration = Duration.ofMinutes(DEFAULT_FAILURE_BACKOFF_MINUTES),
 ) : RegisteredClientRepository {
 
     override fun save(registeredClient: RegisteredClient) = stored.save(registeredClient)
@@ -93,11 +94,33 @@ internal class McpRegisteredClientRepository(
         val url = metadataDocumentUrl(clientId) ?: return stored.findByClientId(clientId)?.withCurrentScopes()
         val known = stored.findByClientId(clientId)?.withCurrentScopes()
         val fresh = known?.clientIdIssuedAt?.isAfter(Instant.now(clock).minus(refreshAfter)) == true
-        if (known != null && fresh) return known
+        if ((known != null && fresh) || recentlyFailed(clientId)) return known
         val fetched = fetcher.fetch(url)?.let { parse(clientId, it, known?.id) }
-        if (fetched == null) return known
-        stored.save(fetched)
-        return fetched
+        if (fetched == null) {
+            rememberFailure(clientId)
+        } else {
+            synchronized(failedFetches) { failedFetches.remove(clientId) }
+            stored.save(fetched)
+        }
+        return fetched ?: known
+    }
+
+    /**
+     * Client ids whose document couldn't be fetched or was refused, and when. SAS looks a client up
+     * several times per request, and anyone can send any client_id, so a failure is remembered for
+     * [failureBackoff] instead of fetching again on every lookup. Bounded: oldest entries go first.
+     */
+    private val failedFetches = object : LinkedHashMap<String, Instant>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Instant>?) = size > MAX_FAILED_FETCHES
+    }
+
+    private fun recentlyFailed(clientId: String): Boolean = synchronized(failedFetches) {
+        val failedAt = failedFetches[clientId] ?: return false
+        Instant.now(clock).isBefore(failedAt.plus(failureBackoff))
+    }
+
+    private fun rememberFailure(clientId: String) = synchronized(failedFetches) {
+        failedFetches[clientId] = Instant.now(clock)
     }
 
     /**
@@ -158,16 +181,21 @@ internal class McpRegisteredClientRepository(
         const val MAX_CLIENT_NAME = 100
         const val MAX_URL_LENGTH = 1000
         const val DEFAULT_REFRESH_HOURS = 24L
+        const val DEFAULT_FAILURE_BACKOFF_MINUTES = 10L
+        const val MAX_FAILED_FETCHES = 1000
+        const val HTTPS_PORT = 443
 
         /**
-         * The URL when [clientId] is a valid metadata-document client id: https, a host, a path
-         * other than "/", no fragment, user info, query, or dot segments.
+         * The URL when [clientId] is a valid metadata-document client id: https on the default port,
+         * a host, a path other than "/", no fragment, user info, query, or dot segments.
          */
         fun metadataDocumentUrl(clientId: String): URI? {
             if (!clientId.startsWith("https://") || clientId.length > MAX_URL_LENGTH) return null
             val uri = runCatching { URI(clientId) }.getOrNull() ?: return null
             val path = uri.rawPath.orEmpty()
-            val valid = !uri.host.isNullOrEmpty() && uri.rawUserInfo == null && uri.rawFragment == null &&
+            val defaultPort = uri.port == -1 || uri.port == HTTPS_PORT
+            val valid = !uri.host.isNullOrEmpty() && defaultPort &&
+                uri.rawUserInfo == null && uri.rawFragment == null &&
                 uri.rawQuery == null && path.length > 1 &&
                 path.split('/').none { it == "." || it == ".." }
             return if (valid) uri else null

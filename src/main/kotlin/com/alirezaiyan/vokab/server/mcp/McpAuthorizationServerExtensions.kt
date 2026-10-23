@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.mcp
 
+import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -15,6 +16,7 @@ import org.springframework.security.oauth2.core.OAuth2ErrorCodes
 import org.springframework.security.oauth2.core.OAuth2RefreshToken
 import org.springframework.security.oauth2.core.endpoint.OAuth2ParameterNames
 import org.springframework.security.oauth2.core.endpoint.PkceParameterNames
+import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
 import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationContext
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationException
@@ -35,6 +37,8 @@ import java.time.Clock
 import java.time.Instant
 import java.util.Base64
 import java.util.function.Consumer
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * SAS's checks on an authorization request, except for the redirect URI. SAS matches redirect URIs
@@ -249,7 +253,11 @@ internal class PublicClientRefreshAuthentication(private val clients: Registered
     }
 }
 
-/** SAS's refresh token generator minus its "no refresh tokens for public clients" rule. */
+/**
+ * SAS's refresh token generator minus its "no refresh tokens for public clients" rule. Each token
+ * also names the authorization it belongs to (`<random>.<authorization id>`), so a superseded token
+ * can be traced back to its authorization once it has rotated away; see [McpRefreshTokenReuseDetection].
+ */
 internal class McpRefreshTokenGenerator(private val clock: Clock) : OAuth2TokenGenerator<OAuth2RefreshToken> {
     private val keys = Base64StringKeyGenerator(Base64.getUrlEncoder().withoutPadding(), TOKEN_BYTES)
 
@@ -257,10 +265,55 @@ internal class McpRefreshTokenGenerator(private val clock: Clock) : OAuth2TokenG
         if (context.tokenType != OAuth2TokenType.REFRESH_TOKEN) return null
         val now = Instant.now(clock)
         val ttl = context.registeredClient.tokenSettings.refreshTokenTimeToLive
-        return OAuth2RefreshToken(keys.generateKey(), now, now.plus(ttl))
+        val family = context.authorization?.id?.let { "$FAMILY_SEPARATOR$it" }.orEmpty()
+        return OAuth2RefreshToken(keys.generateKey() + family, now, now.plus(ttl))
     }
 
-    private companion object {
+    internal companion object {
         const val TOKEN_BYTES = 96
+
+        /** Never part of the base64url random part. */
+        const val FAMILY_SEPARATOR = "."
+
+        /** The authorization id a token generated here carries, or null (older tokens carry none). */
+        fun authorizationIdOf(token: String): String? =
+            token.substringAfterLast(FAMILY_SEPARATOR, "").takeIf { it.isNotBlank() }
+    }
+}
+
+/**
+ * Refresh token reuse detection (OAuth 2.1 section 4.3.1 / RFC 9700 4.14.2). Refresh tokens rotate,
+ * so a token that is no longer current but belongs to a live authorization was already used once:
+ * either the client or someone who stole it is replaying it, and we can't tell which. The whole
+ * authorization (its access and refresh tokens) is revoked, so the thief's copy dies too; the
+ * learner reconnects the app. SAS still answers the request itself with `invalid_grant`.
+ *
+ * Only an authorization id taken from the presented token is acted on. That id appears nowhere but
+ * in the refresh tokens issued to that authorization, so only a holder of one can trigger it.
+ */
+internal class McpRefreshTokenReuseDetection(
+    private val authorizations: OAuth2AuthorizationService,
+    private val tokenPath: String,
+) : OncePerRequestFilter() {
+
+    override fun shouldNotFilter(request: HttpServletRequest) =
+        request.method != "POST" || request.requestURI.removePrefix(request.contextPath) != tokenPath ||
+            request.getParameter(OAuth2ParameterNames.GRANT_TYPE) != AuthorizationGrantType.REFRESH_TOKEN.value
+
+    override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
+        request.getParameter(OAuth2ParameterNames.REFRESH_TOKEN)?.let(::revokeIfSuperseded)
+        chain.doFilter(request, response)
+    }
+
+    internal fun revokeIfSuperseded(token: String) {
+        if (authorizations.findByToken(token, OAuth2TokenType.REFRESH_TOKEN) != null) return
+        val authorizationId = McpRefreshTokenGenerator.authorizationIdOf(token) ?: return
+        val authorization = authorizations.findById(authorizationId) ?: return
+        if (authorization.refreshToken?.token?.tokenValue == token) return
+        authorizations.remove(authorization)
+        logger.warn {
+            "MCP refresh token reuse: revoked authorization $authorizationId " +
+                "(client ${authorization.registeredClientId}, user ${authorization.principalName})"
+        }
     }
 }

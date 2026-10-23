@@ -22,6 +22,7 @@ class SubscriptionService(
     private val processedWebhookEventRepository: ProcessedWebhookEventRepository,
     private val revenueCatClient: RevenueCatClient,
     private val clock: Clock,
+    private val revenueCatPolicy: RevenueCatPolicyProperties = RevenueCatPolicyProperties(),
 ) {
 
     /**
@@ -38,6 +39,11 @@ class SubscriptionService(
         logger.info { "Processing RevenueCat webhook: type=${event.type}, env=${event.environment}" }
 
         if (event.type == "TEST") return
+        if (event.isSandbox && !revenueCatPolicy.allowSandbox) {
+            // Acknowledged (2xx) so RevenueCat stops retrying, but a test-store purchase grants nothing
+            logger.warn { "Ignoring SANDBOX RevenueCat event type=${event.type} (app.revenuecat.allow-sandbox is off)" }
+            return
+        }
         if (processedWebhookEventRepository.existsById(event.id)) {
             logger.info { "Skipping already processed RevenueCat event ${event.id}" }
             return

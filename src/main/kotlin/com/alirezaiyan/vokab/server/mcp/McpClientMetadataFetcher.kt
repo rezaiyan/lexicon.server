@@ -17,6 +17,8 @@ import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
 import java.net.UnknownHostException
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
 
@@ -27,10 +29,13 @@ fun interface McpClientMetadataFetcher {
 }
 
 /**
- * Fetching a URL a stranger chose is an SSRF risk, so: https only, no redirects, short timeouts,
- * a small body cap, and a DNS resolver that refuses names resolving to private, loopback,
- * link-local (cloud metadata) or other non-public addresses. The connection uses the addresses
- * that resolver approved, so a name can't be rebound between the check and the request.
+ * Fetching a URL a stranger chose is an SSRF risk, so: https on the default port only, no
+ * redirects, short timeouts, a small body cap, and a DNS resolver that refuses names resolving to
+ * private, loopback, link-local (cloud metadata) or other non-public addresses. The connection uses
+ * the addresses that resolver approved, so a name can't be rebound between the check and the request.
+ *
+ * It is also a DoS risk (a slow server could hold the pool), so every fetch has a hard total
+ * deadline after which the request is aborted, and waiting for a pooled connection is short.
  */
 @Component
 @ConditionalOnProperty("spring.ai.mcp.server.enabled", havingValue = "true")
@@ -51,6 +56,7 @@ class HttpMcpClientMetadataFetcher : McpClientMetadataFetcher {
         .setDefaultRequestConfig(
             RequestConfig.custom()
                 .setResponseTimeout(Timeout.ofSeconds(READ_SECONDS))
+                .setConnectionRequestTimeout(Timeout.ofSeconds(POOL_WAIT_SECONDS))
                 .setRedirectsEnabled(false)
                 .build()
         )
@@ -60,9 +66,11 @@ class HttpMcpClientMetadataFetcher : McpClientMetadataFetcher {
         .build()
 
     override fun fetch(url: URI): String? {
-        if (url.scheme != "https") return null
+        if (url.scheme != "https" || (url.port != -1 && url.port != HTTPS_PORT)) return null
+        val request = HttpGet(url).apply { setHeader(HttpHeaders.ACCEPT, "application/json") }
+        // Per-read timeouts don't bound a server that trickles one byte every few seconds
+        val deadline = DEADLINES.schedule({ request.cancel() }, TOTAL_SECONDS, TimeUnit.SECONDS)
         return runCatching {
-            val request = HttpGet(url).apply { setHeader(HttpHeaders.ACCEPT, "application/json") }
             client.execute(request) { response ->
                 if (response.code != OK) {
                     null
@@ -72,6 +80,7 @@ class HttpMcpClientMetadataFetcher : McpClientMetadataFetcher {
                 }
             }
         }.onFailure { logger.info { "Client metadata fetch failed for ${url.host}: ${it.javaClass.simpleName}" } }
+            .also { deadline.cancel(false) }
             .getOrNull()
     }
 
@@ -91,6 +100,14 @@ class HttpMcpClientMetadataFetcher : McpClientMetadataFetcher {
         const val OK = 200
         const val CONNECT_SECONDS = 3L
         const val READ_SECONDS = 5L
+        const val TOTAL_SECONDS = 5L
+        const val POOL_WAIT_SECONDS = 1L
+        const val HTTPS_PORT = 443
+
+        /** Aborts fetches that overrun [TOTAL_SECONDS]; one daemon thread is plenty. */
+        private val DEADLINES = Executors.newSingleThreadScheduledExecutor { task ->
+            Thread(task, "mcp-metadata-deadline").apply { isDaemon = true }
+        }
 
         /** True only for globally routable unicast addresses. Uses InetAddress's own classification. */
         fun isPublic(address: InetAddress): Boolean {
@@ -118,8 +135,21 @@ class HttpMcpClientMetadataFetcher : McpClientMetadataFetcher {
         private fun isReservedIpv6(b: ByteArray): Boolean {
             val first = b[0].toInt() and 0xFF
             val mappedOrCompatible = b.copyOfRange(0, 10).all { it.toInt() == 0 }
+            val second = b[1].toInt() and 0xFF
             return (first and 0xFE) == 0xFC || // unique local fc00::/7
-                mappedOrCompatible // ::ffff:a.b.c.d and friends: judged as IPv4 only, never via IPv6
+                mappedOrCompatible || // ::ffff:a.b.c.d and friends: judged as IPv4 only, never via IPv6
+                // IPv4 embedded in IPv6 reaches an IPv4 address we never vetted:
+                (startsWith(b, NAT64_WELL_KNOWN) && b.copyOfRange(4, 12).all { it.toInt() == 0 }) || // 64:ff9b::/96
+                startsWith(b, NAT64_LOCAL) || // 64:ff9b:1::/48
+                (first == 0x20 && second == 0x02) || // 6to4 2002::/16
+                startsWith(b, TEREDO) // Teredo 2001::/32
         }
+
+        private fun startsWith(bytes: ByteArray, prefix: IntArray): Boolean =
+            prefix.indices.all { (bytes[it].toInt() and 0xFF) == prefix[it] }
+
+        private val NAT64_WELL_KNOWN = intArrayOf(0x00, 0x64, 0xFF, 0x9B)
+        private val NAT64_LOCAL = intArrayOf(0x00, 0x64, 0xFF, 0x9B, 0x00, 0x01)
+        private val TEREDO = intArrayOf(0x20, 0x01, 0x00, 0x00)
     }
 }

@@ -24,15 +24,33 @@ class PushTokenService(
         userRepository.findById(userId)
             .orElseThrow { IllegalArgumentException("User not found") }
 
-        pushTokenRepository.insertTokenIfAbsent(userId, token, platform.name, deviceId)
+        if (pushTokenRepository.insertTokenIfAbsent(userId, token, platform.name, deviceId) == 0) {
+            // A device token is unique to one app install, so a token already on file for another
+            // account means the device switched accounts: it must move, or the previous account's
+            // pushes would keep landing on a device now signed in as someone else. Tokens are
+            // high-entropy and never returned by the API, so holding one implies holding the device.
+            val previousOwner = pushTokenRepository.findByToken(token).map { it.user.id }.orElse(null)
+            if (previousOwner != null && previousOwner != userId) {
+                logger.warn { "Push token moved from userId=$previousOwner to userId=$userId, platform: $platform" }
+            }
+        }
         pushTokenRepository.reassignToken(userId, token, platform.name, deviceId)
         logger.info { "Push token registered for user: $userId, platform: $platform" }
     }
 
+    /** FCM/APNs reported [token] as no longer registered; whoever owns it, it can't receive pushes. */
     @Transactional
-    fun deactivateToken(token: String) {
-        pushTokenRepository.deactivateByToken(token)
-        logger.info { "Push token deactivated: ${token.take(20)}..." }
+    fun deactivateInvalidToken(token: String) {
+        val owner = pushTokenRepository.findByToken(token).map { it.user.id }.orElse(null) ?: return
+        pushTokenRepository.deactivateByUserIdAndToken(owner, token)
+        logger.info { "Push token deactivated after provider rejection: ${token.take(8)}..." }
+    }
+
+    /** Deactivates one of the caller's own tokens; another user's token is left alone. */
+    @Transactional
+    fun deactivateToken(userId: Long, token: String) {
+        val updated = pushTokenRepository.deactivateByUserIdAndToken(userId, token)
+        logger.info { "Push token deactivation for userId=$userId: $updated row(s)" }
     }
 
     @Transactional

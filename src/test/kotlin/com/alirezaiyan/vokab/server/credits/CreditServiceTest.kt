@@ -1,7 +1,6 @@
 package com.alirezaiyan.vokab.server.credits
 
 import com.alirezaiyan.vokab.server.MutableClock
-import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.shared.InsufficientCreditsException
 import com.alirezaiyan.vokab.server.subscription.AccessLevel
 import com.alirezaiyan.vokab.server.subscription.FeatureAccessService
@@ -171,7 +170,8 @@ class CreditServiceTest {
     }
 
     @Test
-    fun `upgrading mid-period starts a fresh period with the bigger allowance`() {
+    fun `upgrading mid-period keeps the period and tops up to the new allowance less this period's use`() {
+        val periodEnd = service.balance(userId).periodEndsAt
         service.spend(userId, CreditAction.PHOTO_EXTRACTION)
         clock.advance(Duration.ofDays(10))
         level = AccessLevel.PREMIUM
@@ -179,8 +179,25 @@ class CreditServiceTest {
         val balance = service.balance(userId)
 
         assertEquals(AccessLevel.PREMIUM, balance.tier)
-        assertEquals(300, balance.allowanceRemaining)
-        assertEquals(TEST_NOW.plus(Duration.ofDays(10)).plus(Duration.ofDays(30)), balance.periodEndsAt)
+        assertEquals(297, balance.allowanceRemaining)
+        assertEquals(periodEnd, balance.periodEndsAt)
+    }
+
+    @Test
+    fun `toggling between trial and premium within a period can't refill the allowance`() {
+        level = AccessLevel.TRIAL
+        service.balance(userId)
+        level = AccessLevel.PREMIUM
+        repeat(100) { service.spend(userId, CreditAction.PHOTO_EXTRACTION) } // 300 allowance used
+
+        repeat(3) {
+            level = AccessLevel.TRIAL
+            service.balance(userId)
+            level = AccessLevel.PREMIUM
+            service.balance(userId)
+        }
+
+        assertEquals(0, service.balance(userId).allowanceRemaining)
     }
 
     @Test
@@ -205,6 +222,11 @@ class CreditServiceTest {
 
         level = AccessLevel.PREMIUM
         assertEquals(300, service.balance(userId).allowanceRemaining)
+    }
+
+    @Test
+    fun `grantBonus rejects an amount above the cap`() {
+        assertThrows<IllegalArgumentException> { service.grantBonus(userId, 100_001, null) }
     }
 
     // ── Grants ───────────────────────────────────────────────────────────────────────────────

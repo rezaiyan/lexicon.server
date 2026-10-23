@@ -35,13 +35,44 @@ class RevenueCatClientTest {
         renewal: String = "will_renew",
         givesAccess: Boolean = true,
         endsAt: Long = periodEnd,
+        environment: String = "production",
     ) = SubscriptionDto(
         status = status,
         autoRenewalStatus = renewal,
         givesAccess = givesAccess,
         currentPeriodEndsAt = endsAt,
         productId = "prod_monthly",
+        environment = environment,
     )
+
+    @Test
+    fun `sandbox-only access is ignored when sandbox is not allowed`() {
+        val s = toEntitlementState(
+            access(), listOf(subscription(environment = "sandbox")), hasOneTimePurchases = false, allowSandbox = false,
+        )
+
+        assertFalse(s.isActive)
+        assertFalse(s.hasPurchaseHistory)
+    }
+
+    @Test
+    fun `sandbox access counts when sandbox is allowed`() {
+        val s = toEntitlementState(
+            access(), listOf(subscription(environment = "sandbox")), hasOneTimePurchases = false, allowSandbox = true,
+        )
+
+        assertTrue(s.isActive)
+    }
+
+    @Test
+    fun `a production subscription keeps access even alongside a sandbox one`() {
+        val subscriptions = listOf(subscription(environment = "sandbox"), subscription(renewal = "will_not_renew"))
+
+        val s = toEntitlementState(access(), subscriptions, hasOneTimePurchases = false, allowSandbox = false)
+
+        assertTrue(s.isActive)
+        assertTrue(s.isCanceled)
+    }
 
     private fun access(expiresAt: Long? = periodEnd) = listOf(ActiveEntitlementDto(expiresAt))
 

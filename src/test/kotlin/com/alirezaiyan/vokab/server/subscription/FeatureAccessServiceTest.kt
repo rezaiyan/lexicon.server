@@ -22,13 +22,15 @@ class FeatureAccessServiceTest {
 
     private lateinit var appProperties: AppProperties
     private lateinit var userRepository: UserRepository
+    private lateinit var subscriptionRepository: SubscriptionRepository
     private lateinit var featureAccessService: FeatureAccessService
 
     @BeforeEach
     fun setUp() {
         appProperties = mockk()
         userRepository = mockk()
-        featureAccessService = FeatureAccessService(appProperties, userRepository, clock = fixedClock())
+        subscriptionRepository = mockk { every { findByUser(any()) } returns emptyList() }
+        featureAccessService = FeatureAccessService(appProperties, userRepository, subscriptionRepository, clock = fixedClock())
     }
 
     // --- hasActivePremiumAccess ---
@@ -360,6 +362,37 @@ class FeatureAccessServiceTest {
     }
 
     @Test
+    fun `accessLevel stays TRIAL when a trial is cancelled (auto-renew turned off)`() {
+        val trialEnd = TEST_NOW.plusSeconds(86400)
+        val user = createUser(subscriptionStatus = SubscriptionStatus.CANCELLED, subscriptionExpiresAt = trialEnd)
+        every { subscriptionRepository.findByUser(user) } returns listOf(storeSubscription(user, trialEnd, isTrial = true))
+
+        assertEquals(AccessLevel.TRIAL, accessLevelOf(user))
+    }
+
+    @Test
+    fun `accessLevel is PREMIUM for a cancelled paid period that followed a trial`() {
+        val trialEnd = TEST_NOW.minusSeconds(86400)
+        val paidEnd = TEST_NOW.plusSeconds(30 * 86400L)
+        val user = createUser(subscriptionStatus = SubscriptionStatus.CANCELLED, subscriptionExpiresAt = paidEnd)
+        every { subscriptionRepository.findByUser(user) } returns listOf(
+            storeSubscription(user, trialEnd, isTrial = true, key = "old"),
+            storeSubscription(user, paidEnd, isTrial = false, key = "new"),
+        )
+
+        assertEquals(AccessLevel.PREMIUM, accessLevelOf(user))
+    }
+
+    @Test
+    fun `accessLevel is PREMIUM when a sync extended a cancelled subscription past its recorded trial`() {
+        val user = createUser(subscriptionStatus = SubscriptionStatus.CANCELLED, subscriptionExpiresAt = TEST_NOW.plusSeconds(30 * 86400L))
+        every { subscriptionRepository.findByUser(user) } returns
+            listOf(storeSubscription(user, TEST_NOW.plusSeconds(3600), isTrial = true))
+
+        assertEquals(AccessLevel.PREMIUM, accessLevelOf(user))
+    }
+
+    @Test
     fun `accessLevel is PREMIUM for a grant, even during a store trial`() {
         val user = createUser(
             subscriptionStatus = SubscriptionStatus.TRIAL,
@@ -381,6 +414,16 @@ class FeatureAccessServiceTest {
     }
 
     // --- Factory functions ---
+
+    private fun storeSubscription(user: User, expiresAt: Instant, isTrial: Boolean, key: String = "tx-1") = Subscription(
+        user = user,
+        revenueCatSubscriptionId = key,
+        productId = "premium_monthly",
+        status = SubscriptionStatus.CANCELLED,
+        startedAt = TEST_NOW.minusSeconds(7 * 86400L),
+        expiresAt = expiresAt,
+        isTrial = isTrial,
+    )
 
     private fun createUser(
         id: Long = 1L,

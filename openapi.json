@@ -1637,6 +1637,9 @@
           "idToken" : {
             "minLength" : 1,
             "type" : "string"
+          },
+          "nonce" : {
+            "type" : [ "string", "null" ]
           }
         },
         "required" : [ "idToken" ],
@@ -1743,9 +1746,13 @@
             "type" : "array"
           },
           "sourceLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "targetLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           }
         },
@@ -3108,6 +3115,8 @@
         "properties" : {
           "count" : {
             "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0,
             "type" : "integer"
           }
         },
@@ -3494,6 +3503,8 @@
             } ]
           },
           "languageCode" : {
+            "maxLength" : 8,
+            "minLength" : 0,
             "type" : "string"
           },
           "notificationFrequency" : {
@@ -3511,9 +3522,13 @@
             "type" : "boolean"
           },
           "themeMode" : {
+            "maxLength" : 16,
+            "minLength" : 0,
             "type" : "string"
           },
           "timezone" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           }
         },
@@ -3877,7 +3892,8 @@
       "SyncListeningSessionRequest" : {
         "properties" : {
           "clientSessionId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -3898,7 +3914,8 @@
             "type" : "integer"
           },
           "order" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "pauseCount" : {
@@ -3918,14 +3935,18 @@
           },
           "repeatCount" : {
             "format" : "int32",
+            "maximum" : 100,
             "minimum" : 1,
             "type" : "integer"
           },
           "source" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "sourceDetail" : {
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "speechRate" : {
@@ -3965,11 +3986,13 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "targetLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordId" : {
@@ -4009,9 +4032,13 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordId" : {
@@ -4019,9 +4046,13 @@
             "type" : "integer"
           },
           "wordText" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordTranslation" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -4031,7 +4062,8 @@
       "SyncSessionRequest" : {
         "properties" : {
           "clientSessionId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -4065,10 +4097,13 @@
             "type" : "integer"
           },
           "reviewType" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "sourceLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "startedAt" : {
@@ -4076,6 +4111,8 @@
             "type" : "integer"
           },
           "targetLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "totalCards" : {
@@ -4084,6 +4121,8 @@
             "type" : "integer"
           },
           "triggerSource" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -4094,16 +4133,19 @@
         "properties" : {
           "avgResponseMs" : {
             "format" : "int64",
+            "maximum" : 86400000,
             "minimum" : 0,
             "type" : "integer"
           },
           "bestStreak" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           },
           "clientGameId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -4111,34 +4153,41 @@
           },
           "correctCount" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           },
           "durationMs" : {
             "format" : "int64",
+            "maximum" : 86400000,
             "minimum" : 0,
             "type" : "integer"
           },
           "grade" : {
-            "minLength" : 1,
+            "maxLength" : 4,
+            "minLength" : 0,
             "type" : "string"
           },
           "livesRemaining" : {
             "format" : "int32",
+            "maximum" : 100,
             "minimum" : 0,
             "type" : "integer"
           },
           "playedAt" : {
             "format" : "int64",
+            "minimum" : 0,
             "type" : "integer"
           },
           "score" : {
             "format" : "int32",
+            "maximum" : 1000000,
             "minimum" : 0,
             "type" : "integer"
           },
           "totalQuestions" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           }
@@ -4392,7 +4441,8 @@
       "UpdateTimezoneRequest" : {
         "properties" : {
           "timezone" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -4402,6 +4452,8 @@
       "UpdateWordRequest" : {
         "properties" : {
           "description" : {
+            "maxLength" : 5000,
+            "minLength" : 0,
             "type" : "string"
           },
           "easeFactor" : {
@@ -4425,7 +4477,8 @@
             "type" : "integer"
           },
           "originalWord" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "repetitions" : {
@@ -4433,7 +4486,8 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "tagIds" : {
@@ -4441,14 +4495,18 @@
               "format" : "int64",
               "type" : "integer"
             },
+            "maxItems" : 50,
+            "minItems" : 0,
             "type" : "array"
           },
           "targetLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "translation" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -4689,6 +4747,8 @@
       "WordDto" : {
         "properties" : {
           "description" : {
+            "maxLength" : 5000,
+            "minLength" : 0,
             "type" : "string"
           },
           "easeFactor" : {
@@ -4716,6 +4776,8 @@
             "type" : "integer"
           },
           "originalWord" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "repetitions" : {
@@ -4723,6 +4785,8 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "tagIds" : {
@@ -4730,12 +4794,18 @@
               "format" : "int64",
               "type" : "integer"
             },
+            "maxItems" : 50,
+            "minItems" : 0,
             "type" : "array"
           },
           "targetLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "translation" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "updatedAt" : {

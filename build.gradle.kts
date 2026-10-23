@@ -1,10 +1,13 @@
-// The Spring Boot Gradle plugin brings Jackson onto the build classpath at an older version; keep it
-// on the same patched release as the app (the jackson-2-bom.version override below)
+// The Spring Boot Gradle plugin brings Jackson onto the build classpath at older versions; keep it on
+// the same patched releases as the app (the jackson-bom / jackson-2-bom overrides below)
 buildscript {
 	configurations.classpath {
 		resolutionStrategy.eachDependency {
-			if (requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations") {
-				useVersion("2.21.7")
+			when {
+				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
+					useVersion("2.21.7")
+				requested.group == "tools.jackson.core" || (requested.group == "tools.jackson" && requested.name == "jackson-bom") ->
+					useVersion("3.1.8")
 			}
 		}
 	}
@@ -30,6 +33,8 @@ extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
 // each override once the BOM catches up.
 // Boot 4.1.1 ships Tomcat 11.0.24: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 (critical), fixed in 11.0.25
 extra["tomcat.version"] = "11.0.27"
+// Boot 4.1.1 ships Jackson 3.1.5: GHSA-p6pp-m3f8-5c89, GHSA-7hhh-6rmp-j9qf (high), fixed in 3.1.7
+extra["jackson-bom.version"] = "3.1.8"
 // Jackson 2 is still used by firebase-admin, jjwt and the MCP SDK (the app itself is on Jackson 3)
 extra["jackson-2-bom.version"] = "2.21.7"
 

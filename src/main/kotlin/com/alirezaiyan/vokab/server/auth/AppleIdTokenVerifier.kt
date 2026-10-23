@@ -12,6 +12,7 @@ import io.jsonwebtoken.ProtectedHeader
 import io.jsonwebtoken.UnsupportedJwtException
 import org.springframework.stereotype.Component
 import java.security.Key
+import java.security.MessageDigest
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,11 +45,22 @@ class AppleIdTokenVerifier(
         .requireIssuer(ISSUER)
         .build()
 
-    /** Verifies a Sign in with Apple ID token; `null` if it must not be trusted. */
-    fun verify(idToken: String): AppleIdClaims? {
+    /**
+     * Verifies a Sign in with Apple ID token; `null` if it must not be trusted.
+     *
+     * @param rawNonce the nonce the client generated for this sign-in, if it sent one. The client
+     *   passes `SHA-256(rawNonce)` as lowercase hex to Apple (`ASAuthorizationAppleIDRequest.nonce` on
+     *   iOS, the `nonce` parameter of the web/Android flow) and Apple echoes it in the token's `nonce`
+     *   claim, so a token minted for another sign-in can't be replayed here.
+     */
+    fun verify(idToken: String, rawNonce: String? = null): AppleIdClaims? {
         val claims = verifyClaims(idToken) ?: return null
         val subject = claims.subject?.takeIf { it.isNotBlank() } ?: run {
             logger.warn { "Apple token rejected: missing subject" }
+            return null
+        }
+        if (rawNonce != null && !nonceMatches(claims.get("nonce", String::class.java), rawNonce)) {
+            logger.warn { "Apple token rejected: nonce mismatch" }
             return null
         }
         return AppleIdClaims(
@@ -78,6 +90,14 @@ class AppleIdTokenVerifier(
             return null
         }
         return claims
+    }
+
+    private fun nonceMatches(tokenNonce: String?, rawNonce: String): Boolean {
+        if (tokenNonce == null) return false
+        val expected = MessageDigest.getInstance("SHA-256")
+            .digest(rawNonce.toByteArray(Charsets.UTF_8))
+            .joinToString("") { "%02x".format(it) }
+        return MessageDigest.isEqual(expected.toByteArray(), tokenNonce.lowercase().toByteArray())
     }
 
     private companion object {

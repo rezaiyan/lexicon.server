@@ -67,13 +67,24 @@ class AuditLogServiceTest {
         auditLogService.logLogout(
             userId = 3L,
             email = "user@example.com",
-            refreshToken = "abcdefghijklmnop",
+            tokenLookupHash = "abcdefghijklmnop",
             ipAddress = "10.0.0.1"
         )
 
         // Assert
         verify(exactly = 1) {
             auditLogRepository.save(match { it.eventType == AuditEventType.LOGOUT && it.userId == 3L })
+        }
+    }
+
+    @Test
+    fun `logLogout stores only a prefix of the token lookup hash`() {
+        every { auditLogRepository.save(any<AuditLog>()) } returns mockk()
+
+        auditLogService.logLogout(userId = 3L, email = "user@example.com", tokenLookupHash = "abcdefghijklmnop", ipAddress = null)
+
+        verify(exactly = 1) {
+            auditLogRepository.save(match { it.metadata == """{"tokenHashPrefix":"abcdefgh"}""" })
         }
     }
 

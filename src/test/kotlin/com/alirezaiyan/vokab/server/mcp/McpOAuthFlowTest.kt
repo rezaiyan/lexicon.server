@@ -69,8 +69,8 @@ class McpOAuthFlowTest {
     fun setUp() {
         learner = userRepository.save(User(email = "oauth-learner@example.com", name = "Learner", googleId = "google-uid-1"))
         wordRepository.save(Word(user = learner, originalWord = "Apfel", translation = "apple", sourceLanguage = "en", targetLanguage = "de"))
-        `when`(firebase.verify("good-id-token")).thenReturn(FirebaseIdClaims("google-uid-1", learner.email, "Learner"))
-        `when`(firebase.verify("stranger-id-token")).thenReturn(FirebaseIdClaims("google-uid-404", "stranger@example.com", "Stranger"))
+        `when`(firebase.verify("good-id-token")).thenReturn(googleClaims("google-uid-1", learner.email, "Learner"))
+        `when`(firebase.verify("stranger-id-token")).thenReturn(googleClaims("google-uid-404", "stranger@example.com", "Stranger"))
     }
 
     // ── discovery ────────────────────────────────────────────────────────────
@@ -511,6 +511,9 @@ class McpOAuthFlowTest {
             "response_types" to listOf("code"),
             "token_endpoint_auth_method" to authMethod,
         )))
+
+    private fun googleClaims(uid: String, email: String, name: String) =
+        FirebaseIdClaims(uid, email, name, emailVerified = true, signInProvider = FirebaseIdClaims.GOOGLE_SIGN_IN_PROVIDER)
 
     private fun signIn(idToken: String, session: MockHttpSession) = post("/oauth/session")
         .withFreshIp()

@@ -35,6 +35,26 @@ private fun languageName(code: String): String {
     return if (name.isBlank() || name.equals(code, ignoreCase = true)) code else name
 }
 
+/**
+ * Streak days are UTC days (see StreakService), so the user's local midnight is not the
+ * deadline; say how long is left instead.
+ */
+private fun streakDeadline(now: Instant): String {
+    val nextUtcMidnight = LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1)
+        .atStartOfDay().toInstant(ZoneOffset.UTC)
+    val hoursLeft = Duration.between(now, nextUtcMidnight).toHours()
+    return if (hoursLeft < 1) "within the hour" else "in ${hoursLeft}h"
+}
+
+private fun biteBody(bite: DueBite?): String = when {
+    bite == null -> "A short review keeps them fresh."
+    bite.mostlyKnown -> "Most of them you already know. Quick win?"
+    else -> "A short round, then you're done for now."
+}
+
+private fun biteLink(bite: DueBite?, fallback: String): String =
+    bite?.let { "vokab://review/words?ids=${it.wordIds.joinToString(",")}" } ?: fallback
+
 @Service
 class NotificationContentBuilder(
     private val aiService: AiService,
@@ -65,7 +85,7 @@ class NotificationContentBuilder(
 
     private fun buildStreakRisk(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        val deadline = streakDeadline()
+        val deadline = streakDeadline(Instant.now(clock))
         val fallback = "Your ${user.currentStreak}-day streak resets $deadline. One short review keeps it alive! 🔥"
         val body = aiCopyOr(fallback) {
             aiService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
@@ -80,18 +100,6 @@ class NotificationContentBuilder(
             ),
             type = STREAK_RISK
         )
-    }
-
-    /**
-     * Streak days are UTC days (see StreakService), so the user's local midnight is not the
-     * deadline; say how long is left instead.
-     */
-    private fun streakDeadline(): String {
-        val now = Instant.now(clock)
-        val nextUtcMidnight = LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1)
-            .atStartOfDay().toInstant(ZoneOffset.UTC)
-        val hoursLeft = Duration.between(now, nextUtcMidnight).toHours()
-        return if (hoursLeft < 1) "within the hour" else "in ${hoursLeft}h"
     }
 
     private fun buildAddWords(): NotificationPayload =
@@ -139,15 +147,6 @@ class NotificationContentBuilder(
         bestEffort("Due words for user=${user.id}") {
             DueBite.pick(dueWordQueries.dueWords(user.requireId(), clock.millis()))
         }
-
-    private fun biteBody(bite: DueBite?): String = when {
-        bite == null -> "A short review keeps them fresh."
-        bite.mostlyKnown -> "Most of them you already know. Quick win?"
-        else -> "A short round, then you're done for now."
-    }
-
-    private fun biteLink(bite: DueBite?, fallback: String): String =
-        bite?.let { "vokab://review/words?ids=${it.wordIds.joinToString(",")}" } ?: fallback
 
     private fun buildComebackAlert(user: User): NotificationPayload {
         val word = learnerSignals.topDifficultWord(user.requireId()) ?: return buildFallbackInsight()

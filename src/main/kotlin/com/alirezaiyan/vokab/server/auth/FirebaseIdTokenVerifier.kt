@@ -14,7 +14,18 @@ data class FirebaseIdClaims(
     val uid: String,
     val email: String?,
     val name: String?,
-)
+    /** `email_verified`: only a verified address may be used to link to an existing account. */
+    val emailVerified: Boolean = false,
+    /** `firebase.sign_in_provider`, e.g. `google.com`, `password`, `anonymous`. */
+    val signInProvider: String? = null,
+) {
+    /** The token comes from Google Sign-In, not another Firebase provider (password, phone, ...). */
+    val isGoogleSignIn: Boolean get() = signInProvider == GOOGLE_SIGN_IN_PROVIDER
+
+    companion object {
+        const val GOOGLE_SIGN_IN_PROVIDER = "google.com"
+    }
+}
 
 /**
  * Verifies Firebase ID tokens and tells a bad token apart from a Firebase outage.
@@ -37,7 +48,13 @@ class FirebaseIdTokenVerifier {
             logger.warn { "Firebase token rejected: ${e.message}" }
             return null
         }
-        return FirebaseIdClaims(uid = token.uid, email = token.email, name = token.name)
+        return FirebaseIdClaims(
+            uid = token.uid,
+            email = token.email,
+            name = token.name,
+            emailVerified = token.isEmailVerified,
+            signInProvider = (token.claims?.get("firebase") as? Map<*, *>)?.get("sign_in_provider") as? String,
+        )
     }
 
     private fun FirebaseAuthException.isTransient(): Boolean =

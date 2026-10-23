@@ -21,7 +21,7 @@ class SettingsController(
     @PatchMapping
     fun update(
         @AuthenticationPrincipal user: AuthUser,
-        @RequestBody dto: SettingsDto
+        @Valid @RequestBody dto: SettingsDto
     ): ResponseEntity<ApiResponse<SettingsDto>> {
         val updated = service.update(user.id, dto)
         return ResponseEntity.ok(ApiResponse(success = true, data = updated))

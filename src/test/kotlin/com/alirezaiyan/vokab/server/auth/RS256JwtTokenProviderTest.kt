@@ -11,6 +11,12 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.junit.jupiter.api.io.TempDir
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.attribute.PosixFilePermissions
+import java.time.temporal.ChronoUnit
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.util.Base64
@@ -243,6 +249,83 @@ class RS256JwtTokenProviderTest {
         // Act & Assert
         assertNotNull(provider.privateKey)
         assertEquals("RSA", provider.privateKey.algorithm)
+    }
+
+    // ── verifyAccessToken ─────────────────────────────────────────────────────
+
+    @Test
+    fun `verifyAccessToken returns the user id and issue time`() {
+        val token = provider.generateAccessToken(12L, "test@example.com")
+
+        val verified = provider.verifyAccessToken(token)
+
+        assertEquals(VerifiedAccessToken(12L, clock.instant().truncatedTo(ChronoUnit.SECONDS)), verified)
+    }
+
+    @Test
+    fun `verifyAccessToken returns null for an invalid token`() {
+        assertNull(provider.verifyAccessToken("garbage.token.here"))
+    }
+
+    // ── key loading and generation ────────────────────────────────────────────
+
+    @Test
+    fun `generates the private key file readable by the owner only`(@TempDir dir: Path) {
+        RS256JwtTokenProvider(fileProps(dir), clock)
+
+        val perms = Files.getPosixFilePermissions(dir.resolve("private.pem"))
+        assertEquals(PosixFilePermissions.fromString("rw-------"), perms)
+    }
+
+    @Test
+    fun `reuses previously generated key files`(@TempDir dir: Path) {
+        val first = RS256JwtTokenProvider(fileProps(dir), clock)
+        val token = first.generateAccessToken(1L, "a@example.com")
+
+        val second = RS256JwtTokenProvider(fileProps(dir), clock)
+
+        assertTrue(second.validateToken(token))
+    }
+
+    @Test
+    fun `fails fast when existing key files cannot be loaded`(@TempDir dir: Path) {
+        Files.writeString(dir.resolve("private.pem"), "not-a-key")
+        Files.writeString(dir.resolve("public.pem"), "not-a-key")
+
+        assertThrows<IllegalStateException> { RS256JwtTokenProvider(fileProps(dir), clock) }
+        assertEquals("not-a-key", Files.readString(dir.resolve("private.pem")))
+    }
+
+    @Test
+    fun `fails fast when only one key file exists`(@TempDir dir: Path) {
+        Files.writeString(dir.resolve("public.pem"), "something")
+
+        assertThrows<IllegalStateException> { RS256JwtTokenProvider(fileProps(dir), clock) }
+    }
+
+    @Test
+    fun `fails fast when configured key content cannot be loaded`(@TempDir dir: Path) {
+        val props = fileProps(dir).apply {
+            jwt.privateKey = "bm90LWEta2V5"
+            jwt.publicKey = "bm90LWEta2V5"
+        }
+
+        assertThrows<IllegalStateException> { RS256JwtTokenProvider(props, clock) }
+        assertFalse(Files.exists(dir.resolve("private.pem")))
+    }
+
+    @Test
+    fun `fails fast when only one key is configured`() {
+        val props = createAppPropertiesWithInMemoryKeys(testKeyPair).apply { jwt.publicKey = "" }
+
+        assertThrows<IllegalStateException> { RS256JwtTokenProvider(props, clock) }
+    }
+
+    private fun fileProps(dir: Path) = AppProperties().apply {
+        jwt = JwtConfig(
+            privateKeyPath = dir.resolve("private.pem").toString(),
+            publicKeyPath = dir.resolve("public.pem").toString(),
+        )
     }
 
     // ── factory functions ─────────────────────────────────────────────────────

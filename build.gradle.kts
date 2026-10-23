@@ -96,6 +96,8 @@ dependencies {
 
 	// Rate Limiting
 	implementation(libs.bucket4j.core)
+	// Expiring, size-bounded map of rate-limit buckets (version managed by the Spring Boot BOM)
+	implementation("com.github.ben-manes.caffeine:caffeine")
 	// Fetches MCP client metadata documents with an address-checking DNS resolver
 	implementation(libs.httpclient5)
 
@@ -137,6 +139,9 @@ kotlin {
 			// Annotations on constructor properties (@JsonProperty, @NotBlank, ...) also land on the
 			// property/field — the Kotlin 2.x future default; opting in now silences the migration warning
 			"-Xannotation-default-target=param-property",
+			// Writes annotations on type arguments to bytecode, so Bean Validation sees element
+			// constraints such as List<@Size(max = 40) String>; without it they are silently dropped
+			"-Xemit-jvm-type-annotations",
 		)
 	}
 }

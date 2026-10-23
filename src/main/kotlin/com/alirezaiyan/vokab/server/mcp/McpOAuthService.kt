@@ -44,14 +44,19 @@ class McpOAuthService(
 
     /**
      * The existing, active account behind a Google (Firebase) ID token. Never creates one: an AI
-     * client is no place to sign up, and onboarding happens in the app.
+     * client is no place to sign up, and onboarding happens in the app. Only Google Sign-In tokens are
+     * accepted (the login page uses GoogleAuthProvider), and the email fallback needs a verified address.
      */
     @Transactional(readOnly = true)
     fun signIn(idToken: String): SignInResult {
         val claims = firebase.verify(idToken) ?: return SignInResult.InvalidToken
+        if (!claims.isGoogleSignIn) {
+            logger.warn { "MCP sign-in rejected: Firebase sign-in provider is ${claims.signInProvider}" }
+            return SignInResult.InvalidToken
+        }
         val userId = (
             userRepository.findByGoogleId(claims.uid).orElse(null)
-                ?: claims.email?.let { userRepository.findByEmail(it).orElse(null) }
+                ?: claims.email?.takeIf { claims.emailVerified }?.let { userRepository.findByEmail(it).orElse(null) }
             )?.id
         return if (userId != null && userAccessCache.isAllowed(userId)) SignInResult.SignedIn(userId)
         else SignInResult.NoAccount

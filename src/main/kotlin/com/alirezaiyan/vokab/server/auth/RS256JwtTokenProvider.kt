@@ -18,10 +18,16 @@ import java.util.*
 import java.util.Base64
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.nio.file.StandardOpenOption
+import java.nio.file.attribute.PosixFilePermissions
+import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
+
+/** A signature-checked access token: its user and `iat` (null if the token carries none). */
+data class VerifiedAccessToken(val userId: Long, val issuedAt: Instant?)
 
 /**
  * JWT token provider using RS256 algorithm (asymmetric keys)
@@ -39,23 +45,28 @@ class RS256JwtTokenProvider(
      * Initialize key pair with the following strategy:
      * 1. If raw key content is provided via environment variables (JWT_PRIVATE_KEY / JWT_PUBLIC_KEY), use them
      * 2. If key files exist on disk, load them
-     * 3. Otherwise, generate new keys and save to files
+     * 3. Only if neither is present, generate new keys and save to files
      *
      * Strategy 1 is critical for deployments with ephemeral filesystems (Railway, Fly.io, Render, etc.)
      * where files don't survive restarts/redeploys.
+     *
+     * Keys that are configured or present but can't be loaded fail startup: silently generating a new
+     * pair would invalidate every issued token and hide the misconfiguration.
      */
     private fun initializeKeyPair(): KeyPair {
         val rawPrivateKey = appProperties.jwt.privateKey
         val rawPublicKey = appProperties.jwt.publicKey
 
         // Strategy 1: Load from environment variables (Base64-encoded key content)
-        if (rawPrivateKey.isNotBlank() && rawPublicKey.isNotBlank()) {
+        if (rawPrivateKey.isNotBlank() || rawPublicKey.isNotBlank()) {
+            check(rawPrivateKey.isNotBlank() && rawPublicKey.isNotBlank()) {
+                "Only one of JWT_PRIVATE_KEY / JWT_PUBLIC_KEY is set; both are required"
+            }
+            logger.info { "Loading RSA key pair from environment variables..." }
             return try {
-                logger.info { "Loading RSA key pair from environment variables..." }
                 loadKeyPairFromContent(rawPrivateKey, rawPublicKey)
             } catch (e: Exception) {
-                logger.error(e) { "Failed to load keys from environment variables, falling back to file-based keys" }
-                loadOrGenerateFromFiles()
+                throw IllegalStateException("JWT_PRIVATE_KEY / JWT_PUBLIC_KEY are set but could not be loaded", e)
             }
         }
 
@@ -69,20 +80,25 @@ class RS256JwtTokenProvider(
 
         logger.info { "JWT Key Paths - Private: $privateKeyPath, Public: $publicKeyPath" }
 
-        val privateKeyFile = File(privateKeyPath)
-        val publicKeyFile = File(publicKeyPath)
+        val privateExists = File(privateKeyPath).exists()
+        val publicExists = File(publicKeyPath).exists()
 
-        return if (privateKeyFile.exists() && publicKeyFile.exists()) {
-            try {
+        return when {
+            privateExists && publicExists -> {
                 logger.info { "Loading existing RSA key pair from files..." }
-                loadKeyPairFromFiles(privateKeyPath, publicKeyPath)
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to load existing keys, generating new pair (THIS WILL INVALIDATE ALL TOKENS)" }
+                try {
+                    loadKeyPairFromFiles(privateKeyPath, publicKeyPath)
+                } catch (e: Exception) {
+                    throw IllegalStateException("JWT key files exist but could not be loaded", e)
+                }
+            }
+            privateExists || publicExists -> error(
+                "Only one JWT key file exists (private=$privateExists, public=$publicExists); refusing to overwrite it"
+            )
+            else -> {
+                logger.info { "Key files not found, generating and saving new RSA key pair..." }
                 generateAndSaveKeyPair(privateKeyPath, publicKeyPath)
             }
-        } else {
-            logger.info { "Key files not found, generating and saving new RSA key pair..." }
-            generateAndSaveKeyPair(privateKeyPath, publicKeyPath)
         }
     }
 
@@ -138,25 +154,13 @@ class RS256JwtTokenProvider(
         privateFile.parentFile?.mkdirs()
         publicFile.parentFile?.mkdirs()
 
-        // Save private key (PKCS8 format, Base64 encoded)
-        val privateKeyBytes = pair.private.encoded
-        val privateKeyBase64 = Base64.getEncoder().encodeToString(privateKeyBytes)
-        Files.write(
-            Paths.get(privateKeyPath),
-            privateKeyBase64.toByteArray(),
-            StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING
-        )
+        // Save private key (PKCS8 format, Base64 encoded), owner read/write only from the moment it exists
+        val privateKeyBase64 = Base64.getEncoder().encodeToString(pair.private.encoded)
+        createKeyFile(Paths.get(privateKeyPath), privateKeyBase64.toByteArray(), ownerOnly = true)
 
         // Save public key (X509 format, Base64 encoded)
-        val publicKeyBytes = pair.public.encoded
-        val publicKeyBase64 = Base64.getEncoder().encodeToString(publicKeyBytes)
-        Files.write(
-            Paths.get(publicKeyPath),
-            publicKeyBase64.toByteArray(),
-            StandardOpenOption.CREATE,
-            StandardOpenOption.TRUNCATE_EXISTING
-        )
+        val publicKeyBase64 = Base64.getEncoder().encodeToString(pair.public.encoded)
+        createKeyFile(Paths.get(publicKeyPath), publicKeyBase64.toByteArray(), ownerOnly = false)
 
         logger.info { "✅ RSA key pair saved to files:" }
         logger.info { "   Private key: $privateKeyPath" }
@@ -166,7 +170,25 @@ class RS256JwtTokenProvider(
 
         return pair
     }
-    
+
+    /**
+     * Creates [path] (failing if it already exists) and writes [content]. With [ownerOnly] the file is
+     * created atomically with POSIX 600 permissions; on a non-POSIX filesystem it falls back to the
+     * platform default.
+     */
+    private fun createKeyFile(path: Path, content: ByteArray, ownerOnly: Boolean) {
+        val posix = "posix" in path.toAbsolutePath().fileSystem.supportedFileAttributeViews()
+        if (ownerOnly && posix) {
+            Files.createFile(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
+        } else {
+            if (ownerOnly) {
+                logger.warn { "Filesystem has no POSIX permissions; private key file uses default permissions" }
+            }
+            Files.createFile(path)
+        }
+        Files.write(path, content, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)
+    }
+
     val publicKey: RSAPublicKey get() = keyPair.public as RSAPublicKey
     val privateKey: RSAPrivateKey get() = keyPair.private as RSAPrivateKey
     
@@ -207,6 +229,21 @@ class RS256JwtTokenProvider(
         }
     }
     
+    /**
+     * Verifies [token] once and returns its subject and `iat`, or null if it is invalid or its
+     * subject isn't a user id.
+     */
+    fun verifyAccessToken(token: String): VerifiedAccessToken? {
+        val claims = try {
+            getClaims(token)
+        } catch (e: Exception) {
+            logger.debug(e) { "Token validation failed" }
+            return null
+        }
+        val userId = claims.subject?.toLongOrNull() ?: return null
+        return VerifiedAccessToken(userId = userId, issuedAt = claims.issuedAt?.toInstant())
+    }
+
     fun getExpirationTime(): Long = appProperties.jwt.expirationMs
     
     private fun getClaims(token: String): Claims {

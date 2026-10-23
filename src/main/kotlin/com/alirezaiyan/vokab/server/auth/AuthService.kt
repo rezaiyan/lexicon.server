@@ -45,7 +45,7 @@ class AuthService(
      * Authenticates with a Firebase ID token from Google Sign-In. Finds the user by Google id,
      * links by email, or creates a new one.
      *
-     * @throws AuthRejectedException if the token is invalid or carries no email
+     * @throws AuthRejectedException if the token is invalid, not from Google Sign-In, or carries no email
      */
     @Transactional
     fun authenticateWithGoogle(
@@ -55,7 +55,10 @@ class AuthService(
         ipAddress: String? = null,
     ): AuthResponse {
         val claims = firebaseIdTokenVerifier.verify(idToken)
-            ?: throw AuthRejectedException("Invalid Firebase ID token")
+        if (claims == null || !claims.isGoogleSignIn) {
+            claims?.let { logger.warn { "Google sign-in rejected: Firebase sign-in provider is ${it.signInProvider}" } }
+            throw AuthRejectedException("Invalid Firebase ID token")
+        }
         val email = claims.email
             ?: throw AuthRejectedException("Email not found in Firebase token")
 
@@ -70,7 +73,9 @@ class AuthService(
      * When the user hides their email, a stable fallback address derived from `sub` is used.
      *
      * @param fullName only sent by Apple on the very first sign-in
-     * @throws AuthRejectedException if the token is invalid or doesn't match [appleUserId]
+     * @param nonce the raw nonce the client generated for this sign-in (see [AppleAuthRequest.nonce]);
+     *   when present the token's `nonce` claim must be its SHA-256 hex. Optional until clients send it.
+     * @throws AuthRejectedException if the token is invalid or doesn't match [appleUserId] / [nonce]
      */
     @Transactional
     fun authenticateWithApple(
@@ -80,8 +85,9 @@ class AuthService(
         platform: String? = null,
         appVersion: String? = null,
         ipAddress: String? = null,
+        nonce: String? = null,
     ): AuthResponse {
-        val claims = appleIdTokenVerifier.verify(idToken)
+        val claims = appleIdTokenVerifier.verify(idToken, rawNonce = nonce)
             ?: throw AuthRejectedException("Invalid Apple ID token")
         if (appleUserId != null && appleUserId != claims.subject) {
             logger.warn { "Apple sign-in rejected: client user identifier does not match token subject" }

@@ -48,6 +48,8 @@ class McpRegisteredClientRepositoryTest {
             "https://apps.example.com/client.json#frag",
             "https://user@apps.example.com/client.json",
             "https://apps.example.com/a/../client.json",
+            "https://apps.example.com:8443/client.json",
+            "https://apps.example.com:22/client.json",
             "mcp_abc123",
         ).forEach { assertNull(McpRegisteredClientRepository.metadataDocumentUrl(it), it) }
     }
@@ -144,6 +146,48 @@ class McpRegisteredClientRepositoryTest {
         documents.clear()
 
         assertEquals("Metadata client", repository.findByClientId(CLIENT)?.clientName)
+    }
+
+    @Test
+    fun `the default https port may be spelled out`() {
+        assertNotNull(McpRegisteredClientRepository.metadataDocumentUrl("https://apps.example.com:443/client.json"))
+    }
+
+    @Test
+    fun `a failed fetch is not retried for ten minutes`() {
+        repeat(5) { assertNull(repository.findByClientId(CLIENT)) }
+        assertEquals(1, fetches)
+
+        now = now.plus(Duration.ofMinutes(11))
+        documents[URI(CLIENT)] = document()
+        assertNotNull(repository.findByClientId(CLIENT))
+        assertEquals(2, fetches)
+    }
+
+    @Test
+    fun `a failed refresh of a known client is not retried on every lookup`() {
+        documents[URI(CLIENT)] = document()
+        repository.findByClientId(CLIENT)
+        now = now.plus(Duration.ofDays(2))
+        documents.clear()
+
+        repeat(3) { repository.findByClientId(CLIENT) }
+
+        assertEquals(2, fetches)
+    }
+
+    @Test
+    fun `IPv6 transition prefixes that embed IPv4 addresses are not public`() {
+        listOf("64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b:1::a00:1", "2002:7f00:1::1", "2001:0:4136:e378::1").forEach {
+            assertFalse(HttpMcpClientMetadataFetcher.isPublic(InetAddress.getByName(it)), it)
+        }
+        // Teredo is 2001::/32 only; the rest of 2001::/16 is ordinary global unicast
+        assertTrue(HttpMcpClientMetadataFetcher.isPublic(InetAddress.getByName("2001:4860:4860::8888")))
+    }
+
+    @Test
+    fun `the fetcher refuses a non-default port without connecting`() {
+        assertNull(HttpMcpClientMetadataFetcher().fetch(URI("https://apps.example.com:8443/client.json")))
     }
 
     @Test

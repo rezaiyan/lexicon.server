@@ -69,8 +69,8 @@ class McpOAuthFlowTest {
     fun setUp() {
         learner = userRepository.save(User(email = "oauth-learner@example.com", name = "Learner", googleId = "google-uid-1"))
         wordRepository.save(Word(user = learner, originalWord = "Apfel", translation = "apple", sourceLanguage = "en", targetLanguage = "de"))
-        `when`(firebase.verify("good-id-token")).thenReturn(FirebaseIdClaims("google-uid-1", learner.email, "Learner"))
-        `when`(firebase.verify("stranger-id-token")).thenReturn(FirebaseIdClaims("google-uid-404", "stranger@example.com", "Stranger"))
+        `when`(firebase.verify("good-id-token")).thenReturn(googleClaims("google-uid-1", learner.email, "Learner"))
+        `when`(firebase.verify("stranger-id-token")).thenReturn(googleClaims("google-uid-404", "stranger@example.com", "Stranger"))
     }
 
     // ── discovery ────────────────────────────────────────────────────────────
@@ -512,6 +512,9 @@ class McpOAuthFlowTest {
             "token_endpoint_auth_method" to authMethod,
         )))
 
+    private fun googleClaims(uid: String, email: String, name: String) =
+        FirebaseIdClaims(uid, email, name, emailVerified = true, signInProvider = FirebaseIdClaims.GOOGLE_SIGN_IN_PROVIDER)
+
     private fun signIn(idToken: String, session: MockHttpSession) = post("/oauth/session")
         .withFreshIp()
         .session(session)
@@ -533,7 +536,7 @@ class McpOAuthFlowTest {
 
     /** Registration is limited per IP; each test registration comes from its own address. */
     private fun org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder.withFreshIp() =
-        header("X-Forwarded-For", "10.${registrations / 250}.${registrations++ % 250}.1")
+        with { it.apply { remoteAddr = "10.${registrations / 250}.${registrations++ % 250}.1" } }
 
     private fun metadataDocument(clientId: String) = objectMapper.writeValueAsString(mapOf(
         "client_id" to clientId,

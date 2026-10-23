@@ -3,10 +3,13 @@ package com.alirezaiyan.vokab.server.user
 import com.fasterxml.jackson.annotation.JsonInclude
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
+import jakarta.validation.constraints.Size
 import java.time.LocalDate
 
 data class SettingsDto(
+    @field:Size(max = 8)
     val languageCode: String,
+    @field:Size(max = 16)
     val themeMode: String,
     val notificationsEnabled: Boolean,
     val reviewRemindersEnabled: Boolean = true,
@@ -15,6 +18,7 @@ data class SettingsDto(
     @field:Pattern(regexp = "^(DAILY|EVERY_OTHER_DAY|WEEKLY|OFF)$", message = "Must be one of: DAILY, EVERY_OTHER_DAY, WEEKLY, OFF")
     val notificationFrequency: String = "DAILY",
     /** IANA zone id of the device, e.g. "Europe/Berlin". Omitted by older clients: the stored one is kept. */
+    @field:Size(max = 64)
     val timezone: String? = null,
     @JsonInclude(JsonInclude.Include.NON_NULL)
     val optimalSendHour: Int? = null,
@@ -27,6 +31,7 @@ data class SettingsDto(
 /** IANA zone id of the device, e.g. "Europe/Berlin". */
 data class UpdateTimezoneRequest(
     @field:NotBlank
+    @field:Size(max = 64)
     val timezone: String
 )
 

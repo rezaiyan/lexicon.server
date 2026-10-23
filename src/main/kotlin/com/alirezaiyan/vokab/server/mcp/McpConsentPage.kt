@@ -9,8 +9,19 @@ import org.springframework.web.util.HtmlUtils
  */
 internal object McpConsentPage {
 
-    /** [publisher]: the site a metadata-document client publishes from (verified by fetching it), if any. */
-    data class Client(val name: String, val returnHosts: List<String>, val publisher: String? = null)
+    /**
+     * [publisher]: the site a metadata-document client publishes from (verified by fetching it), if any.
+     * [unverified]: the client registered itself, so its name is only its own claim.
+     * [redirectsElsewhere]: a metadata-document client whose https redirects leave [publisher]'s site.
+     */
+    data class Client(
+        val name: String,
+        val returnHosts: List<String>,
+        val publisher: String? = null,
+        val redirectUris: List<String> = emptyList(),
+        val unverified: Boolean = false,
+        val redirectsElsewhere: Boolean = false,
+    )
 
     fun render(
         client: Client,
@@ -19,9 +30,14 @@ internal object McpConsentPage {
         requestedScopes: List<String>,
         authorizePath: String,
     ): String {
-        val name = escape(client.name)
-        val publisher = client.publisher?.let { "<p>Published by <strong>${escape(it)}</strong>.</p>" }.orEmpty()
-        val hosts = client.returnHosts.joinToString(", ") { "<strong>${escape(it)}</strong>" }
+        val badge = if (client.unverified) """ <span class="badge">Unverified app</span>""" else ""
+        val name = escape(client.name) + badge
+        val publisher = client.publisher?.let { "<p>Published by <strong>${escape(it)}</strong>.</p>" }.orEmpty() +
+            warnings(client)
+        // An unverified app shows the exact address; for the others the publisher vouches for its hosts
+        val showFullUris = client.unverified && client.redirectUris.isNotEmpty()
+        val destinations = if (showFullUris) client.redirectUris else client.returnHosts
+        val hosts = destinations.joinToString(", ") { "<strong>${escape(it)}</strong>" }
         val scopes = requestedScopes.filter { it in McpScopes.ALL }.joinToString("\n") { scope ->
             val checked = if (scope in McpScopes.OPT_IN) "" else " checked"
             """<label><input type="checkbox" name="scope" value="${escape(scope)}"$checked> """ +
@@ -36,6 +52,18 @@ internal object McpConsentPage {
             .replace("__SCOPES__", scopes)
             .replace("__HIDDEN__", hidden)
             .replace("__ACTION__", escape(authorizePath))
+    }
+
+    private fun warnings(client: Client): String = buildString {
+        if (client.redirectsElsewhere) {
+            append("""<p class="warn">This app is published by <strong>""")
+            append(escape(client.publisher.orEmpty()))
+            append("</strong> but sends you back to a different site. Only continue if you expected that.</p>")
+        }
+        if (client.unverified) {
+            append("""<p class="warn">Lexicon hasn't verified this app: it chose its own name. """)
+            append("Check that the address below belongs to the app you meant to connect.</p>")
+        }
     }
 
     private fun describe(scope: String) = when (scope) {
@@ -58,9 +86,9 @@ internal object McpConsentPage {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Allow access to Lexicon</title>
 <style>
-  :root { --bg: #f7f5fb; --card: #ffffff; --text: #1d1b20; --muted: #625b71; --accent: #6750a4; --line: #e7e0ec; }
+  :root { --bg: #f7f5fb; --card: #ffffff; --text: #1d1b20; --muted: #625b71; --accent: #6750a4; --line: #e7e0ec; --warn: #b3261e; }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #141218; --card: #1d1b20; --text: #e6e0e9; --muted: #cac4d0; --accent: #d0bcff; --line: #49454f; }
+    :root { --bg: #141218; --card: #1d1b20; --text: #e6e0e9; --muted: #cac4d0; --accent: #d0bcff; --line: #49454f; --warn: #f2b8b5; }
   }
   * { box-sizing: border-box; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 16px;
@@ -75,6 +103,9 @@ internal object McpConsentPage {
   button { width: 100%; padding: 14px 16px; border: 0; border-radius: 999px; font: inherit; font-weight: 600; cursor: pointer; }
   .allow { background: var(--accent); color: var(--card); }
   .cancel { background: transparent; color: var(--accent); margin-top: 8px; }
+  .badge { display: inline-block; font-size: 13px; font-weight: 600; padding: 2px 10px; border-radius: 999px;
+           border: 1px solid var(--warn); color: var(--warn); vertical-align: middle; }
+  .warn { color: var(--warn); }
 </style>
 </head>
 <body>

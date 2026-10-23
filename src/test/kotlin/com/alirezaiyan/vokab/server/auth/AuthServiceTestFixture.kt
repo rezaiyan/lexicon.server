@@ -41,6 +41,7 @@ abstract class AuthServiceTestFixture {
     protected lateinit var appConfigService: AppConfigService
     protected lateinit var domainEventPublisher: DomainEventPublisher
     protected lateinit var geoLocationService: GeoLocationService
+    protected lateinit var userAccessCache: UserAccessCache
 
     protected lateinit var authService: AuthService
     protected lateinit var tokenService: TokenService
@@ -63,6 +64,7 @@ abstract class AuthServiceTestFixture {
         domainEventPublisher = mockk(relaxed = true)
         every { appConfigService.getTestEmails() } returns emptySet()
         geoLocationService = mockk(relaxed = true)
+        userAccessCache = mockk(relaxed = true)
 
         appProperties = AppProperties(
             jwt = JwtConfig(refreshExpirationMs = 7_776_000_000L, refreshTokenGracePeriodMs = 30_000L),
@@ -82,6 +84,7 @@ abstract class AuthServiceTestFixture {
         )
         every { userRepository.updateSubscription(any(), any(), any(), any()) } returns 1
         every { userRepository.updateGrant(any(), any(), any(), any()) } returns 1
+        every { userRepository.updateTokensValidAfter(any(), any()) } returns 1
     }
 
 
@@ -89,7 +92,7 @@ abstract class AuthServiceTestFixture {
         every { jwtTokenProvider.generateAccessToken(user.id!!, user.email, any()) } returns "access-token"
         every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
         every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
-        every { refreshTokenRepository.save(any()) } returns mockk()
+        every { refreshTokenRepository.save(any()) } answers { firstArg() }
         every { jwtTokenProvider.getExpirationTime() } returns 86400L
     }
 
@@ -138,6 +141,7 @@ abstract class AuthServiceTestFixture {
         appProperties = properties,
         auditLogService = auditLogService,
         deviceDataWipe = DeviceDataWipe(pushNotificationService),
+        userAccessCache = userAccessCache,
         clock = fixedClock(),
     )
 
@@ -165,12 +169,16 @@ abstract class AuthServiceTestFixture {
         user: User,
         tokenHash: String = "hash",
         expiresAt: Instant = TEST_NOW.plusSeconds(3600),
-        revoked: Boolean = false
+        revoked: Boolean = false,
+        familyId: String = "family-1",
+        usedAt: Instant? = null,
     ): RefreshToken = RefreshToken(
         id = id,
         tokenHash = tokenHash,
         user = user,
         expiresAt = expiresAt,
+        familyId = familyId,
+        usedAt = usedAt,
         revoked = revoked
     )
 }

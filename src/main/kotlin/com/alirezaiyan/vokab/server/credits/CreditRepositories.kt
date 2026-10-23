@@ -46,4 +46,11 @@ interface CreditWalletRepository : JpaRepository<CreditWallet, Long> {
 @Repository
 interface CreditTransactionRepository : JpaRepository<CreditTransaction, Long> {
     fun existsByReferenceId(referenceId: Long): Boolean
+
+    /** Net allowance movement of the given ledger types since [since] (negative = consumed). */
+    @Query(
+        "SELECT COALESCE(SUM(t.allowanceDelta), 0) FROM CreditTransaction t " +
+            "WHERE t.userId = :userId AND t.type IN :types AND t.createdAt >= :since"
+    )
+    fun sumAllowanceDeltaSince(userId: Long, types: Collection<CreditTransactionType>, since: Instant): Long
 }

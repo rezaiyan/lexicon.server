@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.shared.AccessLogFilter
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.alirezaiyan.vokab.server.shared.clientAddress
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -32,8 +33,10 @@ const val ADMIN_SESSION_PATH = "/admin/session"
 
 /**
  * Grants ROLE_ADMIN on the admin path prefix, from either the `X-Admin-Key` header or a
- * dashboard session cookie. Wrong keys are throttled per client IP; while an IP is throttled even
- * the right key is refused, so guessing can't continue in the background.
+ * dashboard session cookie. Wrong keys are throttled per client IP and across all IPs; while
+ * either is throttled even the right key is refused, so guessing can't continue in the background.
+ * Key auth is off entirely while the configured key is shorter than
+ * [AdminSessionTokens.MIN_DASHBOARD_KEY_LENGTH].
  */
 @Component
 class AdminAuthenticationFilter(
@@ -62,7 +65,8 @@ class AdminAuthenticationFilter(
             )
             request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, "admin")
             if (request.method != "GET") {
-                logger.info { "Admin ${request.method} ${request.requestURI} via $principal from ${clientIp(request)}" }
+                val ip = request.clientAddress()
+                logger.info { "Admin ${request.method} ${request.requestURI} via $principal from $ip" }
             }
         }
         filterChain.doFilter(request, response)
@@ -70,14 +74,21 @@ class AdminAuthenticationFilter(
 
     /** @return the principal, or null once a response has been written. */
     private fun authenticateKey(key: String, request: HttpServletRequest, response: HttpServletResponse): String? {
-        val ip = clientIp(request)
+        val ip = request.clientAddress()
+        if (!adminSessionTokens.keyAuthEnabled()) {
+            logger.warn { "Refused admin key for ${request.requestURI} from $ip: admin key auth is disabled" }
+            reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid admin key")
+            return null
+        }
         val bucket = rateLimitConfig.getAdminAuthBucket(ip)
-        if (bucket.availableTokens <= 0) {
+        val globalBucket = rateLimitConfig.getAdminAuthGlobalBucket()
+        if (bucket.availableTokens <= 0 || globalBucket.availableTokens <= 0) {
             reject(response, HttpStatus.TOO_MANY_REQUESTS.value(), "Too many failed admin attempts. Try again later.")
             return null
         }
         if (adminSessionTokens.keyMatches(key)) return CLI_PRINCIPAL
         bucket.tryConsume(1)
+        globalBucket.tryConsume(1)
         logger.warn { "Rejected admin key for ${request.requestURI} from $ip" }
         reject(response, HttpServletResponse.SC_UNAUTHORIZED, "Invalid admin key")
         return null
@@ -103,11 +114,5 @@ class AdminAuthenticationFilter(
         const val CLI_PRINCIPAL = "ali-cli"
         const val DASHBOARD_PRINCIPAL = "admin-dashboard"
         private const val ANONYMOUS = ""
-
-        /** First X-Forwarded-For hop (set by the reverse proxy), else the socket address. */
-        fun clientIp(request: HttpServletRequest): String =
-            request.getHeader("X-Forwarded-For")?.split(",")?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-                ?: request.remoteAddr
-                ?: "unknown"
     }
 }

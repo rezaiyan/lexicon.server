@@ -88,7 +88,8 @@ jobs:
               text,
               re.DOTALL,
           )
-          notes = match.group(1).strip() if match else "See CHANGELOG.md for details."
+          # Drop the "---" divider that ends each section
+          notes = match.group(1).strip().rstrip("-").strip() if match else "See CHANGELOG.md for details."
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write("NOTES<<EOF\n")

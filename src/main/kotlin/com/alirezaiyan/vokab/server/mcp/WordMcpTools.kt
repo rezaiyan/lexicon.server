@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.words.NewWord
 import com.alirezaiyan.vokab.server.words.TagService
 import com.alirezaiyan.vokab.server.words.WordAdditionService
 import com.alirezaiyan.vokab.server.words.WordDto
+import com.alirezaiyan.vokab.server.words.WordQueryService
 import com.alirezaiyan.vokab.server.words.WordService
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
@@ -25,9 +26,11 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty("spring.ai.mcp.server.enabled", havingValue = "true")
 class WordMcpTools(
     private val wordService: WordService,
+    private val wordQueryService: WordQueryService,
     private val wordAdditionService: WordAdditionService,
     private val tagService: TagService,
     private val auditLog: AuditLogService,
+    private val deleteLimiter: McpDeleteLimiter,
 ) {
 
     @McpTool(
@@ -65,7 +68,7 @@ class WordMcpTools(
             tagService.list(userId).firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }?.id
                 ?: return WordList(emptyList(), nextCursor = null)
         }
-        val page = wordService.search(userId, query, language, tagId, limit.clamped(), cursor, newestFirst == true)
+        val page = wordQueryService.search(userId, query, language, tagId, limit.clamped(), cursor, newestFirst == true)
         return WordList(page.words.map { it.toResult() }, page.nextCursor)
     }
 
@@ -94,8 +97,8 @@ class WordMcpTools(
         limit: Int?,
     ): DueWords {
         val userId = context.userIdWithScope(McpScopes.WORDS_READ)
-        val due = wordService.listDue(userId, limit.clamped())
-        return DueWords(dueCount = wordService.countDue(userId).toInt(), words = due.map { it.toResult() })
+        val due = wordQueryService.listDue(userId, limit.clamped())
+        return DueWords(dueCount = wordQueryService.countDue(userId).toInt(), words = due.map { it.toResult() })
     }
 
     @McpTool(
@@ -152,6 +155,7 @@ class WordMcpTools(
         name = "delete_words",
         description = "Permanently delete some of the learner's words, with their review progress, on all " +
             "their devices. Ids that aren't the learner's are ignored. Confirm with the learner first. " +
+            "At most ${McpDeleteLimiter.WORDS_PER_HOUR} words can be deleted per hour. " +
             "Get word ids from search_words or get_due_words.",
         title = "Delete Lexicon words",
         annotations = McpTool.McpAnnotations(
@@ -165,6 +169,7 @@ class WordMcpTools(
     ): DeletedWordIds {
         val userId = context.userIdWithScope(McpScopes.WORDS_DELETE)
         require(wordIds.isNotEmpty() && wordIds.size <= MAX_BATCH) { "Send between 1 and $MAX_BATCH word ids" }
+        deleteLimiter.acquire(userId, wordIds.distinct().size)
         val deleted = wordService.deleteOwned(userId, wordIds)
         if (deleted.isNotEmpty()) auditLog.logMcpWrite(userId, context.clientId(), "delete_words", deleted)
         return DeletedWordIds(deleted = deleted, notFound = wordIds.distinct() - deleted.toSet())

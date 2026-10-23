@@ -4,6 +4,7 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.util.HtmlUtils
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -58,9 +59,11 @@ class EmailService(
             }
         }
 
-        val subject = replaceVariables(template.subject, variables)
-        val bodyHtml = replaceVariables(template.bodyHtml, variables)
-        val bodyText = template.bodyText?.let { replaceVariables(it, variables) }
+        // Values can carry user input (names, words): escape them for HTML, and keep them on one
+        // line in the subject so they can't inject headers.
+        val subject = replaceVariables(template.subject, variables, ::singleLine)
+        val bodyHtml = replaceVariables(template.bodyHtml, variables, HtmlUtils::htmlEscape)
+        val bodyText = template.bodyText?.let { replaceVariables(it, variables) { value -> value } }
 
         return sendRaw(
             userId = userId,
@@ -140,11 +143,16 @@ class EmailService(
             .map { it.userId }
     }
 
-    private fun replaceVariables(text: String, variables: Map<String, String>): String {
+    private fun replaceVariables(text: String, variables: Map<String, String>, encode: (String) -> String): String {
         var result = text
         for ((key, value) in variables) {
-            result = result.replace("{{$key}}", value)
+            result = result.replace("{{$key}}", encode(value))
         }
         return result
     }
 }
+
+/** CR/LF (and other line breaks) become spaces: a subject is a single header line. */
+internal fun singleLine(value: String): String = value.replace(LINE_BREAKS, " ")
+
+private val LINE_BREAKS = Regex("[\\r\\n\\u0085\\u2028\\u2029]+")

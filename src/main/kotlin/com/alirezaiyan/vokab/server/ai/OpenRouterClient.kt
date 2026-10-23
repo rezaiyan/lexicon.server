@@ -41,10 +41,15 @@ class OpenRouterClient(
         .defaultHeader("X-Title", "Vokab")
         .build()
 
-    /** [usage] asks OpenRouter to report the call's cost next to its token counts. */
+    /**
+     * [usage] asks OpenRouter to report the call's cost next to its token counts; [max_tokens]
+     * bounds what one call can cost.
+     */
+    @Suppress("ConstructorParameterNaming") // OpenRouter's wire name
     private data class ChatRequest(
         val model: String,
         val messages: List<Message>,
+        val max_tokens: Int,
         val usage: UsageOption = UsageOption(include = true),
     )
 
@@ -107,7 +112,11 @@ class OpenRouterClient(
     /** Response bodies are logged, never put into exception messages. */
     private fun requestChat(content: List<Content>, operation: AiOperation): String? {
         val model = modelFor(operation)
-        val request = ChatRequest(model = model, messages = listOf(Message(role = "user", content = content)))
+        val request = ChatRequest(
+            model = model,
+            messages = listOf(Message(role = "user", content = content)),
+            max_tokens = operation.maxTokens ?: appProperties.openrouter.maxTokens,
+        )
         val response = post(request, operation.tag)
         response?.error?.let { error ->
             logger.error { "[OpenRouter] ${operation.tag} API error: ${error.message}" }

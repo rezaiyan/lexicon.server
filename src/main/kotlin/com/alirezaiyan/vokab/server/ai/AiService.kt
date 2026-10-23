@@ -41,6 +41,7 @@ class AiService(
         // Base64 inflates by ~4/3.
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
         require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
+        val targetLanguage = targetLanguage.asPromptLabel()
         logger.info { "[AI] Image extraction: size=~${estimatedSizeBytes / 1024}KB, language=$targetLanguage" }
 
         val (extractionType, extractionRule) = when {
@@ -198,7 +199,10 @@ class AiService(
     }
 
     fun translateText(text: String, targetLanguage: String): String {
-        val prompt = promptTemplates.render(Prompt.TRANSLATE, mapOf("targetLanguage" to targetLanguage, "text" to text))
+        val prompt = promptTemplates.render(
+            Prompt.TRANSLATE,
+            mapOf("targetLanguage" to targetLanguage.asPromptLabel(), "text" to text),
+        )
         return aiClient.complete(prompt, AiOperation.TRANSLATION)
             ?: throw UserFacingException("Translation failed. Please try again.")
     }

@@ -1,8 +1,10 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.shared.ApiResponse
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import com.alirezaiyan.vokab.server.shared.RateLimitExceededException
-import com.alirezaiyan.vokab.server.shared.ApiResponse
+import com.alirezaiyan.vokab.server.shared.clientAddress
+import com.alirezaiyan.vokab.server.shared.consumeOrThrow
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
@@ -16,7 +18,8 @@ private val logger = KotlinLogging.logger {}
 
 /**
  * Public onboarding API: submit language preferences and receive suggested vocabulary.
- * No authentication required. Rate limited by IP.
+ * No authentication required. Rate limited per IP, and in total across all IPs so that rotating
+ * addresses can't run up an unbounded AI bill.
  */
 @RestController
 @RequestMapping("/api/v1/onboarding")
@@ -43,7 +46,7 @@ class OnboardingController(
         @Valid @RequestBody request: OnboardingPreferencesRequest,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ApiResponse<SuggestVocabularyResponse>> {
-        val clientIp = getClientIp(httpRequest)
+        val clientIp = httpRequest.clientAddress()
         logger.info {
             val interestsSummary = if (request.interests.isEmpty()) {
                 "none"
@@ -60,6 +63,10 @@ class OnboardingController(
             logger.warn { "Onboarding rate limit exceeded for IP $clientIp" }
             throw RateLimitExceededException("Rate limit exceeded. Please try again in a minute.")
         }
+        // Checked after the per-IP limit, so one throttled client can't drain the shared budget
+        rateLimitConfig.getOnboardingGlobalBucket().consumeOrThrow {
+            logger.warn { "Onboarding global AI budget exhausted; refusing request from $clientIp" }
+        }
 
         val response = vocabularySuggestionService.suggestForOnboarding(
             targetLanguage = request.targetLanguage,
@@ -69,14 +76,5 @@ class OnboardingController(
         )
         logger.info { "Onboarding: returning ${response.items.size} vocabulary items to $clientIp" }
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
-    }
-
-    private fun getClientIp(request: HttpServletRequest): String {
-        val forwarded = request.getHeader("X-Forwarded-For")
-        return if (!forwarded.isNullOrBlank()) {
-            forwarded.split(",").firstOrNull()?.trim() ?: request.remoteAddr
-        } else {
-            request.remoteAddr ?: "unknown"
-        }
     }
 }

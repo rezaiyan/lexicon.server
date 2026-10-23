@@ -3,6 +3,9 @@ package com.alirezaiyan.vokab.server.auth
 import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.ApiResponse
+import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.alirezaiyan.vokab.server.shared.clientAddress
+import com.alirezaiyan.vokab.server.shared.consumeOrThrow
 import io.github.oshai.kotlinlogging.KotlinLogging
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.validation.Valid
@@ -20,7 +23,8 @@ class AuthController(
     private val authService: AuthService,
     private val tokenService: TokenService,
     private val accountDeletionService: AccountDeletionService,
-    private val appProperties: AppProperties
+    private val appProperties: AppProperties,
+    private val rateLimitConfig: RateLimitConfig,
 ) {
     
     @PostMapping("/google")
@@ -30,7 +34,8 @@ class AuthController(
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        val ipAddress = getClientIpAddress(httpRequest)
+        val ipAddress = httpRequest.clientAddress()
+        consumeAuthAttempt(ipAddress, "google")
         val response = authService.authenticateWithGoogle(request.idToken, platform, appVersion, ipAddress)
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
@@ -42,7 +47,8 @@ class AuthController(
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         httpRequest: HttpServletRequest
     ): ResponseEntity<ApiResponse<AuthResponse>> {
-        val ipAddress = getClientIpAddress(httpRequest)
+        val ipAddress = httpRequest.clientAddress()
+        consumeAuthAttempt(ipAddress, "apple")
         val response = authService.authenticateWithApple(
             request.idToken,
             request.fullName,
@@ -60,11 +66,14 @@ class AuthController(
         @RequestHeader("X-Platform", required = false) platform: String?,
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         @RequestParam("premium", defaultValue = "true") premium: Boolean,
+        httpRequest: HttpServletRequest,
     ): ResponseEntity<ApiResponse<AuthResponse>> {
         if (!appProperties.ciAuth.enabled) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse(success = false, message = "Not found"))
         }
+        // After the enabled check: a disabled endpoint keeps answering a plain 404
+        consumeAuthAttempt(httpRequest.clientAddress(), "ci-token")
 
         if (ciSecret.isNullOrBlank() || !constantTimeEquals(ciSecret, appProperties.ciAuth.secret)) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
@@ -77,8 +86,13 @@ class AuthController(
 
     @PostMapping("/refresh")
     fun refreshToken(
-        @Valid @RequestBody request: RefreshTokenRequest
+        @Valid @RequestBody request: RefreshTokenRequest,
+        httpRequest: HttpServletRequest,
     ): ResponseEntity<ApiResponse<AuthResponse>> {
+        val ipAddress = httpRequest.clientAddress()
+        rateLimitConfig.getRefreshBucket(ipAddress).consumeOrThrow {
+            logger.warn { "Refresh rate limit exceeded for IP $ipAddress" }
+        }
         val response = tokenService.rotate(request.refreshToken)
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
@@ -92,21 +106,11 @@ class AuthController(
         return ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
     }
     
-    private fun getClientIpAddress(request: HttpServletRequest): String {
-        var ipAddress = request.getHeader("X-Forwarded-For")
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equals(ipAddress, ignoreCase = true)) {
-            ipAddress = request.getHeader("X-Real-IP")
+    /** Takes one sign-in attempt for [ipAddress], or rejects the call with a 429 and Retry-After. */
+    private fun consumeAuthAttempt(ipAddress: String, endpoint: String) {
+        rateLimitConfig.getAuthBucket(ipAddress).consumeOrThrow {
+            logger.warn { "Auth rate limit exceeded for IP $ipAddress on $endpoint" }
         }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equals(ipAddress, ignoreCase = true)) {
-            ipAddress = request.getHeader("Proxy-Client-IP")
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equals(ipAddress, ignoreCase = true)) {
-            ipAddress = request.getHeader("WL-Proxy-Client-IP")
-        }
-        if (ipAddress == null || ipAddress.isEmpty() || "unknown".equals(ipAddress, ignoreCase = true)) {
-            ipAddress = request.remoteAddr
-        }
-        return ipAddress?.split(",")?.firstOrNull()?.trim() ?: request.remoteAddr
     }
     
     @PostMapping("/logout-all")

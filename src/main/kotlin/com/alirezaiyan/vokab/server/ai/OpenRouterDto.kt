@@ -7,6 +7,15 @@ import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import jakarta.validation.constraints.NotNull
 
+/** Language names and levels reach prompts (as [asPromptLabel]s); real ones are far shorter. */
+const val MAX_LANGUAGE_LENGTH = 40
+
+/** Most interests (topics) one request may carry, each at most [MAX_LANGUAGE_LENGTH] characters. */
+const val MAX_INTERESTS = 10
+
+/** Raw translate input; the controller then allows at most 200 characters after trimming. */
+const val MAX_TRANSLATE_TEXT_LENGTH = 1000
+
 /** A request the learner can steer: free quick picks plus their own (screened, guided-priced) words. */
 interface GuidedAiRequest {
     val focus: VocabularyFocus?
@@ -18,6 +27,7 @@ data class ExtractVocabularyRequest(
     val imageBase64: String,
     
     @field:NotBlank(message = "Target language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val targetLanguage: String,
     
     val extractWords: Boolean = true,
@@ -41,9 +51,11 @@ data class InsightResponse(
 
 data class TranslateTextRequest(
     @field:NotBlank(message = "Text is required")
+    @field:Size(min = 1, max = MAX_TRANSLATE_TEXT_LENGTH)
     val text: String,
     
     @field:NotBlank(message = "Target language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val targetLanguage: String
 )
 
@@ -56,17 +68,20 @@ data class TranslateTextResponse(
 
 data class SuggestVocabularyRequest(
     @field:NotBlank(message = "Target language (language to learn) is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val targetLanguage: String,
 
     @field:NotBlank(message = "Current level in the target language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val currentLevel: String,
 
     @field:NotBlank(message = "Native or current language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val nativeLanguage: String,
 
     /** Optional focus topics; older clients omit it. */
-    @field:Size(max = 10, message = "At most 10 interests")
-    val interests: List<@Size(max = 40) String> = emptyList(),
+    @field:Size(max = MAX_INTERESTS, message = "At most 10 interests")
+    val interests: List<@Size(max = MAX_LANGUAGE_LENGTH) String> = emptyList(),
 
     /** ISO code of [targetLanguage] (e.g. "de"), used to skip words the user already has. */
     @field:Size(max = 8)
@@ -89,19 +104,24 @@ data class SuggestVocabularyRequest(
  */
 data class OnboardingPreferencesRequest(
     @field:NotBlank(message = "Target language (language to learn) is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val targetLanguage: String,
 
     @field:NotBlank(message = "Native or current language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val nativeLanguage: String,
 
     @field:NotBlank(message = "Current level in the target language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val currentLevel: String,
 
     /**
      * Optional list of interests or topics (e.g., "travel", "business", "university")
-     * that should guide the generated vocabulary set.
+     * that should guide the generated vocabulary set. Each one goes into the prompt, so both the
+     * count and the length are bounded (same limits as [SuggestVocabularyRequest.interests]).
      */
-    val interests: List<String> = emptyList()
+    @field:Size(max = MAX_INTERESTS, message = "At most 10 interests")
+    val interests: List<@Size(max = MAX_LANGUAGE_LENGTH) String> = emptyList()
 )
 
 /**
@@ -127,9 +147,11 @@ data class ExtractWordsRequest(
     val imageBase64: String,
 
     @field:NotBlank(message = "Learning language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val learningLanguage: String,
 
     @field:NotBlank(message = "Native language is required")
+    @field:Size(min = 1, max = MAX_LANGUAGE_LENGTH)
     val nativeLanguage: String,
 
     /** Also return short phrases, not only single words. */

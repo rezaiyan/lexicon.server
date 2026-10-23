@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.mcp
 
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.alirezaiyan.vokab.server.shared.clientAddress
 import jakarta.servlet.http.HttpServletRequest
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.http.HttpStatus
@@ -36,10 +37,5 @@ class McpClientRegistrationController(
     }
 }
 
-/**
- * The caller's address as Caddy saw it. Caddy appends it last to X-Forwarded-For; earlier entries
- * are client-supplied and would let anyone dodge the per-IP limits.
- */
-internal fun clientIp(request: HttpServletRequest): String =
-    request.getHeader("X-Forwarded-For")?.split(",")?.lastOrNull()?.trim()?.takeIf { it.isNotEmpty() }
-        ?: request.remoteAddr
+/** The caller's address for per-IP limits; see [clientAddress] for why headers are not read here. */
+internal fun clientIp(request: HttpServletRequest): String = request.clientAddress()

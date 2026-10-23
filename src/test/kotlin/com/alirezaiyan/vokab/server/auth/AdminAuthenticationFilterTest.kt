@@ -4,6 +4,7 @@ import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.fixedClock
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.alirezaiyan.vokab.server.shared.RateLimitProperties
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -32,7 +33,10 @@ class AdminAuthenticationFilterTest {
             block()
         }
 
-    private fun run(request: MockHttpServletRequest): Pair<MockHttpServletResponse, MockFilterChain> {
+    private fun run(
+        request: MockHttpServletRequest,
+        filter: AdminAuthenticationFilter = this.filter,
+    ): Pair<MockHttpServletResponse, MockFilterChain> {
         val response = MockHttpServletResponse()
         val chain = MockFilterChain()
         filter.doFilter(request, response, chain)
@@ -68,6 +72,54 @@ class AdminAuthenticationFilterTest {
         assertNull(chain.request)
         // Another client is unaffected
         assertNotNull(run(adminRequest(ip = "10.0.0.10") { addHeader(ADMIN_KEY_HEADER, key) }).second.request)
+    }
+
+    @Test
+    fun `X-Forwarded-For is ignored, so a client can't rotate its way past the lockout`() {
+        repeat(5) {
+            run(adminRequest(ip = "10.0.0.11") {
+                addHeader("X-Forwarded-For", "198.51.100.$it")
+                addHeader(ADMIN_KEY_HEADER, "guess-$it")
+            })
+        }
+
+        val (response, _) = run(adminRequest(ip = "10.0.0.11") {
+            addHeader("X-Forwarded-For", "198.51.100.99")
+            addHeader(ADMIN_KEY_HEADER, key)
+        })
+
+        assertEquals(429, response.status)
+    }
+
+    @Test
+    fun `failures from many IPs together lock admin key auth for everyone`() {
+        val limitedProps = AppProperties(rateLimit = RateLimitProperties(adminFailuresGlobalPerHour = 3))
+            .apply { security.adminApiKey = key }
+        val limited = AdminAuthenticationFilter(
+            AdminSessionTokens(limitedProps, fixedClock(TEST_NOW)),
+            RateLimitConfig(limitedProps),
+        )
+        repeat(3) { run(adminRequest(ip = "10.1.0.$it") { addHeader(ADMIN_KEY_HEADER, "guess") }, limited) }
+
+        val (response, chain) = run(adminRequest(ip = "10.2.0.1") { addHeader(ADMIN_KEY_HEADER, key) }, limited)
+
+        assertEquals(429, response.status)
+        assertNull(chain.request)
+    }
+
+    @Test
+    fun `a configured key shorter than 32 characters disables key auth`() {
+        val weakProps = AppProperties().apply { security.adminApiKey = "short-key" }
+        val weak = AdminAuthenticationFilter(
+            AdminSessionTokens(weakProps, fixedClock(TEST_NOW)),
+            RateLimitConfig(weakProps),
+        )
+
+        val (response, chain) = run(adminRequest { addHeader(ADMIN_KEY_HEADER, "short-key") }, weak)
+
+        assertEquals(401, response.status)
+        assertNull(chain.request)
+        assertTrue(!isAdmin())
     }
 
     @Test

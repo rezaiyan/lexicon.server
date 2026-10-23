@@ -17,15 +17,30 @@ import org.springframework.web.ErrorResponse as SpringErrorResponse
 
 private val logger = KotlinLogging.logger {}
 
+/** Classes whose exception messages were written by us (tests included), not by a library. */
+private const val APP_PACKAGE_PREFIX = "com.alirezaiyan.vokab."
+
 @RestControllerAdvice
 class GlobalExceptionHandler {
 
+    /**
+     * 400. The message reaches the client only when our own code created the exception (a
+     * `require(...) { "msg" }` or an explicit throw): those messages are written for callers. One
+     * raised inside a library or the JDK (a bad UUID, number or enum name, ...) can carry internal
+     * detail, so the client gets a generic message and the log keeps the real one.
+     */
     @ExceptionHandler(IllegalArgumentException::class)
     fun handleIllegalArgumentException(ex: IllegalArgumentException): ResponseEntity<ApiResponse<Unit>> {
-        logger.warn { "IllegalArgumentException: ${ex.message}" }
+        val origin = ex.stackTrace.firstOrNull()?.className
+        logger.warn { "IllegalArgumentException from $origin: ${ex.message}" }
+        val message = if (origin?.startsWith(APP_PACKAGE_PREFIX) == true) {
+            ex.message ?: "Invalid argument"
+        } else {
+            "Invalid request"
+        }
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)
-            .body(ApiResponse(success = false, message = ex.message ?: "Invalid argument"))
+            .body(ApiResponse(success = false, message = message))
     }
 
     @ExceptionHandler(UserFacingException::class)

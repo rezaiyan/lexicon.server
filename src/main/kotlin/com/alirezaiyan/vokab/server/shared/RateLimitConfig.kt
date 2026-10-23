@@ -1,30 +1,72 @@
 package com.alirezaiyan.vokab.server.shared
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import io.github.bucket4j.Bandwidth
 import io.github.bucket4j.Bucket
 import org.springframework.context.annotation.Configuration
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.time.Duration
-import java.util.concurrent.ConcurrentHashMap
+
+/** Most buckets kept at once; past it the least used go (an evicted bucket comes back full). */
+private const val MAX_BUCKETS = 100_000L
+
+/** Leading bytes of an IPv6 address that form its /64 network, what one subscriber usually holds. */
+private const val IPV6_PREFIX_BYTES = 8
+
+/** A bucket idle this long is dropped; never shorter than twice the longest refill window. */
+private val MIN_BUCKET_IDLE: Duration = Duration.ofHours(2)
 
 @Configuration
 class RateLimitConfig(private val appProperties: AppProperties) {
 
-    private val cache: MutableMap<String, Bucket> = ConcurrentHashMap()
-    
+    /**
+     * Per-user and per-IP buckets. Bounded and expiring, so a flood of new IPs or users can't grow
+     * memory without limit; an idle bucket only goes once its window would have refilled it anyway.
+     */
+    private val cache: Cache<String, Bucket> = Caffeine.newBuilder()
+        .maximumSize(MAX_BUCKETS)
+        .expireAfterAccess(bucketIdleTimeout(appProperties))
+        .build()
+
+    /** All unauthenticated onboarding AI calls together, from any IP (see [getOnboardingGlobalBucket]). */
+    private val onboardingGlobal: Bucket by lazy {
+        val limits = appProperties.rateLimit
+        Bucket.builder()
+            .addLimit(
+                Bandwidth.builder().capacity(limits.onboardingGlobalPerHour)
+                    .refillGreedy(limits.onboardingGlobalPerHour, Duration.ofHours(1)).build(),
+            )
+            .addLimit(
+                Bandwidth.builder().capacity(limits.onboardingGlobalPerDay)
+                    .refillGreedy(limits.onboardingGlobalPerDay, Duration.ofDays(1)).build(),
+            )
+            .build()
+    }
+
+    /** Failed admin key attempts from every IP together (see [getAdminAuthGlobalBucket]). */
+    private val adminAuthGlobal: Bucket by lazy {
+        val failures = appProperties.rateLimit.adminFailuresGlobalPerHour
+        Bucket.builder()
+            .addLimit(Bandwidth.builder().capacity(failures).refillIntervally(failures, Duration.ofHours(1)).build())
+            .build()
+    }
+
     /** Text AI calls (insight, translation, suggestions) per user: `app.rate-limit.ai-calls` per window. */
     fun getAiBucket(userId: String): Bucket =
-        cache.computeIfAbsent(userId) { windowBucket(appProperties.rateLimit.aiCalls) }
+        cache.get(userId) { windowBucket(appProperties.rateLimit.aiCalls) }
 
     /** Photo extraction calls per user: `app.rate-limit.photo-calls` per window (each call costs more). */
     fun getImageProcessingBucket(userId: String): Bucket =
-        cache.computeIfAbsent("image_$userId") { windowBucket(appProperties.rateLimit.photoCalls) }
+        cache.get("image_$userId") { windowBucket(appProperties.rateLimit.photoCalls) }
 
     /**
      * Refused AI instructions per user. Only refusals consume; an empty bucket pauses the user's
      * instructions until the window ends (plain AI requests keep working).
      */
     fun getInstructionRejectionBucket(userId: Long): Bucket =
-        cache.computeIfAbsent("instruction_rejections_$userId") {
+        cache.get("instruction_rejections_$userId") {
             val rejections = appProperties.aiInstructions.maxRejections
             val window = Duration.ofMinutes(appProperties.aiInstructions.rejectionWindowMinutes)
             val limit = Bandwidth.builder().capacity(rejections).refillIntervally(rejections, window).build()
@@ -37,10 +79,10 @@ class RateLimitConfig(private val appProperties: AppProperties) {
         val limit = Bandwidth.builder().capacity(calls).refillIntervally(calls, window).build()
         return Bucket.builder().addLimit(limit).build()
     }
-    
+
     /** Support chat messages per user: 10 per minute, enough to chat, too few to flood the admin. */
     fun getSupportBucket(userId: Long): Bucket =
-        cache.computeIfAbsent("support_$userId") {
+        cache.get("support_$userId") {
             val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
             Bucket.builder().addLimit(limit).build()
         }
@@ -51,7 +93,7 @@ class RateLimitConfig(private val appProperties: AppProperties) {
      */
     fun getSubscriptionSyncBucket(userId: String): Bucket {
         val key = "subscription_sync_$userId"
-        return cache.computeIfAbsent(key) {
+        return cache.get(key) {
             val limit = Bandwidth.builder().capacity(2).refillIntervally(2, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
@@ -60,53 +102,47 @@ class RateLimitConfig(private val appProperties: AppProperties) {
     }
 
     /**
-     * Get rate limit bucket for authentication endpoints (IP-based)
-     * Limit: 5 login attempts per minute per IP
+     * Sign-in attempts (Google, Apple, CI token, MCP sign-in) per IP: `app.rate-limit.auth-per-minute`.
+     * Roomy enough for many users behind one carrier NAT; every attempt also needs a valid ID token.
      */
     fun getAuthBucket(ipAddress: String): Bucket {
-        val key = "auth_$ipAddress"
-        return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
-            Bucket.builder()
-                .addLimit(limit)
-                .build()
-        }
+        val perMinute = appProperties.rateLimit.authPerMinute
+        return cache.get("auth_${ipKey(ipAddress)}") { perMinuteBucket(perMinute) }
     }
-    
+
     /**
      * Failed admin key attempts (dashboard sign-in and `X-Admin-Key`) per IP: 5 per 15 minutes.
      * Only failures consume; an empty bucket locks the IP out of admin auth until it refills.
      */
     fun getAdminAuthBucket(ipAddress: String): Bucket =
-        cache.computeIfAbsent("admin_auth_$ipAddress") {
+        cache.get("admin_auth_${ipKey(ipAddress)}") {
             val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(15)).build()
             Bucket.builder().addLimit(limit).build()
         }
 
     /**
-     * Get rate limit bucket for token refresh endpoint (IP-based)
-     * Limit: 10 refresh requests per minute per IP
+     * Failed admin key attempts from all IPs together: `app.rate-limit.admin-failures-global-per-hour`.
+     * Only failures consume; while it is empty admin key auth is refused for everyone, so guessing
+     * from many addresses can't go faster than this.
      */
+    fun getAdminAuthGlobalBucket(): Bucket = adminAuthGlobal
+
+    /** Token refreshes per IP: `app.rate-limit.refresh-per-minute` (an app start may refresh). */
     fun getRefreshBucket(ipAddress: String): Bucket {
-        val key = "refresh_$ipAddress"
-        return cache.computeIfAbsent(key) {
-            val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofMinutes(1)).build()
-            Bucket.builder()
-                .addLimit(limit)
-                .build()
-        }
+        val perMinute = appProperties.rateLimit.refreshPerMinute
+        return cache.get("refresh_${ipKey(ipAddress)}") { perMinuteBucket(perMinute) }
     }
 
     /** Open MCP client registration (IP-based): 10 per hour, so nobody can fill the client table. */
     fun getMcpClientRegistrationBucket(ipAddress: String): Bucket =
-        cache.computeIfAbsent("mcp_register_$ipAddress") {
+        cache.get("mcp_register_${ipKey(ipAddress)}") {
             val limit = Bandwidth.builder().capacity(10).refillIntervally(10, Duration.ofHours(1)).build()
             Bucket.builder().addLimit(limit).build()
         }
 
     /** MCP tool calls per learner and app: an abuse ceiling (300 a minute), not a usage limit. */
     fun getMcpCallBucket(key: String): Bucket =
-        cache.computeIfAbsent("mcp_calls_$key") {
+        cache.get("mcp_calls_$key") {
             val limit = Bandwidth.builder().capacity(300).refillGreedy(300, Duration.ofMinutes(1)).build()
             Bucket.builder().addLimit(limit).build()
         }
@@ -116,16 +152,47 @@ class RateLimitConfig(private val appProperties: AppProperties) {
      * Limit: 5 requests per minute per IP to prevent abuse
      */
     fun getOnboardingBucket(ipAddress: String): Bucket {
-        val key = "onboarding_$ipAddress"
-        return cache.computeIfAbsent(key) {
+        val key = "onboarding_${ipKey(ipAddress)}"
+        return cache.get(key) {
             val limit = Bandwidth.builder().capacity(5).refillIntervally(5, Duration.ofMinutes(1)).build()
             Bucket.builder()
                 .addLimit(limit)
                 .build()
         }
     }
+
+    /**
+     * Unauthenticated onboarding AI calls from all IPs together: `app.rate-limit.onboarding-global-per-hour`
+     * and `-per-day`. Caps the bill when someone rotates IPs around [getOnboardingBucket].
+     */
+    fun getOnboardingGlobalBucket(): Bucket = onboardingGlobal
 }
 
+/** Twice the longest refill window (at least [MIN_BUCKET_IDLE]): expiry never resets a bucket early. */
+private fun bucketIdleTimeout(appProperties: AppProperties): Duration = listOf(
+    MIN_BUCKET_IDLE,
+    Duration.ofMinutes(appProperties.rateLimit.windowMinutes).multipliedBy(2),
+    Duration.ofMinutes(appProperties.aiInstructions.rejectionWindowMinutes).multipliedBy(2),
+).max()
+
+/** [perMinute] tokens that all come back at the end of each minute. */
+private fun perMinuteBucket(perMinute: Long): Bucket = Bucket.builder()
+    .addLimit(Bandwidth.builder().capacity(perMinute).refillIntervally(perMinute, Duration.ofMinutes(1)).build())
+    .build()
+
+/**
+ * The rate-limit key for [ip]: IPv4 as is, IPv6 by its /64 network, because one subscriber
+ * usually holds a whole /64 and could otherwise take a fresh bucket per address. Anything that
+ * isn't an IP literal is used unchanged; nothing is ever resolved through DNS.
+ */
+internal fun ipKey(ip: String): String {
+    if (':' !in ip) return ip
+    // Brackets make getByName parse an IPv6 literal or fail, never look a name up; ::ffff:a.b.c.d comes back as IPv4
+    val address = runCatching { InetAddress.getByName("[${ip.substringBefore('%')}]") }.getOrNull()
+    if (address !is Inet6Address) return address?.hostAddress ?: ip
+    val prefix = address.address.copyOf(IPV6_PREFIX_BYTES).joinToString("") { "%02x".format(it) }
+    return "$prefix::/64"
+}
 
 /**
  * Takes one token, or calls [onRejected] and throws [RateLimitExceededException] saying how long

@@ -66,7 +66,12 @@ data class OpenRouterConfig(
     var model: String = "anthropic/claude-haiku-4.5",
     /** Model for second-opinion checks (the rescue copy judge); blank = [model]. */
     var judgeModel: String = "",
-    var timeoutSeconds: Long = 60
+    var timeoutSeconds: Long = 60,
+    /**
+     * `max_tokens` for calls whose answer is a few sentences or a small JSON object. Long answers
+     * (photo extraction, vocabulary lists, rescue copy) have their own, larger cap in `AiOperation`.
+     */
+    var maxTokens: Int = 1024,
 )
 
 data class AppleConfig(
@@ -127,6 +132,15 @@ data class RateLimitProperties(
     var windowMinutes: Long = 5,
     var photoCalls: Long = 20,
     var aiCalls: Long = 50,
+    /** Sign-in attempts (Google, Apple, CI token) per IP per minute. */
+    var authPerMinute: Long = 20,
+    /** Token refreshes per IP per minute. */
+    var refreshPerMinute: Long = 60,
+    /** Unauthenticated onboarding AI calls across all IPs: a ceiling on that bill, not a per-user limit. */
+    var onboardingGlobalPerHour: Long = 200,
+    var onboardingGlobalPerDay: Long = 2000,
+    /** Failed admin key attempts across all IPs per hour before admin key auth pauses for everyone. */
+    var adminFailuresGlobalPerHour: Long = 50,
 )
 
 /** The learner-instruction guard (see `InstructionGuard`). */

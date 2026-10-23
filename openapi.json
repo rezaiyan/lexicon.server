@@ -2104,6 +2104,7 @@
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -2133,10 +2134,12 @@
             "type" : [ "string", "null" ]
           },
           "learningLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -2992,20 +2995,27 @@
       "OnboardingPreferencesRequest" : {
         "properties" : {
           "currentLevel" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "interests" : {
             "items" : {
+              "maxLength" : 40,
+              "minLength" : 0,
               "type" : "string"
             },
+            "maxItems" : 10,
+            "minItems" : 0,
             "type" : "array"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -3627,6 +3637,7 @@
       "SuggestVocabularyRequest" : {
         "properties" : {
           "currentLevel" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
@@ -3644,6 +3655,8 @@
           },
           "interests" : {
             "items" : {
+              "maxLength" : 40,
+              "minLength" : 0,
               "type" : "string"
             },
             "maxItems" : 10,
@@ -3651,10 +3664,12 @@
             "type" : "array"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
@@ -4316,10 +4331,12 @@
       "TranslateTextRequest" : {
         "properties" : {
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "text" : {
+            "maxLength" : 1000,
             "minLength" : 1,
             "type" : "string"
           }

@@ -57,6 +57,26 @@ class OpenRouterClientTest {
     }
 
     @Test
+    fun `short answers are capped at the configured default max_tokens`() {
+        expectChat()
+            .andExpect(jsonPath("$.max_tokens").value(1024))
+            .andRespond(answer("Hallo"))
+
+        client.complete("Translate", AiOperation.TRANSLATION)
+        server.verify()
+    }
+
+    @Test
+    fun `list answers get their own larger max_tokens cap`() {
+        expectChat()
+            .andExpect(jsonPath("$.max_tokens").value(8192))
+            .andRespond(answer("Hallo,hello"))
+
+        client.complete("Suggest", AiOperation.SUGGEST_VOCABULARY)
+        server.verify()
+    }
+
+    @Test
     fun `an image is sent as a JPEG data URL before the prompt`() {
         expectChat()
             .andExpect(jsonPath("$.messages[0].content[0].type").value("image_url"))

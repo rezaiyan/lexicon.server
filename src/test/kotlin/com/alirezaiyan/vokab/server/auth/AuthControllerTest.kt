@@ -23,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.header
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -373,7 +374,56 @@ class AuthControllerTest {
             .andExpect(status().is4xxClientError)
     }
 
+    // ── rate limits ────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST google should return 429 once an IP has used its sign-in attempts`() {
+        val ip = "198.51.100.20"
+        `when`(authService.authenticateWithGoogle("tok", null, null, ip)).thenReturn(createAuthResponse())
+        // AppProperties defaults: 20 sign-in attempts per IP per minute
+        repeat(20) { mockMvc.perform(googleSignIn(ip)).andExpect(status().isOk) }
+
+        mockMvc.perform(googleSignIn(ip))
+            .andExpect(status().isTooManyRequests)
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+            .andExpect(header().exists("Retry-After"))
+    }
+
+    @Test
+    fun `POST google should key the sign-in limit on the resolved address, not X-Forwarded-For`() {
+        val ip = "198.51.100.21"
+        `when`(authService.authenticateWithGoogle("tok", null, null, ip)).thenReturn(createAuthResponse())
+        repeat(20) { n ->
+            mockMvc.perform(googleSignIn(ip).header("X-Forwarded-For", "203.0.113.$n")).andExpect(status().isOk)
+        }
+
+        mockMvc.perform(googleSignIn(ip).header("X-Forwarded-For", "203.0.113.99"))
+            .andExpect(status().isTooManyRequests)
+    }
+
+    @Test
+    fun `POST refresh should return 429 once an IP has used its refreshes`() {
+        val ip = "198.51.100.22"
+        `when`(tokenService.rotate("valid-refresh-token")).thenReturn(createAuthResponse())
+        // AppProperties defaults: 60 refreshes per IP per minute
+        repeat(60) { mockMvc.perform(refresh(ip)).andExpect(status().isOk) }
+
+        mockMvc.perform(refresh(ip))
+            .andExpect(status().isTooManyRequests)
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+    }
+
     // ── factory functions ──────────────────────────────────────────────────────
+
+    private fun googleSignIn(ip: String) = post("/api/v1/auth/google")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""{"idToken":"tok"}""")
+        .with { it.apply { remoteAddr = ip } }
+
+    private fun refresh(ip: String) = post("/api/v1/auth/refresh")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""{"refreshToken":"valid-refresh-token"}""")
+        .with { it.apply { remoteAddr = ip } }
 
     private fun createAuthResponse(
         accessToken: String = "access-tok",

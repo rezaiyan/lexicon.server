@@ -533,7 +533,7 @@ class McpOAuthFlowTest {
 
     /** Registration is limited per IP; each test registration comes from its own address. */
     private fun org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder.withFreshIp() =
-        header("X-Forwarded-For", "10.${registrations / 250}.${registrations++ % 250}.1")
+        with { it.apply { remoteAddr = "10.${registrations / 250}.${registrations++ % 250}.1" } }
 
     private fun metadataDocument(clientId: String) = objectMapper.writeValueAsString(mapOf(
         "client_id" to clientId,

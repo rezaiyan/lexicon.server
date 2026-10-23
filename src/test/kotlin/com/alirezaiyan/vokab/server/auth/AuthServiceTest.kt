@@ -13,6 +13,7 @@ import io.mockk.just
 import io.mockk.Runs
 import io.mockk.verify
 import io.mockk.verifyOrder
+import org.springframework.dao.DataIntegrityViolationException
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
@@ -325,6 +326,75 @@ class AuthServiceTest : AuthServiceTestFixture() {
         assertEquals("access-token", result.accessToken)
     }
 
+    @Test
+    fun `authenticateWithGoogle reactivates a deactivated account`() {
+        val existing = createUser(id = 15L, email = "g15@example.com", googleId = "g-15").apply { active = false }
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-15", email = "g15@example.com")
+        every { userRepository.findByGoogleId("g-15") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithGoogle("token")
+
+        verify { userRepository.save(match { it.id == 15L && it.active }) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle audits a reactivation and drops the cached access answer`() {
+        val existing = createUser(id = 16L, email = "g16@example.com", googleId = "g-16").apply { active = false }
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-16", email = "g16@example.com")
+        every { userRepository.findByGoogleId("g-16") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithGoogle("token", ipAddress = "203.0.113.9")
+
+        verify { auditLogService.logAccountReactivation(16L, "g16@example.com", "Google", "203.0.113.9") }
+        verify { userAccessCache.evict(16L) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle does not audit a reactivation for an active account`() {
+        val existing = createUser(id = 17L, email = "g17@example.com", googleId = "g-17")
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-17", email = "g17@example.com")
+        every { userRepository.findByGoogleId("g-17") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithGoogle("token")
+
+        verify(exactly = 0) { auditLogService.logAccountReactivation(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle retries once when a concurrent sign-in created the user first`() {
+        val created = createUser(id = 18L, email = "race@example.com", googleId = "g-18")
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-18", email = "race@example.com")
+        // First attempt sees no user and loses the insert race; the retry finds the row the other request made
+        every { userRepository.findByGoogleId("g-18") } returnsMany listOf(Optional.empty(), Optional.of(created))
+        every { userRepository.findByEmail("race@example.com") } returns Optional.empty()
+        var saves = 0
+        every { userRepository.save(any()) } answers {
+            if (saves++ == 0) throw DataIntegrityViolationException("duplicate google_id") else firstArg()
+        }
+        stubTokenGeneration(created)
+
+        val result = authService.authenticateWithGoogle("token")
+
+        assertEquals(18L, result.user.id)
+    }
+
+    @Test
+    fun `authenticateWithGoogle gives up after a second constraint violation`() {
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-19", email = "race2@example.com")
+        every { userRepository.findByGoogleId("g-19") } returns Optional.empty()
+        every { userRepository.findByEmail("race2@example.com") } returns Optional.empty()
+        every { userRepository.save(any()) } throws DataIntegrityViolationException("duplicate")
+
+        assertThrows<DataIntegrityViolationException> { authService.authenticateWithGoogle("token") }
+        verify(exactly = 2) { userRepository.save(any()) }
+    }
+
     // ── authenticateWithApple ─────────────────────────────────────────────────
 
     @Test
@@ -404,6 +474,53 @@ class AuthServiceTest : AuthServiceTestFixture() {
 
         assertEquals("real@example.com", result.user.email)
         verify { userRepository.save(match { it.email == "real@example.com" }) }
+    }
+
+    @Test
+    fun `authenticateWithApple reactivates a deactivated account`() {
+        val existing = createUser(id = 21L, email = "a21@example.com", appleId = "sub-21").apply { active = false }
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "sub-21", email = null)
+        every { userRepository.findByAppleId("sub-21") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithApple("token", null, null)
+
+        verify { userRepository.save(match { it.id == 21L && it.active }) }
+    }
+
+    @Test
+    fun `authenticateWithApple links an existing account by a verified email`() {
+        val existing = createUser(id = 22L, email = "a22@example.com", googleId = "g-22")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-22", email = "a22@example.com", emailVerified = true)
+        every { userRepository.findByAppleId("sub-22") } returns Optional.empty()
+        every { userRepository.findByEmail("a22@example.com") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals(22L, result.user.id)
+        assertEquals("sub-22", existing.appleId)
+    }
+
+    @Test
+    fun `authenticateWithApple does not link an existing account by an unverified email`() {
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-23", email = "victim@example.com", emailVerified = false)
+        every { userRepository.findByAppleId("sub-23") } returns Optional.empty()
+        every { userRepository.save(any()) } answers { firstArg<User>().withAssignedId(23L) }
+        every { jwtTokenProvider.generateAccessToken(23L, "apple_sub-23@apple.hidden", any()) } returns "access-token"
+        every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
+        every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
+        every { refreshTokenRepository.save(any()) } answers { firstArg() }
+        every { jwtTokenProvider.getExpirationTime() } returns 86400L
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("apple_sub-23@apple.hidden", result.user.email)
+        verify(exactly = 0) { userRepository.findByEmail(any()) }
     }
 
     // ── TestAccessPolicy (test-email list, applied on interactive sign-in) ────

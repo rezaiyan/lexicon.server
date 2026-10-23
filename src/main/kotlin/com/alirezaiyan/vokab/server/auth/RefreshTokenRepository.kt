@@ -25,9 +25,10 @@ interface RefreshTokenRepository : JpaRepository<RefreshToken, Long> {
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.user = :user")
     fun revokeAllByUser(user: User): Int
 
+    /** Revokes the token only if it belongs to [userId], so one user can't revoke another's session. */
     @Modifying
-    @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.tokenHash = :tokenHash")
-    fun revokeByTokenHash(tokenHash: String): Int
+    @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.tokenHash = :tokenHash AND r.user.id = :userId")
+    fun revokeByTokenHash(tokenHash: String, userId: Long): Int
 
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.familyId = :familyId")

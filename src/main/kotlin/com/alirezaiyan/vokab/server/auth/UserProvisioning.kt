@@ -13,18 +13,26 @@ import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
-/** A signed-in user after find-or-create, saved; [isNew] when this sign-in created the account. */
-data class ProvisionedUser(val user: User, val userId: Long, val isNew: Boolean)
+/**
+ * A signed-in user after find-or-create, saved; [isNew] when this sign-in created the account,
+ * [reactivated] when it brought back a deactivated one.
+ */
+data class ProvisionedUser(val user: User, val userId: Long, val isNew: Boolean, val reactivated: Boolean = false)
 
 /**
  * Finds, links or creates the account behind a verified identity and saves it, with the test-list
  * premium grant applied. Runs inside the caller's sign-in transaction.
+ *
+ * A Google or Apple sign-in reactivates a deactivated account: deactivation only comes from Apple
+ * consent revocation, and signing in again is renewed consent. Without it the user would get tokens
+ * that every endpoint refuses, with no way back.
  */
 @Component
 class UserProvisioning(
     private val userRepository: UserRepository,
     private val userPlatformRepository: UserPlatformRepository,
     private val testAccessPolicy: TestAccessPolicy,
+    private val userAccessCache: UserAccessCache,
     private val clock: Clock,
 ) {
 
@@ -55,20 +63,25 @@ class UserProvisioning(
             }
             ?: User(email = email, name = name, googleId = claims.uid, lastLoginAt = now)
                 .also { logger.info { "Creating new user" } }
-        return save(testAccessPolicy.applyTo(user))
+        val reactivated = user.reactivate()
+        return save(testAccessPolicy.applyTo(user), reactivated)
     }
 
     /**
      * Apple id is the primary key for lookup. Email linking only happens when Apple shared the real
-     * address ([email] non-null) — a fallback address must never match another account. A returning
-     * user keeps their stored email: Apple omitting the claim must not replace a real address with
-     * the fallback.
+     * address and marked it verified — a fallback or unverified address must never match another
+     * account, so an unverified [email] is treated as absent. A returning user keeps their stored
+     * email: Apple omitting the claim must not replace a real address with the fallback.
      */
-    fun appleUser(appleId: String, email: String?, fullName: String?): ProvisionedUser {
+    fun appleUser(appleId: String, email: String?, emailVerified: Boolean, fullName: String?): ProvisionedUser {
         val now = Instant.now(clock)
+        val trustedEmail = email?.takeIf { emailVerified }
+        if (email != null && trustedEmail == null) {
+            logger.warn { "Apple sign-in: email not marked verified; not using it for linking" }
+        }
         val user = userRepository.findByAppleId(appleId).orElse(null)
             ?.also { it.recordLogin(now) }
-            ?: email?.let { userRepository.findByEmail(it).orElse(null) }?.let { existing ->
+            ?: trustedEmail?.let { userRepository.findByEmail(it).orElse(null) }?.let { existing ->
                 logger.info { "Linking Apple account to userId=${existing.id}" }
                 existing.also {
                     it.appleId = appleId
@@ -76,8 +89,9 @@ class UserProvisioning(
                     it.recordLogin(now)
                 }
             }
-            ?: newAppleUser(appleId, email, fullName, now)
-        return save(testAccessPolicy.applyTo(user))
+            ?: newAppleUser(appleId, trustedEmail, fullName, now)
+        val reactivated = user.reactivate()
+        return save(testAccessPolicy.applyTo(user), reactivated)
     }
 
     /**
@@ -131,10 +145,20 @@ class UserProvisioning(
         )
     }
 
-    private fun save(user: User): ProvisionedUser {
+    private fun save(user: User, reactivated: Boolean = false): ProvisionedUser {
         val isNew = user.id == null
         val saved = userRepository.save(user)
-        return ProvisionedUser(saved, saved.requireId(), isNew)
+        // The cached "inactive" answer would otherwise refuse the new tokens until it expires
+        if (reactivated) userAccessCache.evict(saved.requireId())
+        return ProvisionedUser(saved, saved.requireId(), isNew, reactivated)
+    }
+
+    /** Marks a deactivated account active again; true if it was deactivated. */
+    private fun User.reactivate(): Boolean {
+        if (active) return false
+        active = true
+        logger.info { "Reactivating deactivated account userId=$id on sign-in" }
+        return true
     }
 
     private fun User.recordLogin(now: Instant) {

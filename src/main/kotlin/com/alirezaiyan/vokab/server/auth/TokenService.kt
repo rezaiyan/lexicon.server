@@ -99,12 +99,14 @@ class TokenService(
         throw AuthRejectedException("Refresh token has been revoked")
     }
 
-    /** Revokes one refresh token. */
+    /** Revokes one of [userId]'s refresh tokens; a token belonging to anyone else is left alone. */
     @Transactional
     fun logout(userId: Long, refreshToken: String) {
         logger.info { "Logging out user: $userId" }
         val lookupHash = refreshTokenHashService.createLookupHash(refreshToken)
-        refreshTokenRepository.revokeByTokenHash(lookupHash)
+        if (refreshTokenRepository.revokeByTokenHash(lookupHash, userId) == 0) {
+            logger.warn { "Logout for userId=$userId matched none of their refresh tokens" }
+        }
 
         userRepository.findById(userId).orElse(null)?.let { user ->
             auditLogService.logLogout(userId, user.email, lookupHash, null)
@@ -130,9 +132,18 @@ class TokenService(
             type = "sign_out",
         )
 
+        revokeAllSessions(user, userId)
+        auditLogService.logLogoutAll(userId, user.email, null)
+    }
+
+    /**
+     * Revokes every refresh token of the user and every access token issued so far, without
+     * notifying devices (logout-all, Apple consent revocation).
+     */
+    @Transactional
+    fun revokeAllSessions(user: User, userId: Long) {
         refreshTokenRepository.revokeAllByUser(user)
         revokeAccessTokens(user, userId)
-        auditLogService.logLogoutAll(userId, user.email, null)
     }
 
     /**

@@ -266,14 +266,14 @@ class TokenServiceTest : AuthServiceTestFixture() {
         val user = createUser(id = userId)
 
         every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
+        every { refreshTokenRepository.revokeByTokenHash(lookupHash, userId) } returns 1
         every { userRepository.findById(userId) } returns Optional.of(user)
 
         // Act
         tokenService.logout(userId, refreshToken)
 
         // Assert
-        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash) }
+        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash, userId) }
     }
 
     @Test
@@ -285,7 +285,7 @@ class TokenServiceTest : AuthServiceTestFixture() {
         val user = createUser(id = userId)
 
         every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
+        every { refreshTokenRepository.revokeByTokenHash(lookupHash, userId) } returns 1
         every { userRepository.findById(userId) } returns Optional.of(user)
 
         // Act
@@ -303,14 +303,14 @@ class TokenServiceTest : AuthServiceTestFixture() {
         val lookupHash = "orphan-hash"
 
         every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
+        every { refreshTokenRepository.revokeByTokenHash(lookupHash, userId) } returns 1
         every { userRepository.findById(userId) } returns Optional.empty()
 
         // Act — must not throw even if the user row is gone
         assertDoesNotThrow { tokenService.logout(userId, refreshToken) }
 
         // Assert
-        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash) }
+        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash, userId) }
         verify(exactly = 0) { auditLogService.logLogout(any(), any(), any(), any()) }
     }
 

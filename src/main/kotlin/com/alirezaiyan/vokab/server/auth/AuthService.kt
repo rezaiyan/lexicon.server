@@ -7,14 +7,20 @@ import com.alirezaiyan.vokab.server.shared.UserSignedInEvent
 import com.alirezaiyan.vokab.server.shared.UserSignedUpEvent
 import com.alirezaiyan.vokab.server.user.GeoLocationService
 import io.github.oshai.kotlinlogging.KotlinLogging
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
+import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.transaction.support.TransactionTemplate
 
 private val logger = KotlinLogging.logger {}
 
 /**
  * Sign-in (Google via Firebase, Sign in with Apple, CI): verifies the identity, provisions the
  * account through [UserProvisioning] and issues tokens through [TokenService].
+ *
+ * Google and Apple verify the ID token before opening a transaction (it may fetch signing keys), then
+ * provision and issue tokens in one transaction, retried once if it loses a race to create the user.
  */
 @Service
 class AuthService(
@@ -26,7 +32,9 @@ class AuthService(
     private val auditLogService: AuditLogService,
     private val domainEventPublisher: DomainEventPublisher,
     private val geoLocationService: GeoLocationService,
+    transactionManager: PlatformTransactionManager,
 ) {
+    private val transactionTemplate = TransactionTemplate(transactionManager)
 
     /** Request metadata recorded on every interactive sign-in. */
     private data class SignInContext(
@@ -47,7 +55,6 @@ class AuthService(
      *
      * @throws AuthRejectedException if the token is invalid, not from Google Sign-In, or carries no email
      */
-    @Transactional
     fun authenticateWithGoogle(
         idToken: String,
         platform: String? = null,
@@ -63,8 +70,8 @@ class AuthService(
             ?: throw AuthRejectedException("Email not found in Firebase token")
 
         logger.info { "Authenticating user" }
-        val provisioned = userProvisioning.googleUser(claims, email)
-        return completeSignIn(provisioned, SignInContext(SignInProvider.GOOGLE, platform, appVersion, ipAddress))
+        val ctx = SignInContext(SignInProvider.GOOGLE, platform, appVersion, ipAddress)
+        return inSignInTransaction { completeSignIn(userProvisioning.googleUser(claims, email), ctx) }
     }
 
     /**
@@ -77,7 +84,6 @@ class AuthService(
      *   when present the token's `nonce` claim must be its SHA-256 hex. Optional until clients send it.
      * @throws AuthRejectedException if the token is invalid or doesn't match [appleUserId] / [nonce]
      */
-    @Transactional
     fun authenticateWithApple(
         idToken: String,
         fullName: String?,
@@ -95,8 +101,11 @@ class AuthService(
         }
 
         logger.info { "Authenticating user with Apple: appleId=${claims.subject}" }
-        val provisioned = userProvisioning.appleUser(claims.subject, claims.email, fullName)
-        return completeSignIn(provisioned, SignInContext(SignInProvider.APPLE, platform, appVersion, ipAddress))
+        val ctx = SignInContext(SignInProvider.APPLE, platform, appVersion, ipAddress)
+        return inSignInTransaction {
+            val provisioned = userProvisioning.appleUser(claims.subject, claims.email, claims.emailVerified, fullName)
+            completeSignIn(provisioned, ctx)
+        }
     }
 
     /**
@@ -118,10 +127,25 @@ class AuthService(
         return response
     }
 
+    /**
+     * Runs [block] in a transaction. Two first sign-ins of the same identity at once both try to
+     * insert the user and one hits a unique constraint; its retry, in a fresh transaction, finds the
+     * row the other created.
+     */
+    private fun inSignInTransaction(block: () -> AuthResponse): AuthResponse = try {
+        requireNotNull(transactionTemplate.execute { block() })
+    } catch (e: DataIntegrityViolationException) {
+        logger.info(e) { "Sign-in lost a race with a concurrent sign-in of the same account; retrying once" }
+        requireNotNull(transactionTemplate.execute { block() })
+    }
+
     /** Shared tail of every interactive sign-in: record, issue tokens, publish events. */
     private fun completeSignIn(provisioned: ProvisionedUser, ctx: SignInContext): AuthResponse {
         val (user, userId, isNewUser) = provisioned
         userProvisioning.recordPlatform(userId, ctx.platform, ctx.appVersion)
+        if (provisioned.reactivated) {
+            auditLogService.logAccountReactivation(userId, user.email, ctx.provider.auditName, ctx.ipAddress)
+        }
 
         val response = tokenService.issue(user, userId)
 

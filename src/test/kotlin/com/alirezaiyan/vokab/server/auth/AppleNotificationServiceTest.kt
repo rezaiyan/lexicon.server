@@ -31,6 +31,7 @@ class AppleNotificationServiceTest {
     private lateinit var objectMapper: ObjectMapper
     private lateinit var pushNotificationService: PushNotificationService
     private lateinit var accountDeletionService: AccountDeletionService
+    private lateinit var tokenService: TokenService
 
     private lateinit var appleNotificationService: AppleNotificationService
 
@@ -41,6 +42,7 @@ class AppleNotificationServiceTest {
         objectMapper = jacksonObjectMapper()
         pushNotificationService = mockk()
         accountDeletionService = mockk()
+        tokenService = mockk(relaxed = true)
 
         appleNotificationService = AppleNotificationService(
             userRepository,
@@ -48,7 +50,7 @@ class AppleNotificationServiceTest {
             objectMapper,
             pushNotificationService,
             accountDeletionService,
-            userAccessCache = mockk(relaxed = true),
+            tokenService = tokenService,
             clock = fixedClock()
         )
     }
@@ -162,6 +164,7 @@ class AppleNotificationServiceTest {
         )
         every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
         every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
+        every { userRepository.findByEmail(newEmail) } returns Optional.empty()
 
         val savedSlot = slot<User>()
         every { userRepository.save(capture(savedSlot)) } answers { firstArg() }
@@ -170,6 +173,25 @@ class AppleNotificationServiceTest {
 
         assertTrue(result)
         verify(exactly = 1) { userRepository.save(match { it.email == newEmail }) }
+    }
+
+    @Test
+    fun `should not take another account's email on EMAIL_ENABLED event`() {
+        val user = createUser(id = 1L, appleId = "apple-user-1", email = "old@example.com")
+        val other = createUser(id = 2L, appleId = "apple-user-2", email = "taken@example.com")
+        val (token, rsaKey) = buildSignedJwt(
+            appleUserId = "apple-user-1",
+            eventType = "email-enabled",
+            eventExtra = """"email-enabled":{"email":"taken@example.com","is_private_email":false}"""
+        )
+        every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
+        every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
+        every { userRepository.findByEmail("taken@example.com") } returns Optional.of(other)
+
+        val result = appleNotificationService.processNotification(token)
+
+        assertTrue(result)
+        verify(exactly = 0) { userRepository.save(any()) }
     }
 
     @Test
@@ -200,6 +222,20 @@ class AppleNotificationServiceTest {
 
         assertTrue(result)
         verify(exactly = 1) { userRepository.save(match { !it.active }) }
+    }
+
+    @Test
+    fun `should revoke every session on CONSENT_REVOKED event`() {
+        val user = createUser(id = 43L, appleId = "apple-user-1", active = true)
+        val (token, rsaKey) = buildSignedJwt(appleUserId = "apple-user-1", eventType = "consent-revoked")
+        every { applePublicKeyService.getPublicKey("test-key-id") } returns rsaKey
+        every { userRepository.findByAppleId("apple-user-1") } returns Optional.of(user)
+        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any(), any(), any()) } returns emptyList()
+        every { userRepository.save(any()) } answers { firstArg() }
+
+        appleNotificationService.processNotification(token)
+
+        verify(exactly = 1) { tokenService.revokeAllSessions(user, 43L) }
     }
 
     @Test

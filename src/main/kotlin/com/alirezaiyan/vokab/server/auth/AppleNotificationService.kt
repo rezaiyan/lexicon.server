@@ -27,7 +27,7 @@ class AppleNotificationService(
     private val objectMapper: ObjectMapper,
     private val pushNotificationService: PushNotificationService,
     private val accountDeletionService: AccountDeletionService,
-    private val userAccessCache: UserAccessCache,
+    private val tokenService: TokenService,
     private val clock: Clock
 ) {
     
@@ -113,6 +113,13 @@ class AppleNotificationService(
         if (event != null) {
             logger.info { "  Is private relay: ${event.is_private_email}" }
 
+            // The email column is unique; taking another account's address would fail the whole notification
+            val owner = userRepository.findByEmail(event.email).orElse(null)
+            if (owner != null && owner.id != user.id) {
+                logger.warn { "Not updating email for userId=${user.id}: address belongs to userId=${owner.id}" }
+                return
+            }
+
             // Update user with the new email
             user.email = event.email
             user.updatedAt = Instant.now(clock)
@@ -148,11 +155,12 @@ class AppleNotificationService(
             logger.warn(e) { "Failed to send consent revocation notification, continuing with deactivation" }
         }
         
-        // Mark user as inactive but don't delete data
+        // Mark user as inactive but don't delete data. Every session dies with it, so signing in again
+        // (which reactivates the account) can't bring an old refresh token back to life.
         user.active = false
         user.updatedAt = Instant.now(clock)
         userRepository.save(user)
-        user.id?.let(userAccessCache::evict)
+        tokenService.revokeAllSessions(user, user.requireId())
 
         logger.info { "✅ Deactivated user account: ${user.id}" }
     }

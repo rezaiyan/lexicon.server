@@ -16,6 +16,7 @@ import io.mockk.every
 import io.mockk.justRun
 import io.mockk.mockk
 import org.junit.jupiter.api.BeforeEach
+import org.springframework.transaction.PlatformTransactionManager
 import java.time.Instant
 import java.util.Optional
 import com.alirezaiyan.vokab.server.admin.AppConfigService
@@ -42,6 +43,7 @@ abstract class AuthServiceTestFixture {
     protected lateinit var domainEventPublisher: DomainEventPublisher
     protected lateinit var geoLocationService: GeoLocationService
     protected lateinit var userAccessCache: UserAccessCache
+    protected lateinit var transactionManager: PlatformTransactionManager
 
     protected lateinit var authService: AuthService
     protected lateinit var tokenService: TokenService
@@ -65,6 +67,7 @@ abstract class AuthServiceTestFixture {
         every { appConfigService.getTestEmails() } returns emptySet()
         geoLocationService = mockk(relaxed = true)
         userAccessCache = mockk(relaxed = true)
+        transactionManager = mockk(relaxed = true)
 
         appProperties = AppProperties(
             jwt = JwtConfig(refreshExpirationMs = 7_776_000_000L, refreshTokenGracePeriodMs = 30_000L),
@@ -124,6 +127,7 @@ abstract class AuthServiceTestFixture {
             userRepository = userRepository,
             userPlatformRepository = userPlatformRepository,
             testAccessPolicy = TestAccessPolicy(userRepository, appConfigService, fixedClock()),
+            userAccessCache = userAccessCache,
             clock = fixedClock(),
         ),
         tokenService = buildTokenService(properties),
@@ -131,6 +135,7 @@ abstract class AuthServiceTestFixture {
         auditLogService = auditLogService,
         domainEventPublisher = domainEventPublisher,
         geoLocationService = geoLocationService,
+        transactionManager = transactionManager,
     )
 
     private fun buildTokenService(properties: AppProperties) = TokenService(

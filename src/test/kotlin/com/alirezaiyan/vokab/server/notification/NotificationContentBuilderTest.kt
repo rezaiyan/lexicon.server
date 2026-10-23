@@ -5,7 +5,6 @@ import com.alirezaiyan.vokab.server.ai.DailyInsight
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.analytics.DifficultWordResponse
-import com.alirezaiyan.vokab.server.analytics.LanguagePairStatsResponse
 import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.analytics.WeeklyReportResponse
 import com.alirezaiyan.vokab.server.study.MilestoneDetector.MilestoneEvent
@@ -668,22 +667,6 @@ class NotificationContentBuilderTest {
         level4Count = level4Count,
         level5Count = level5Count,
         level6Count = level6Count
-    )
-
-    private fun createLanguagePairStats(
-        sourceLanguage: String = "en",
-        targetLanguage: String = "de",
-        totalReviews: Long = 50L,
-        correctCount: Long = 40L,
-        uniqueWords: Long = 30L,
-        accuracyPercent: Double = 80.0
-    ): LanguagePairStatsResponse = LanguagePairStatsResponse(
-        sourceLanguage = sourceLanguage,
-        targetLanguage = targetLanguage,
-        totalReviews = totalReviews,
-        correctCount = correctCount,
-        uniqueWords = uniqueWords,
-        accuracyPercent = accuracyPercent
     )
 
     private fun createDifficultWord(

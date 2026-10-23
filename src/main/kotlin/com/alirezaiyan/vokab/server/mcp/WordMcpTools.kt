@@ -5,6 +5,7 @@ import com.alirezaiyan.vokab.server.words.NewWord
 import com.alirezaiyan.vokab.server.words.TagService
 import com.alirezaiyan.vokab.server.words.WordAdditionService
 import com.alirezaiyan.vokab.server.words.WordDto
+import com.alirezaiyan.vokab.server.words.WordQueryService
 import com.alirezaiyan.vokab.server.words.WordService
 import com.fasterxml.jackson.annotation.JsonCreator
 import com.fasterxml.jackson.annotation.JsonInclude
@@ -25,6 +26,7 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty("spring.ai.mcp.server.enabled", havingValue = "true")
 class WordMcpTools(
     private val wordService: WordService,
+    private val wordQueryService: WordQueryService,
     private val wordAdditionService: WordAdditionService,
     private val tagService: TagService,
     private val auditLog: AuditLogService,
@@ -65,7 +67,7 @@ class WordMcpTools(
             tagService.list(userId).firstOrNull { it.name.equals(name.trim(), ignoreCase = true) }?.id
                 ?: return WordList(emptyList(), nextCursor = null)
         }
-        val page = wordService.search(userId, query, language, tagId, limit.clamped(), cursor, newestFirst == true)
+        val page = wordQueryService.search(userId, query, language, tagId, limit.clamped(), cursor, newestFirst == true)
         return WordList(page.words.map { it.toResult() }, page.nextCursor)
     }
 
@@ -94,8 +96,8 @@ class WordMcpTools(
         limit: Int?,
     ): DueWords {
         val userId = context.userIdWithScope(McpScopes.WORDS_READ)
-        val due = wordService.listDue(userId, limit.clamped())
-        return DueWords(dueCount = wordService.countDue(userId).toInt(), words = due.map { it.toResult() })
+        val due = wordQueryService.listDue(userId, limit.clamped())
+        return DueWords(dueCount = wordQueryService.countDue(userId).toInt(), words = due.map { it.toResult() })
     }
 
     @McpTool(

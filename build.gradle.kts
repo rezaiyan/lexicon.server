@@ -28,6 +28,8 @@ description = "Lexicon Server Application"
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
 // Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
 // each override once the BOM catches up.
+// Boot 4.1.1 ships Tomcat 11.0.24: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 (critical), fixed in 11.0.25
+extra["tomcat.version"] = "11.0.27"
 // Jackson 2 is still used by firebase-admin, jjwt and the MCP SDK (the app itself is on Jackson 3)
 extra["jackson-2-bom.version"] = "2.21.7"
 

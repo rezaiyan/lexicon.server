@@ -55,11 +55,12 @@ class AuthController(
             request.appleUserId,
             platform,
             appVersion,
-            ipAddress
+            ipAddress,
+            request.nonce
         )
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
-    
+
     @PostMapping("/ci-token")
     fun authenticateForCi(
         @RequestHeader("X-CI-Secret", required = false) ciSecret: String?,

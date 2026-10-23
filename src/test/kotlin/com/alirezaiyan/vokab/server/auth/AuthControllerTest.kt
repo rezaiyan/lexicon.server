@@ -153,6 +153,21 @@ class AuthControllerTest {
     }
 
     @Test
+    fun `POST apple should pass the raw nonce to the service`() {
+        val authResponse = createAuthResponse()
+        `when`(authService.authenticateWithApple("valid-apple-token", null, null, null, null, "127.0.0.1", "raw-nonce"))
+            .thenReturn(authResponse)
+
+        mockMvc.perform(
+            post("/api/v1/auth/apple")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"idToken":"valid-apple-token","nonce":"raw-nonce"}""")
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+    }
+
+    @Test
     fun `POST apple should return 401 when the token is rejected`() {
         `when`(authService.authenticateWithApple("bad-apple-token", null, null, null, null, "127.0.0.1"))
             .thenThrow(AuthRejectedException("Invalid Apple ID token"))

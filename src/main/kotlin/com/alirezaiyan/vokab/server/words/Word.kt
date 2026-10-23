@@ -69,3 +69,24 @@ class Word(
     )
     var tags: MutableSet<Tag> = mutableSetOf(),
 ) : JpaEntity<Long>()
+
+/**
+ * Bounds for the client-owned spaced-repetition fields. Levels run 0 (new) to 6 (mastered, which
+ * the leaderboard counts), so values outside the ranges are clamped rather than stored as sent.
+ */
+internal object SrsLimits {
+    const val MAX_LEVEL = 6
+    const val DEFAULT_EASE_FACTOR = 2.5f
+    const val MAX_EASE_FACTOR = 10f
+    const val MAX_INTERVAL_DAYS = 36_500
+    const val MAX_REPETITIONS = 100_000
+
+    fun level(value: Int): Int = value.coerceIn(0, MAX_LEVEL)
+
+    fun easeFactor(value: Float): Float =
+        if (value.isNaN()) DEFAULT_EASE_FACTOR else value.coerceIn(0f, MAX_EASE_FACTOR)
+
+    fun interval(value: Int): Int = value.coerceIn(0, MAX_INTERVAL_DAYS)
+
+    fun repetitions(value: Int): Int = value.coerceIn(0, MAX_REPETITIONS)
+}

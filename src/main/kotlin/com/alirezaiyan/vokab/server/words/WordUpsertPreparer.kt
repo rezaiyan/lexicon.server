@@ -11,18 +11,25 @@ class WordUpsertPreparer(
     fun prepareUpsertEntities(user: User, words: List<WordDto>): Collection<Word> {
         if (words.isEmpty()) return emptyList()
 
-        val existingByKey = loadExistingByKey(user, words)
+        val existing = loadExisting(user, words)
         val tagById = loadTagsById(user, words)
-        return buildEntitiesToSave(user, words, existingByKey, tagById).values
+        return buildEntitiesToSave(user, words, existing, tagById).values
     }
 
-    private fun loadExistingByKey(user: User, words: List<WordDto>): Map<WordKey, Word> {
+    /**
+     * The caller's own words that the request may touch. Every query here is scoped to [user], so a
+     * client-supplied id can only ever resolve to one of the caller's words.
+     */
+    private fun loadExisting(user: User, words: List<WordDto>): ExistingWords {
         val knownIds = words.mapNotNull { it.id }
         val byId = if (knownIds.size == words.size) wordRepository.findAllByUserAndIdIn(user, knownIds) else null
         // Full scan to match by content when some words are new, or when an id isn't this user's
         // (a device-local id): matching only by id would store a duplicate.
         val existing = byId?.takeIf { it.size == knownIds.distinct().size } ?: wordRepository.findAllByUser(user)
-        return existing.associateBy { WordKey.of(it.originalWord, it.translation, it.targetLanguage) }
+        return ExistingWords(
+            byKey = existing.associateBy { WordKey.of(it.originalWord, it.translation, it.targetLanguage) },
+            byId = existing.associateBy { checkNotNull(it.id) },
+        )
     }
 
     /** Batch-loads all tags referenced by any DTO in the request (single query). */
@@ -36,13 +43,15 @@ class WordUpsertPreparer(
     private fun buildEntitiesToSave(
         user: User,
         words: List<WordDto>,
-        existingByKey: Map<WordKey, Word>,
+        existing: ExistingWords,
         tagById: Map<Long, Tag>,
     ): LinkedHashMap<WordKey, Word> {
         val result = LinkedHashMap<WordKey, Word>()
         for (dto in words) {
             val key = WordKey.of(dto.originalWord, dto.translation, dto.targetLanguage)
-            val entity = existingByKey[key]?.let { updateEntityFromDto(it, dto, tagById) }
+            // Match by content first, then by id among the caller's own words (an edited term).
+            val match = existing.byKey[key] ?: dto.id?.let { existing.byId[it] }
+            val entity = match?.let { updateEntityFromDto(it, dto, tagById) }
                 ?: createEntityFromDto(user, dto, tagById)
             // last write wins within the same request
             result[key] = entity
@@ -56,10 +65,10 @@ class WordUpsertPreparer(
         entity.description = dto.description
         entity.sourceLanguage = dto.sourceLanguage
         entity.targetLanguage = dto.targetLanguage
-        entity.level = dto.level
-        entity.easeFactor = dto.easeFactor
-        entity.interval = dto.interval
-        entity.repetitions = dto.repetitions
+        entity.level = SrsLimits.level(dto.level)
+        entity.easeFactor = SrsLimits.easeFactor(dto.easeFactor)
+        entity.interval = SrsLimits.interval(dto.interval)
+        entity.repetitions = SrsLimits.repetitions(dto.repetitions)
         entity.lastReviewDate = dto.lastReviewDate
         entity.nextReviewDate = dto.nextReviewDate
         // Only update tags when the client explicitly provides them; empty list means "no tag info"
@@ -69,22 +78,28 @@ class WordUpsertPreparer(
         return entity
     }
 
+    /**
+     * A new row. The client's id is never reused: it is only a lookup key among the caller's own
+     * words, and a non-null id would make `save` merge onto whatever row has it, another user's included.
+     */
     private fun createEntityFromDto(user: User, dto: WordDto, tagById: Map<Long, Tag>): Word = Word(
-        id = dto.id,
+        id = null,
         user = user,
         originalWord = dto.originalWord,
         translation = dto.translation,
         description = dto.description,
         sourceLanguage = dto.sourceLanguage,
         targetLanguage = dto.targetLanguage,
-        level = dto.level,
-        easeFactor = dto.easeFactor,
-        interval = dto.interval,
-        repetitions = dto.repetitions,
+        level = SrsLimits.level(dto.level),
+        easeFactor = SrsLimits.easeFactor(dto.easeFactor),
+        interval = SrsLimits.interval(dto.interval),
+        repetitions = SrsLimits.repetitions(dto.repetitions),
         lastReviewDate = dto.lastReviewDate,
         nextReviewDate = dto.nextReviewDate,
         tags = dto.tagIds.mapNotNull { tagById[it] }.toMutableSet(),
     )
+
+    private class ExistingWords(val byKey: Map<WordKey, Word>, val byId: Map<Long, Word>)
 
     /**
      * Content identity of a word: same term and translation (case-insensitive) in the same learning

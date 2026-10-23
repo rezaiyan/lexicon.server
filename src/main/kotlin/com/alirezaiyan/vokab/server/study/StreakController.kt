@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.study
 import com.alirezaiyan.vokab.server.shared.AuthUser
 import com.alirezaiyan.vokab.server.shared.ApiResponse
 import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
@@ -22,7 +23,7 @@ class StreakController(
     @PostMapping("/record")
     fun recordActivity(
         @AuthenticationPrincipal user: AuthUser,
-        @RequestBody(required = false) request: RecordActivityRequest?
+        @Valid @RequestBody(required = false) request: RecordActivityRequest?
     ): ResponseEntity<ApiResponse<StreakResponse>> {
         val count = request?.count ?: 1
         logger.debug { "Recording activity for userId=${user.id}, count=$count" }

@@ -1,19 +1,29 @@
 package com.alirezaiyan.vokab.server.analytics
 
+import com.fasterxml.jackson.annotation.JsonIgnore
 import jakarta.validation.Valid
 import jakarta.validation.constraints.*
 
 // === Sync (client -> server) ===
+
+/** Review events across all sessions of one sync call; a larger backlog is sent in several calls. */
+const val MAX_EVENTS_PER_SYNC = 10_000
 
 data class SyncAnalyticsRequest(
     @field:Valid
     @field:NotEmpty
     @field:Size(max = 100, message = "Maximum 100 sessions per sync request")
     val sessions: List<SyncSessionRequest>
-)
+) {
+    @get:JsonIgnore
+    @get:AssertTrue(message = "Maximum $MAX_EVENTS_PER_SYNC review events per sync request")
+    val isWithinEventLimit: Boolean
+        get() = sessions.sumOf { it.events.size } <= MAX_EVENTS_PER_SYNC
+}
 
 data class SyncSessionRequest(
     @field:NotBlank
+    @field:Size(max = 128)
     val clientSessionId: String,
     val startedAt: Long,
     val endedAt: Long?,
@@ -26,10 +36,14 @@ data class SyncSessionRequest(
     @field:Min(0)
     val incorrectCount: Int,
     @field:NotBlank
+    @field:Size(max = 32)
     val reviewType: String,
     val completedNormally: Boolean,
+    @field:Size(max = 20)
     val sourceLanguage: String? = null,
+    @field:Size(max = 20)
     val targetLanguage: String? = null,
+    @field:Size(max = 64)
     val triggerSource: String = "unknown",
     @field:Valid
     @field:Size(max = 1000, message = "Maximum 1000 events per session")
@@ -38,9 +52,13 @@ data class SyncSessionRequest(
 
 data class SyncReviewEventRequest(
     val wordId: Long,
+    @field:Size(max = 500)
     val wordText: String,
+    @field:Size(max = 500)
     val wordTranslation: String,
+    @field:Size(max = 20)
     val sourceLanguage: String,
+    @field:Size(max = 20)
     val targetLanguage: String,
     @field:Min(0)
     @field:Max(5)

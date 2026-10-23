@@ -9,12 +9,29 @@ import org.springframework.web.multipart.MultipartFile
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
 
 private val logger = KotlinLogging.logger {}
 
 private const val MAX_FILE_SIZE = 5L * 1024 * 1024 // 5MB
-private val ALLOWED_CONTENT_TYPES = setOf("image/jpeg", "image/png", "image/webp")
+
+private val JPEG_MAGIC = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte())
+private val PNG_MAGIC = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+private val RIFF_MAGIC = "RIFF".toByteArray(Charsets.US_ASCII)
+private val WEBP_MAGIC = "WEBP".toByteArray(Charsets.US_ASCII)
+
+/**
+ * File extension for an accepted image, read from its leading bytes (JPEG, PNG or WebP); null for
+ * anything else. The client's Content-Type header is not trusted.
+ */
+internal fun detectImageExtension(bytes: ByteArray): String? = when {
+    bytes.startsWith(JPEG_MAGIC) -> "jpg"
+    bytes.startsWith(PNG_MAGIC) -> "png"
+    bytes.startsWith(RIFF_MAGIC) && bytes.startsWith(WEBP_MAGIC, offset = 8) -> "webp"
+    else -> null
+}
+
+private fun ByteArray.startsWith(prefix: ByteArray, offset: Int = 0): Boolean =
+    size >= offset + prefix.size && prefix.indices.all { this[offset + it] == prefix[it] }
 
 @Service
 class AvatarService(
@@ -33,16 +50,9 @@ class AvatarService(
 
         require(file.size <= MAX_FILE_SIZE) { "File size exceeds 5MB limit" }
 
-        val contentType = file.contentType
-        require(contentType in ALLOWED_CONTENT_TYPES) {
+        val bytes = file.bytes
+        val extension = requireNotNull(detectImageExtension(bytes)) {
             "File type not allowed. Accepted: JPEG, PNG, WebP"
-        }
-
-        val extension = when (contentType) {
-            "image/jpeg" -> "jpg"
-            "image/png" -> "png"
-            "image/webp" -> "webp"
-            else -> "jpg"
         }
 
         val uploadPath = Paths.get(uploadDir)
@@ -53,7 +63,7 @@ class AvatarService(
 
         val filename = "avatar_${userId}_${clock.millis()}.${extension}"
         val filePath = uploadPath.resolve(filename)
-        Files.copy(file.inputStream, filePath, StandardCopyOption.REPLACE_EXISTING)
+        Files.write(filePath, bytes)
 
         val imageUrl = "${baseUrl}/uploads/avatars/${filename}"
 
@@ -79,11 +89,14 @@ class AvatarService(
     }
 
     private fun deleteAvatarFile(userId: Long, uploadPath: Path) {
-        Files.list(uploadPath)
-            .filter { it.fileName.toString().startsWith("avatar_${userId}_") }
-            .forEach { path ->
-                Files.deleteIfExists(path)
-                logger.debug { "Deleted old avatar file: ${path.fileName}" }
-            }
+        if (!Files.isDirectory(uploadPath)) return
+        Files.list(uploadPath).use { files ->
+            files
+                .filter { it.fileName.toString().startsWith("avatar_${userId}_") }
+                .forEach { path ->
+                    Files.deleteIfExists(path)
+                    logger.debug { "Deleted old avatar file: ${path.fileName}" }
+                }
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.user
 import jakarta.persistence.*
 import java.time.Instant
 import com.alirezaiyan.vokab.server.shared.JpaEntity
+import com.alirezaiyan.vokab.server.shared.normalizeEmail
 import com.alirezaiyan.vokab.server.notification.PushToken
 
 @Entity
@@ -11,9 +12,8 @@ class User(
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     override val id: Long? = null,
-    
-    @Column(nullable = false, unique = true)
-    var email: String,
+
+    email: String,
     
     @Column(nullable = false)
     var name: String,
@@ -70,6 +70,13 @@ class User(
     @OneToMany(mappedBy = "user", cascade = [CascadeType.ALL], orphanRemoval = true, fetch = FetchType.LAZY)
     val pushTokens: MutableList<PushToken> = mutableListOf()
 ) : JpaEntity<Long>() {
+
+    /** Always stored normalized ([normalizeEmail]), however it is set. */
+    @Column(nullable = false, unique = true)
+    var email: String = normalizeEmail(email)
+        set(value) {
+            field = normalizeEmail(value)
+        }
 
     // Store-owned columns are `updatable = false` on purpose: services save whole user rows (login,
     // streaks, profile) from possibly stale instances, which would otherwise silently revert a webhook

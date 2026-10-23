@@ -12,8 +12,8 @@ import com.fasterxml.jackson.annotation.JsonInclude
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.annotation.JsonPropertyDescription
 import io.modelcontextprotocol.common.McpTransportContext
-import org.springaicommunity.mcp.annotation.McpTool
-import org.springaicommunity.mcp.annotation.McpToolParam
+import org.springframework.ai.mcp.annotation.McpTool
+import org.springframework.ai.mcp.annotation.McpToolParam
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 

@@ -9,7 +9,7 @@ import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
 import com.alirezaiyan.vokab.server.user.requireId
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import java.time.Clock

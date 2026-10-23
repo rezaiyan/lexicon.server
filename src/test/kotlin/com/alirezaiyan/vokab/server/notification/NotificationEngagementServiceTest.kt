@@ -46,7 +46,7 @@ class NotificationEngagementServiceTest {
             notificationScheduleRepository,
             userSettingsRepository,
             dailyActivityRepository,
-            com.fasterxml.jackson.databind.ObjectMapper(),
+            tools.jackson.databind.ObjectMapper(),
             clock = fixedClock(),
             meterRegistry = meterRegistry,
         )

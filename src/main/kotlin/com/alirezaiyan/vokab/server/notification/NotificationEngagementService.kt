@@ -3,7 +3,7 @@ package com.alirezaiyan.vokab.server.notification
 import io.micrometer.core.instrument.MeterRegistry
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service

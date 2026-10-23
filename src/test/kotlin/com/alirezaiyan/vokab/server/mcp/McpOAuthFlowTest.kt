@@ -8,13 +8,13 @@ import com.alirezaiyan.vokab.server.user.UserRepository
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.words.Word
 import com.alirezaiyan.vokab.server.words.WordRepository
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
@@ -79,11 +79,11 @@ class McpOAuthFlowTest {
     fun `authorization server metadata advertises registration and PKCE`() {
         val metadata = json(mockMvc.perform(get("/.well-known/oauth-authorization-server")).andExpect(status().isOk))
 
-        assertEquals(ISSUER, metadata["issuer"].asText())
-        assertEquals("$ISSUER/oauth/register", metadata["registration_endpoint"].asText())
-        assertTrue(metadata["code_challenge_methods_supported"].any { it.asText() == "S256" })
-        assertTrue(metadata["token_endpoint_auth_methods_supported"].any { it.asText() == "none" })
-        assertTrue(metadata["scopes_supported"].map { it.asText() }.containsAll(listOf("words:read", "words:write")))
+        assertEquals(ISSUER, metadata["issuer"].asString())
+        assertEquals("$ISSUER/oauth/register", metadata["registration_endpoint"].asString())
+        assertTrue(metadata["code_challenge_methods_supported"].any { it.asString() == "S256" })
+        assertTrue(metadata["token_endpoint_auth_methods_supported"].any { it.asString() == "none" })
+        assertTrue(metadata["scopes_supported"].values().map { it.asString() }.containsAll(listOf("words:read", "words:write")))
         assertTrue(metadata["authorization_response_iss_parameter_supported"].asBoolean())
         assertTrue(metadata["client_id_metadata_document_supported"].asBoolean())
     }
@@ -93,8 +93,8 @@ class McpOAuthFlowTest {
         for (path in listOf("/.well-known/oauth-protected-resource", "/.well-known/oauth-protected-resource/mcp")) {
             val metadata = json(mockMvc.perform(get(path)).andExpect(status().isOk))
 
-            assertEquals("$ISSUER/mcp", metadata["resource"].asText())
-            assertEquals(listOf(ISSUER), metadata["authorization_servers"].map { it.asText() })
+            assertEquals("$ISSUER/mcp", metadata["resource"].asString())
+            assertEquals(listOf(ISSUER), metadata["authorization_servers"].values().map { it.asString() })
         }
     }
 
@@ -140,9 +140,9 @@ class McpOAuthFlowTest {
         val client = json(mockMvc.perform(register(listOf("https://claude.ai/api/mcp/auth_callback", "http://127.0.0.1:33418/callback"), "none"))
             .andExpect(status().isCreated))
 
-        assertNotNull(client["client_id"]?.asText())
+        assertNotNull(client["client_id"]?.asString())
         assertNull(client["client_secret"])
-        assertEquals("none", client["token_endpoint_auth_method"].asText())
+        assertEquals("none", client["token_endpoint_auth_method"].asString())
     }
 
     @Test
@@ -158,7 +158,7 @@ class McpOAuthFlowTest {
         val client = json(mockMvc.perform(
             registerWithGrants(listOf("authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:jwt-bearer"))
         ).andExpect(status().isCreated))
-        assertEquals(setOf("authorization_code", "refresh_token"), client["grant_types"].map { it.asText() }.toSet())
+        assertEquals(setOf("authorization_code", "refresh_token"), client["grant_types"].values().map { it.asString() }.toSet())
 
         mockMvc.perform(registerWithGrants(listOf("client_credentials"))).andExpect(status().isBadRequest)
     }
@@ -167,42 +167,42 @@ class McpOAuthFlowTest {
 
     @Test
     fun `public client signs in, consents and calls mcp with the issued token`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val tokens = authorize(clientId, clientSecret = null)
 
         assertTrue(tokens["expires_in"].asLong() <= 3600, "access tokens are short-lived")
-        val accessToken = tokens["access_token"].asText()
+        val accessToken = tokens["access_token"].asString()
 
         val toolNames = json(mockMvc.perform(mcp(rpc("tools/list"), accessToken)).andExpect(status().isOk))["result"]["tools"]
-            .map { it["name"].asText() }
+            .values().map { it["name"].asString() }
         assertTrue("search_words" in toolNames)
 
         val call = json(mockMvc.perform(mcp(rpc("tools/call", mapOf("name" to "search_words", "arguments" to mapOf("query" to "apple"))), accessToken))
             .andExpect(status().isOk))
         val words = call["result"]["structuredContent"]["words"]
-        assertEquals(listOf("Apfel"), words.map { it["word"].asText() })
+        assertEquals(listOf("Apfel"), words.values().map { it["word"].asString() })
     }
 
     @Test
     fun `confidential client also gets a refresh token`() {
         val client = registerClient("client_secret_basic")
-        val tokens = authorize(client["client_id"].asText(), client["client_secret"].asText())
+        val tokens = authorize(client["client_id"].asString(), client["client_secret"].asString())
 
-        assertNotNull(tokens["refresh_token"]?.asText())
+        assertNotNull(tokens["refresh_token"]?.asString())
     }
 
     @Test
     fun `public client refreshes with a rotating refresh token`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val first = authorize(clientId, clientSecret = null)
-        val firstRefresh = requireNotNull(first["refresh_token"]?.asText()) { "public clients get a refresh token" }
+        val firstRefresh = requireNotNull(first["refresh_token"]?.asString()) { "public clients get a refresh token" }
 
         val second = refresh(clientId, firstRefresh)
         assertEquals(200, second.status, second.contentAsString)
         val rotated = objectMapper.readTree(second.contentAsString)
-        val secondRefresh = rotated["refresh_token"].asText()
+        val secondRefresh = rotated["refresh_token"].asString()
         assertTrue(secondRefresh != firstRefresh, "refresh tokens rotate")
-        mockMvc.perform(mcp(rpc("tools/list"), rotated["access_token"].asText())).andExpect(status().isOk)
+        mockMvc.perform(mcp(rpc("tools/list"), rotated["access_token"].asString())).andExpect(status().isOk)
 
         // The replaced refresh token is spent
         assertEquals(400, refresh(clientId, firstRefresh).status)
@@ -210,23 +210,23 @@ class McpOAuthFlowTest {
 
     @Test
     fun `refreshing as another client fails`() {
-        val owner = registerClient("none")["client_id"].asText()
-        val other = registerClient("none")["client_id"].asText()
-        val refreshToken = authorize(owner, clientSecret = null)["refresh_token"].asText()
+        val owner = registerClient("none")["client_id"].asString()
+        val other = registerClient("none")["client_id"].asString()
+        val refreshToken = authorize(owner, clientSecret = null)["refresh_token"].asString()
 
         assertEquals(400, refresh(other, refreshToken).status)
     }
 
     @Test
     fun `the authorization response names the issuer`() {
-        authorize(registerClient("none")["client_id"].asText(), clientSecret = null)
+        authorize(registerClient("none")["client_id"].asString(), clientSecret = null)
 
         assertEquals(ISSUER, lastCallback.getFirst("iss"))
     }
 
     @Test
     fun `authorize refuses a token for another resource and says so to the client`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val session = signedInSession()
 
         val response = mockMvc.perform(authorizeRequest(clientId, resource = "https://other.example.com/mcp").session(session))
@@ -245,17 +245,17 @@ class McpOAuthFlowTest {
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .param("grant_type", "authorization_code")
                 .param("code", "whatever")
-                .param("client_id", registerClient("none")["client_id"].asText())
+                .param("client_id", registerClient("none")["client_id"].asString())
                 .param("resource", "https://other.example.com/mcp")
         ).andReturn().response
 
         assertEquals(400, response.status)
-        assertEquals("invalid_target", objectMapper.readTree(response.contentAsString)["error"].asText())
+        assertEquals("invalid_target", objectMapper.readTree(response.contentAsString)["error"].asString())
     }
 
     @Test
     fun `consent page names the app and where it sends the learner back`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val session = signedInSession()
 
         val toConsent = mockMvc.perform(authorizeRequest(clientId).session(session).accept(MediaType.TEXT_HTML))
@@ -270,7 +270,7 @@ class McpOAuthFlowTest {
 
     @Test
     fun `deleting words is offered unticked, everything else ticked`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val session = signedInSession()
 
         val toConsent = mockMvc.perform(
@@ -292,7 +292,7 @@ class McpOAuthFlowTest {
                 "redirect_uris" to listOf(REDIRECT),
                 "token_endpoint_auth_method" to "none",
             )))
-        ).andExpect(status().isCreated))["client_id"].asText()
+        ).andExpect(status().isCreated))["client_id"].asString()
         val session = signedInSession()
 
         val toConsent = mockMvc.perform(authorizeRequest(clientId).session(session).accept(MediaType.TEXT_HTML)).andReturn().response
@@ -310,8 +310,8 @@ class McpOAuthFlowTest {
 
         val tokens = authorize(CIMD_CLIENT, clientSecret = null)
 
-        assertNotNull(tokens["refresh_token"]?.asText())
-        mockMvc.perform(mcp(rpc("tools/list"), tokens["access_token"].asText())).andExpect(status().isOk)
+        assertNotNull(tokens["refresh_token"]?.asString())
+        mockMvc.perform(mcp(rpc("tools/list"), tokens["access_token"].asString())).andExpect(status().isOk)
     }
 
     @Test
@@ -328,7 +328,7 @@ class McpOAuthFlowTest {
 
     @Test
     fun `authorization requests without S256 PKCE or with unknown scopes go back as errors`() {
-        val clientId = registerClient("none")["client_id"].asText()
+        val clientId = registerClient("none")["client_id"].asString()
         val session = signedInSession()
         fun errorFor(request: org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder): String? {
             val redirect = mockMvc.perform(request.session(session)).andReturn().response.redirectedUrl
@@ -354,7 +354,7 @@ class McpOAuthFlowTest {
         val tokens = authorize(CIMD_CLIENT, clientSecret = null, redirect = "http://localhost:57499/callback")
 
         assertTrue(lastCallbackUrl.startsWith("http://localhost:57499/callback?"), lastCallbackUrl)
-        assertNotNull(tokens["access_token"]?.asText())
+        assertNotNull(tokens["access_token"]?.asString())
         listOf("http://localhost:57499/elsewhere", "http://example.com:57499/callback").forEach { redirect ->
             val response = mockMvc.perform(authorizeRequest(CIMD_CLIENT, redirect = redirect).session(signedInSession()))
                 .andReturn().response
@@ -374,7 +374,7 @@ class McpOAuthFlowTest {
 
     @Test
     fun `a revoked grant stops working immediately`() {
-        val accessToken = authorize(registerClient("none")["client_id"].asText(), clientSecret = null)["access_token"].asText()
+        val accessToken = authorize(registerClient("none")["client_id"].asString(), clientSecret = null)["access_token"].asString()
         val authorization = requireNotNull(authorizationService.findByToken(accessToken, OAuth2TokenType.ACCESS_TOKEN))
 
         authorizationService.remove(authorization)

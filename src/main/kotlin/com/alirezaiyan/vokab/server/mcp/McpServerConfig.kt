@@ -1,9 +1,9 @@
 package com.alirezaiyan.vokab.server.mcp
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.json.JsonMapper
 import io.modelcontextprotocol.common.McpTransportContext
-import io.modelcontextprotocol.json.jackson.JacksonMcpJsonMapper
-import io.modelcontextprotocol.server.transport.WebMvcStatelessServerTransport
+import io.modelcontextprotocol.json.jackson3.JacksonMcpJsonMapper
+import org.springframework.ai.mcp.server.webmvc.transport.WebMvcStatelessServerTransport
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -21,9 +21,9 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 class McpServerConfig {
 
     @Bean
-    fun webMvcStatelessServerTransport(objectMapper: ObjectMapper): WebMvcStatelessServerTransport =
+    fun webMvcStatelessServerTransport(jsonMapper: JsonMapper): WebMvcStatelessServerTransport =
         WebMvcStatelessServerTransport.builder()
-            .jsonMapper(JacksonMcpJsonMapper(objectMapper))
+            .jsonMapper(JacksonMcpJsonMapper(jsonMapper))
             .messageEndpoint(McpAuthorizationServerConfig.MCP_PATH)
             .contextExtractor { request ->
                 val token = request.servletRequest().userPrincipal as? JwtAuthenticationToken
@@ -31,7 +31,7 @@ class McpServerConfig {
                 if (token == null || userId == null) {
                     McpTransportContext.EMPTY
                 } else {
-                    val scopes = token.authorities.map { it.authority }
+                    val scopes = token.authorities.mapNotNull { it.authority }
                         .filter { it.startsWith(SCOPE_PREFIX) }
                         .map { it.removePrefix(SCOPE_PREFIX) }
                     val clientId = token.token.getClaimAsString(McpAuthorizationServerConfig.CLIENT_ID_CLAIM).orEmpty()

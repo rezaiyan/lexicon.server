@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.mcp
 
 import com.alirezaiyan.vokab.server.shared.AppProperties
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository

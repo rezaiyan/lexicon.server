@@ -4,14 +4,14 @@ import com.alirezaiyan.vokab.server.auth.RS256JwtTokenProvider
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserRepository
 import com.alirezaiyan.vokab.server.user.requireId
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.SecurityContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
@@ -69,16 +69,16 @@ class McpConnectionsTest {
         val list = connections(learner)
 
         assertEquals(1, list.size())
-        assertEquals("Test client", list[0]["clientName"].asText())
-        assertEquals("client.example.com", list[0]["website"].asText())
-        assertEquals(listOf(McpScopes.WORDS_READ), list[0]["scopes"].map { it.asText() })
+        assertEquals("Test client", list[0]["clientName"].asString())
+        assertEquals("client.example.com", list[0]["website"].asString())
+        assertEquals(listOf(McpScopes.WORDS_READ), list[0]["scopes"].values().map { it.asString() })
         assertEquals(true, list[0]["connectedAt"].asLong() > 0)
     }
 
     @Test
     fun `disconnecting an app removes it and its token stops working on mcp`() {
         val token = tokens().accessToken(learner.requireId())
-        val id = connections(learner)[0]["id"].asText()
+        val id = connections(learner)[0]["id"].asString()
         mockMvc.perform(mcp(token)).andExpect(status().isOk)
 
         mockMvc.perform(delete("/api/v1/mcp/connections/$id").with(signedIn(learner)))
@@ -91,7 +91,7 @@ class McpConnectionsTest {
     @Test
     fun `a learner can't disconnect someone else's app`() {
         tokens().accessToken(other.requireId())
-        val id = connections(other)[0]["id"].asText()
+        val id = connections(other)[0]["id"].asString()
 
         mockMvc.perform(delete("/api/v1/mcp/connections/$id").with(signedIn(learner)))
             .andExpect(status().isNotFound)

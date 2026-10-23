@@ -10,33 +10,40 @@ geoip2 = "4.2.0"
 kotlin-logging = "5.1.0"
 mockk = "1.14.11"
 detekt = "1.23.8"
-springdoc = "2.8.17"
-spring-modulith = "1.4.13"
-konsist = "0.17.3"
-# 1.1.x is the Spring Boot 3.5 line; 2.x needs Boot 4
-spring-ai = "1.1.8"
+springdoc = "3.1.1"
+spring-modulith = "2.1.2"
+konsist = "0.18.1"
+# 2.x is the Spring Boot 4 line
+spring-ai = "2.0.2"
 
 [libraries]
 # Versions managed by the Spring Boot BOM
-spring-boot-starter-web = { module = "org.springframework.boot:spring-boot-starter-web" }
+spring-boot-starter-webmvc = { module = "org.springframework.boot:spring-boot-starter-webmvc" }
 springdoc-openapi-webmvc-api = { module = "org.springdoc:springdoc-openapi-starter-webmvc-api", version.ref = "springdoc" }
 spring-boot-starter-data-jpa = { module = "org.springframework.boot:spring-boot-starter-data-jpa" }
 spring-boot-starter-security = { module = "org.springframework.boot:spring-boot-starter-security" }
 spring-boot-starter-validation = { module = "org.springframework.boot:spring-boot-starter-validation" }
 spring-boot-starter-actuator = { module = "org.springframework.boot:spring-boot-starter-actuator" }
 spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-starter-mail" }
+spring-boot-starter-flyway = { module = "org.springframework.boot:spring-boot-starter-flyway" }
+spring-boot-starter-restclient = { module = "org.springframework.boot:spring-boot-starter-restclient" }
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
+spring-boot-starter-webmvc-test = { module = "org.springframework.boot:spring-boot-starter-webmvc-test" }
+spring-boot-starter-data-jpa-test = { module = "org.springframework.boot:spring-boot-starter-data-jpa-test" }
+spring-boot-starter-security-test = { module = "org.springframework.boot:spring-boot-starter-security-test" }
+spring-boot-starter-actuator-test = { module = "org.springframework.boot:spring-boot-starter-actuator-test" }
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
 spring-security-oauth2-authorization-server = { module = "org.springframework.security:spring-security-oauth2-authorization-server" }
 spring-security-oauth2-resource-server = { module = "org.springframework.security:spring-security-oauth2-resource-server" }
 spring-security-test = { module = "org.springframework.security:spring-security-test" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
-jackson-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
+jackson-module-kotlin = { module = "tools.jackson.module:jackson-module-kotlin" }
+jackson2-module-kotlin = { module = "com.fasterxml.jackson.module:jackson-module-kotlin" }
 postgresql = { module = "org.postgresql:postgresql" }
 h2 = { module = "com.h2database:h2" }
-testcontainers-postgresql = { module = "org.testcontainers:postgresql" }
+testcontainers-postgresql = { module = "org.testcontainers:testcontainers-postgresql" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
 
 # Pinned here
@@ -47,7 +54,7 @@ jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
 jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
 firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 bucket4j-core = { module = "com.bucket4j:bucket4j-core", version.ref = "bucket4j" }
-# Version managed by the Spring Boot BOM (pinned via httpclient5.version in build.gradle.kts)
+# Version managed by the Spring Boot BOM
 httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5" }
 geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }

@@ -21,7 +21,7 @@ A **Spring Boot + Kotlin** backend for a vocabulary learning mobile app. It prov
 | Layer | Technology |
 |---|---|
 | Language | Kotlin 1.9.25 |
-| Framework | Spring Boot 3.5.6 |
+| Framework | Spring Boot 4.1 |
 | Security | Spring Security · JJWT 0.12.3 |
 | Persistence | Spring Data JPA · Flyway |
 | Database | PostgreSQL (prod) · H2 (dev) |

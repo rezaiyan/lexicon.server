@@ -4,7 +4,7 @@ import com.alirezaiyan.vokab.server.ai.AiClient
 import com.alirezaiyan.vokab.server.ai.AiOperation
 import com.alirezaiyan.vokab.server.ai.PromptTemplates
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot

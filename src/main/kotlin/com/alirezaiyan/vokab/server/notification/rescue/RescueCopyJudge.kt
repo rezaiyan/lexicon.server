@@ -5,7 +5,7 @@ import com.alirezaiyan.vokab.server.ai.AiOperation
 import com.alirezaiyan.vokab.server.ai.Prompt
 import com.alirezaiyan.vokab.server.ai.PromptTemplates
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
@@ -61,7 +61,7 @@ class RescueCopyJudge(
         return verdicts
             .filter { it.path("index").isInt && it.path("index").asInt() in indices }
             .associate { node ->
-                val verdict = JudgeVerdict(node.path("pass").asBoolean(false), node.path("reason").asText())
+                val verdict = JudgeVerdict(node.path("pass").asBoolean(false), node.path("reason").asString())
                 node.path("index").asInt() to verdict
             }
     }

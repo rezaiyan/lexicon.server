@@ -6,8 +6,8 @@ import com.alirezaiyan.vokab.server.ai.Prompt
 import com.alirezaiyan.vokab.server.ai.PromptTemplates
 import com.alirezaiyan.vokab.server.ai.asPromptLabel
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
 
@@ -53,8 +53,8 @@ class InstructionJudge(
         val end = raw.lastIndexOf('}')
         if (start < 0 || end <= start) return null
         val node = runCatching { objectMapper.readTree(raw.substring(start, end + 1)) }.getOrNull() ?: return null
-        return when (node.path("verdict").asText()) {
-            "ALLOW" -> sanitizeIntent(node.path("intent").asText())?.let { intent ->
+        return when (node.path("verdict").asString()) {
+            "ALLOW" -> sanitizeIntent(node.path("intent").asString())?.let { intent ->
                 InstructionVerdict.Allowed(ScreenedInstruction(intent, itemCount(node.path("count"))))
             }
             "OFF_TOPIC" -> InstructionVerdict.Refused(InstructionRejection.OFF_TOPIC)

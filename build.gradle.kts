@@ -1,13 +1,13 @@
-// The Spring Boot Gradle plugin brings Jackson and Apache HttpClient onto the build classpath at
-// older versions; keep them on the same patched releases as the app (the extra[...] overrides below)
+// The Spring Boot Gradle plugin brings Jackson onto the build classpath at older versions; keep it on
+// the same patched releases as the app (the jackson-bom / jackson-2-bom overrides below)
 buildscript {
 	configurations.classpath {
 		resolutionStrategy.eachDependency {
 			when {
 				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
 					useVersion("2.21.7")
-				requested.group == "org.apache.httpcomponents.client5" -> useVersion("5.6.4")
-				requested.group == "org.apache.httpcomponents.core5" -> useVersion("5.4.3")
+				requested.group == "tools.jackson.core" || (requested.group == "tools.jackson" && requested.name == "jackson-bom") ->
+					useVersion("3.1.8")
 			}
 		}
 	}
@@ -31,13 +31,12 @@ description = "Lexicon Server Application"
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
 // Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
 // each override once the BOM catches up.
-extra["tomcat.version"] = "10.1.60"
-extra["netty.version"] = "4.1.137.Final"
-extra["jackson-bom.version"] = "2.21.7"
-extra["postgresql.version"] = "42.7.12"
-// firebase-admin asks for httpclient5 5.6.x; the BOM would pin the older, vulnerable 5.5/core 5.3
-extra["httpclient5.version"] = "5.6.4"
-extra["httpcore5.version"] = "5.4.3"
+// Boot 4.1.1 ships Tomcat 11.0.24: CVE-2026-65182, CVE-2026-65905, CVE-2026-68525 (critical), fixed in 11.0.25
+extra["tomcat.version"] = "11.0.27"
+// Boot 4.1.1 ships Jackson 3.1.5: GHSA-p6pp-m3f8-5c89, GHSA-7hhh-6rmp-j9qf (high), fixed in 3.1.7
+extra["jackson-bom.version"] = "3.1.8"
+// Jackson 2 is still used by firebase-admin, jjwt and the MCP SDK (the app itself is on Jackson 3)
+extra["jackson-2-bom.version"] = "2.21.7"
 
 repositories {
 	mavenCentral()
@@ -45,7 +44,7 @@ repositories {
 
 dependencies {
 	// Spring Boot Starters
-	implementation(libs.spring.boot.starter.web)
+	implementation(libs.spring.boot.starter.webmvc)
 	// Event publication registry: cross-feature events persisted in Postgres until their listeners complete
 	implementation(libs.spring.modulith.starter.jdbc)
 	// OpenAPI spec of the API, rendered in tests and committed as openapi.json (no UI, route off in prod)
@@ -58,12 +57,6 @@ dependencies {
 	// MCP server (/mcp): learner tools over the word services, for AI clients
 	implementation(platform(libs.spring.ai.bom))
 	implementation(libs.spring.ai.starter.mcp.server.webmvc)
-	// Spring AI 1.1.8 pins MCP SDK 0.18.3; 0.18.4 bounds HTTP request reads (security backport)
-	constraints {
-		listOf("mcp", "mcp-core", "mcp-json-jackson2", "mcp-spring-webmvc").forEach {
-			implementation("io.modelcontextprotocol.sdk:$it:0.18.4")
-		}
-	}
 	// OAuth 2.1 for MCP clients: we are the authorization server, /mcp is the resource server
 	implementation(libs.spring.security.oauth2.authorization.server)
 	implementation(libs.spring.security.oauth2.resource.server)
@@ -74,11 +67,17 @@ dependencies {
 	// Kotlin
 	implementation(libs.kotlin.reflect)
 	implementation(libs.jackson.module.kotlin)
+	// springdoc models schemas with swagger-core, still on Jackson 2: without its Kotlin module the spec
+	// loses required (non-null) fields and renames is-prefixed properties
+	runtimeOnly(libs.jackson2.module.kotlin)
 
 	// Database
 	implementation(libs.postgresql)
 	// H2 only for the local h2 profile (bootRun); not shipped in the production jar
 	developmentOnly(libs.h2)
+	// /h2-console for the h2 profile (a separate module since Boot 4)
+	developmentOnly("org.springframework.boot:spring-boot-h2console")
+	implementation(libs.spring.boot.starter.flyway)
 	implementation(libs.flyway.core)
 	implementation(libs.flyway.postgresql)
 
@@ -100,6 +99,8 @@ dependencies {
 	implementation("com.github.ben-manes.caffeine:caffeine")
 	// Fetches MCP client metadata documents with an address-checking DNS resolver
 	implementation(libs.httpclient5)
+	// RestClient.Builder auto-configuration (RestClientBuilderConfigurer), see HttpClientConfig
+	implementation(libs.spring.boot.starter.restclient)
 
 	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)
@@ -112,6 +113,10 @@ dependencies {
 
 	// Testing
 	testImplementation(libs.spring.boot.starter.test)
+	testImplementation(libs.spring.boot.starter.webmvc.test)
+	testImplementation(libs.spring.boot.starter.data.jpa.test)
+	testImplementation(libs.spring.boot.starter.security.test)
+	testImplementation(libs.spring.boot.starter.actuator.test)
 	testImplementation(libs.spring.security.test)
 	testImplementation(libs.kotlin.test.junit5)
 	testImplementation(libs.mockk)

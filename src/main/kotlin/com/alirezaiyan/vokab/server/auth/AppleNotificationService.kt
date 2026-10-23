@@ -3,7 +3,7 @@ package com.alirezaiyan.vokab.server.auth
 import com.alirezaiyan.vokab.server.notification.NotificationCategory
 import com.alirezaiyan.vokab.server.user.UserRepository
 import com.alirezaiyan.vokab.server.notification.PushNotificationService
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service

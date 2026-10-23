@@ -2,7 +2,7 @@ package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.shared.describe
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
-import com.fasterxml.jackson.databind.JsonNode
+import tools.jackson.databind.JsonNode
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestClient
@@ -89,10 +89,10 @@ class ApplePublicKeyService(
     }
 
     private fun JsonNode.toRsaKeyOrNull(): Pair<String, PublicKey>? {
-        if (get("kty")?.asText() != "RSA") return null
-        val kid = get("kid")?.asText() ?: return null
-        val modulus = get("n")?.asText() ?: return null
-        val exponent = get("e")?.asText() ?: return null
+        if (get("kty")?.asString() != "RSA") return null
+        val kid = get("kid")?.asString() ?: return null
+        val modulus = get("n")?.asString() ?: return null
+        val exponent = get("e")?.asString() ?: return null
         return try {
             kid to rsaPublicKey(modulus, exponent)
         } catch (e: IllegalArgumentException) {

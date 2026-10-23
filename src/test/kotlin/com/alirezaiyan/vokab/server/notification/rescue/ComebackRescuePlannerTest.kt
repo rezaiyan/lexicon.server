@@ -11,7 +11,7 @@ import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserSettings
 import com.alirezaiyan.vokab.server.user.UserSettingsRepository
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

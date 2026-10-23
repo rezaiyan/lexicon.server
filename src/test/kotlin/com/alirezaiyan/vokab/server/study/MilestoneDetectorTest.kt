@@ -5,7 +5,7 @@ import com.alirezaiyan.vokab.server.notification.NotificationSchedule
 import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.notification.NotificationScheduleRepository
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify

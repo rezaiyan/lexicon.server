@@ -79,7 +79,7 @@ class McpOAuthService(
         val client = RegisteredClient.withId(UUID.randomUUID().toString())
             .clientId("mcp_" + randomToken())
             .clientIdIssuedAt(now)
-            .apply { secret?.let { clientSecret(secretEncoder.encode(it)) } }
+            .apply { secret?.let { clientSecret(checkNotNull(secretEncoder.encode(it))) } }
             .clientName(request.clientName?.trim()?.takeIf { it.isNotEmpty() } ?: DEFAULT_CLIENT_NAME)
             .clientAuthenticationMethod(ClientAuthenticationMethod(authMethod))
             .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)

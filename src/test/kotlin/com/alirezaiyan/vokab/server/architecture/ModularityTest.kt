@@ -46,9 +46,9 @@ class ModularityTest {
 
     private fun actualDependencies(): Map<String, Set<String>> =
         modules.associate { module ->
-            module.name to module.getDirectDependencies(modules).uniqueModules()
-                .map { it.name }
-                .filter { it != "shared" && it != module.name }
+            module.identifier.toString() to module.getDirectDependencies(modules).uniqueModules()
+                .map { it.identifier.toString() }
+                .filter { it != "shared" && it != module.identifier.toString() }
                 .toList()
                 .toSet()
         }

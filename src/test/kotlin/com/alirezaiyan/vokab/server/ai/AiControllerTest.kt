@@ -20,7 +20,7 @@ import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.words.WordService
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyBoolean
@@ -30,7 +30,7 @@ import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
+import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.context.annotation.Import
 import org.springframework.http.MediaType

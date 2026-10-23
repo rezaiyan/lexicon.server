@@ -4,7 +4,7 @@
 | Layer | Technology |
 |---|---|
 | Language | Kotlin 1.9.25 |
-| Framework | Spring Boot 3.5.6 |
+| Framework | Spring Boot 4.1 |
 | JVM | Java 21 toolchain (bytecode target); production image runs on Java 25 (see Dockerfile) |
 | Build | Gradle 8.x (Kotlin DSL — `build.gradle.kts`) |
 
@@ -40,7 +40,7 @@
 |---|---|
 | Spring WebFlux (`WebClient`) | Non-blocking HTTP client for external APIs |
 | Kotlin Coroutines | Async support |
-| Jackson + Kotlin module | JSON serialization |
+| Jackson 3 + Kotlin module | JSON serialization (Jackson 2 stays only for libraries: firebase-admin, jjwt, swagger-core) |
 
 ## Observability
 | Technology | Role |

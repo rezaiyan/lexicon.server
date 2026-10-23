@@ -10,7 +10,7 @@ import com.alirezaiyan.vokab.server.shared.OpenRouterConfig
 import com.alirezaiyan.vokab.server.shared.VocabularyConfig
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.shared.UserFacingException
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Assertions.assertEquals

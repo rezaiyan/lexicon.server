@@ -2,9 +2,9 @@ package com.alirezaiyan.vokab.server.shared
 
 import java.time.Clock
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.actuate.health.CompositeHealth
-import org.springframework.boot.actuate.health.HealthEndpoint
-import org.springframework.boot.actuate.health.Status
+import org.springframework.boot.health.actuate.endpoint.CompositeHealthDescriptor
+import org.springframework.boot.health.actuate.endpoint.HealthEndpoint
+import org.springframework.boot.health.contributor.Status
 import org.springframework.boot.info.BuildProperties
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
@@ -37,7 +37,7 @@ class HealthController(
     ): ResponseEntity<*> {
         val readiness = healthEndpoint.healthForPath("readiness")
         val status = readiness?.status ?: Status.UNKNOWN
-        val dbStatus = ((readiness as? CompositeHealth)?.components?.get("db")?.status ?: Status.UNKNOWN).code
+        val dbStatus = ((readiness as? CompositeHealthDescriptor)?.components?.get("db")?.status ?: Status.UNKNOWN).code
         val httpStatus = if (status == Status.UP) HttpStatus.OK else HttpStatus.SERVICE_UNAVAILABLE
         val timestamp = Instant.now(clock).toString()
         val version = buildProperties?.version ?: "development"

@@ -5,7 +5,7 @@ import com.alirezaiyan.vokab.server.ai.OpenRouterClient
 import com.alirezaiyan.vokab.server.ai.PromptTemplates
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.OpenRouterConfig
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.module.kotlin.jacksonObjectMapper
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

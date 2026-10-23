@@ -111,7 +111,7 @@ services:
       # Persist avatar uploads
       - avatar_uploads:/var/www/uploads/avatars
     ports:
-      - "127.0.0.1:8080:8080"  # Localhost only; use nginx (HTTPS) for external access
+      - "127.0.0.1:8080:8080"  # Localhost only; Caddy terminates HTTPS in front of it
     networks:
       - lexicon-network
     restart: unless-stopped

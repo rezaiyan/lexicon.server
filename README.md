@@ -199,7 +199,7 @@ src/main/kotlin/com/alirezaiyan/vokab/server/
 
 src/main/resources/
 ├── application.yml
-└── db/migration/    # Flyway V1–V14
+└── db/migration/    # Flyway migrations
 ```
 
 ## Development

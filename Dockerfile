@@ -2,7 +2,7 @@
 # Multi-stage build. CI builds and publishes this image to GHCR; the VPS only pulls it.
 
 # Stage 1: Build
-FROM eclipse-temurin:21-jdk AS builder
+FROM eclipse-temurin:25-jdk AS builder
 
 WORKDIR /app
 

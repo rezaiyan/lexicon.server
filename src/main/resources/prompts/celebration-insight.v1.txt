@@ -1,0 +1,4 @@
+The user {{userName}} just completed their vocabulary review session today.
+They have {{totalWords}} words total, {{masteredWords}} fully mastered.
+Write a 1-sentence celebration acknowledging their consistency. Max 2 emojis. Be specific and warm, not generic.
+Return ONLY the message, no quotes or extra formatting.

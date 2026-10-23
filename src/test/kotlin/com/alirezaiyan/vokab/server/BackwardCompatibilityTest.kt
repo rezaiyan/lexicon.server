@@ -1,7 +1,24 @@
 package com.alirezaiyan.vokab.server
 
-import com.alirezaiyan.vokab.server.domain.entity.*
-import com.alirezaiyan.vokab.server.domain.repository.*
+import com.alirezaiyan.vokab.server.user.requireId
+import com.alirezaiyan.vokab.server.study.DailyActivity
+import com.alirezaiyan.vokab.server.ai.DailyInsight
+import com.alirezaiyan.vokab.server.user.Platform
+import com.alirezaiyan.vokab.server.notification.PushToken
+import com.alirezaiyan.vokab.server.auth.RefreshToken
+import com.alirezaiyan.vokab.server.subscription.Subscription
+import com.alirezaiyan.vokab.server.user.SubscriptionStatus
+import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.UserSettings
+import com.alirezaiyan.vokab.server.words.Word
+import com.alirezaiyan.vokab.server.study.DailyActivityRepository
+import com.alirezaiyan.vokab.server.ai.DailyInsightRepository
+import com.alirezaiyan.vokab.server.notification.PushTokenRepository
+import com.alirezaiyan.vokab.server.auth.RefreshTokenRepository
+import com.alirezaiyan.vokab.server.subscription.SubscriptionRepository
+import com.alirezaiyan.vokab.server.user.UserRepository
+import com.alirezaiyan.vokab.server.user.UserSettingsRepository
+import com.alirezaiyan.vokab.server.words.WordRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -60,7 +77,7 @@ class BackwardCompatibilityTest {
         )
         assertNotNull(settings.id)
 
-        val retrieved = userRepository.findById(user.id).orElse(null)
+        val retrieved = userRepository.findById(user.requireId()).orElse(null)
         assertNotNull(retrieved)
         assertTrue(retrieved.email == "legacy@example.com")
     }
@@ -79,11 +96,12 @@ class BackwardCompatibilityTest {
                 tokenHash = "test_hash",
                 user = user,
                 expiresAt = Instant.now().plusSeconds(3600),
+                familyId = "test-family",
             )
         )
 
         assertNotNull(refreshToken.id)
-        val loaded = refreshTokenRepository.findById(refreshToken.id).orElse(null)
+        val loaded = refreshTokenRepository.findById(refreshToken.id!!).orElse(null)
         assertNotNull(loaded)
         assertTrue(loaded.tokenHash == "test_hash")
     }

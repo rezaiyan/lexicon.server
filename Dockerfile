@@ -1,4 +1,5 @@
-# Multi-stage build for optimized Docker image
+# syntax=docker/dockerfile:1
+# Multi-stage build. CI builds and publishes this image to GHCR; the VPS only pulls it.
 
 # Stage 1: Build
 FROM eclipse-temurin:21-jdk AS builder
@@ -15,36 +16,46 @@ COPY gradlew build.gradle.kts settings.gradle.kts gradle.properties ./
 RUN sed -i '/org.gradle.java.home/d' gradle.properties
 COPY gradle gradle
 
-# Download dependencies (cached layer) — ignore failure due to missing sources
-RUN ./gradlew build --no-daemon || true
+# Resolve dependencies in their own layer, so a code-only change reuses it. The cache mount keeps
+# Gradle's download cache across builds without baking it into the image.
+RUN --mount=type=cache,target=/app/.gradle/caches \
+    ./gradlew dependencies --configuration runtimeClasspath --no-daemon -q > /dev/null
 
 # Copy source code
 COPY src src
 
-# Build application
-RUN ./gradlew clean build --no-daemon -x test
+# Build the boot jar (tests, detekt and coverage already ran in CI), then split it into layers
+# ordered from least to most frequently changed, so a code-only deploy ships just the app layer
+RUN --mount=type=cache,target=/app/.gradle/caches \
+    ./gradlew bootJar --no-daemon \
+ && java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+# Java 25, though we compile for 21: since Java 24 (JEP 491) a virtual thread blocked in a
+# `synchronized` block no longer pins its carrier. On 21, a burst of cold-start requests building
+# Jackson serializers pinned every carrier and froze all requests (seen in McpConcurrentCallsTest).
+FROM eclipse-temurin:25-jre-alpine
+
+# Set by CI (docker/metadata-action); shown by `docker inspect` to tell which commit is running
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.source="https://github.com/rezaiyan/lexicon.server" \
+      org.opencontainers.image.revision="${GIT_SHA}"
 
 WORKDIR /app
 
 # Create non-root user
 RUN addgroup -S spring && adduser -S spring -G spring
 
-# Copy built JAR from builder stage
-COPY --from=builder /app/build/libs/*.jar app.jar
+# Create mount points for JWT RSA keys and avatar uploads (mounted as volumes)
+RUN mkdir -p /app/keys /var/www/uploads/avatars \
+ && chown -R spring:spring /app /var/www/uploads
 
-# Create keys directory for JWT RSA keys (will be mounted as volume)
-RUN mkdir -p /app/keys && chown -R spring:spring /app/keys
-
-# Create avatar uploads directory (will be mounted as volume)
-RUN mkdir -p /var/www/uploads/avatars && chown -R spring:spring /var/www/uploads
+COPY --from=builder --chown=spring:spring /app/extracted/dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/spring-boot-loader/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/snapshot-dependencies/ ./
+COPY --from=builder --chown=spring:spring /app/extracted/application/ ./
 
 # Firebase service account is provided via a secure path or secret at runtime
-
-# Change ownership
-RUN chown -R spring:spring /app
 
 # Switch to non-root user
 USER spring:spring
@@ -56,6 +67,7 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD sh -c 'PORT=${PORT:-8080}; wget --no-verbose --tries=1 --spider "http://localhost:${PORT}/api/v1/health" || exit 1'
 
-# Run application
-ENTRYPOINT ["java", "-jar", "app.jar"]
-
+# Heap is sized from the container memory limit (mem_limit in docker-compose.yml). On OOM the JVM
+# exits instead of limping on half-broken, and the restart policy brings up a fresh one.
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+ExitOnOutOfMemoryError", \
+            "org.springframework.boot.loader.launch.JarLauncher"]

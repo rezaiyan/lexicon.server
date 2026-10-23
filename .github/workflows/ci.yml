@@ -11,35 +11,52 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# A newer push to the same PR supersedes the running check; main runs are never cancelled, so
+# every merge gets its own image and deploy
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
   build:
-    # Gate for PRs and main: compile, full test suite and the JaCoCo coverage threshold.
+    # Gate for PRs and main: compile, detekt, full test suite and the JaCoCo coverage threshold.
     name: Build & Test
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
+
+      # Caches dependencies and build outputs; PR runs read the cache main writes
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build and test
         run: ./gradlew build --stacktrace
 
-      - name: Upload test reports
+      - name: Upload reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: test-reports
-          path: build/reports/tests/test
+          name: build-reports
+          path: |
+            build/reports/tests/test
+            build/reports/detekt
+            build/reports/jacoco
           retention-days: 7
+          if-no-files-found: ignore
 
       - name: Update coverage badge
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
@@ -65,9 +82,109 @@ jobs:
           print(f"Coverage badge updated: {pct}% ({color})")
           PYEOF
 
+  docker:
+    # PRs: prove the Dockerfile still builds and scan it. main: also publish the image the VPS deploys
+    # (ghcr.io/<repo>:sha-<commit> and :latest), so the server never builds with Gradle itself.
+    name: Docker Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build
+    permissions:
+      contents: read
+      packages: write
+    env:
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: env.PUBLISH == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=sha,format=short,prefix=sha-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      # Built into the local Docker daemon first, so the scan sees exactly the image that ships
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: lexicon-server:scan
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Fails on a CRITICAL vulnerability that has a fixed version (bump the dependency, or for a
+      # finding that can't reach the app, add it to .trivyignore with the reason). HIGH ones are
+      # listed in the job summary without failing, so a new advisory doesn't block every merge.
+      - name: Scan image for vulnerabilities
+        run: |
+          trivy() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD/.trivyignore:/.trivyignore:ro" -v "$HOME/.cache/trivy:/root/.cache/trivy" \
+              aquasec/trivy:0.58.1 image --quiet --scanners vuln --ignore-unfixed \
+              --ignorefile /.trivyignore "$@" lexicon-server:scan
+          }
+          trivy --severity CRITICAL,HIGH --format table > trivy.txt || true
+          {
+            echo '### Image vulnerabilities (fixable, CRITICAL/HIGH)'
+            echo '```'
+            cat trivy.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          trivy --severity CRITICAL --exit-code 1 --skip-db-update --skip-java-db-update
+
+      # Same build, so every layer comes from the cache: this only tags and uploads
+      - name: Push
+        if: env.PUBLISH == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: GIT_SHA=${{ github.sha }}
+          cache-from: type=gha
+
+  workflow-lint:
+    # Catches broken workflow syntax/expressions and shell bugs in the ops scripts before main
+    name: Workflow & Script Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: actionlint
+        run: |
+          docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:1.7.7 -color
+
+      - name: shellcheck
+        run: |
+          docker run --rm -v "$PWD:/mnt" koalaman/shellcheck:v0.10.0 -S warning scripts/*.sh
+
   openrouter-model-check:
     name: OpenRouter Model Validation
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     permissions:
@@ -75,7 +192,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate OpenRouter model ID
         env:
@@ -105,7 +222,7 @@ jobs:
             exit 1
           fi
 
-          CONTENT=$(cat /tmp/model-response.json | jq -r '.choices[0].message.content // empty')
+          CONTENT=$(jq -r '.choices[0].message.content // empty' /tmp/model-response.json)
           if [ -z "$CONTENT" ]; then
             echo "::error::Model returned empty response"
             cat /tmp/model-response.json
@@ -114,32 +231,44 @@ jobs:
 
           echo "OpenRouter model validation passed: '$MODEL_ID' is valid"
 
-  dependency-check:
-    name: Dependency Check
+  dependency-graph:
+    # Uploads the resolved Gradle dependency graph (build.gradle.kts can't be parsed statically),
+    # so Dependabot security alerts and the PR dependency review see the real versions.
+    name: Dependency Graph
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     permissions:
-      contents: read
-    if: github.event_name == 'pull_request'
-    
+      contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Run Dependency Check
-        uses: jeremylong/DependencyCheck_Action@main
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
         with:
-          project: 'Lexicon Server'
-          path: '.'
-          format: 'sarif'
-          args: >
-            --enableExperimental
-            --exclude '.git/**'
-            --exclude 'build/**'
-        continue-on-error: true
+          java-version: '21'
+          distribution: 'temurin'
 
-      - name: Upload SARIF
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Submit dependency graph
+        uses: gradle/actions/dependency-submission@v4
+
+  dependency-review:
+    # Fails a PR that adds or upgrades to a dependency with a known high/critical vulnerability.
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: github.event_name == 'pull_request'
+    needs: dependency-graph
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@v4
         with:
-          sarif_file: reports/dependency-check-report.sarif
-        if: always()
-        continue-on-error: true
+          fail-on-severity: high
+          retry-on-snapshot-warnings: true
+          # The spring-webmvc advisories accepted in .trivyignore (CVE-2026-47884, CVE-2026-47890):
+          # fixed only in Spring Framework 7 and not reachable here. Drop with them.
+          allow-ghsas: GHSA-pc63-qcmh-9cmg, GHSA-j9f9-w8pj-32f8
+          comment-summary-in-pr: on-failure

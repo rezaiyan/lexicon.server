@@ -1,8 +1,17 @@
+# Container logs rotate at 3 x 20 MB per service. Docker's default json-file driver never
+# rotates, so logs would grow until the disk fills (and a full disk takes Postgres down).
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
 services:
   # PostgreSQL Database (for production-like testing)
   postgres:
     image: postgres:17-alpine
     container_name: lexicon-postgres
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lexicondb}
       POSTGRES_USER: ${POSTGRES_USER:-lexicon_user}
@@ -22,14 +31,24 @@ services:
 
   # Lexicon Server Application
   app:
+    # CI publishes this image for every main commit; scripts/deploy.sh sets APP_IMAGE_TAG in .env.
+    # `docker compose build app` still builds it locally from the Dockerfile.
+    image: ghcr.io/rezaiyan/lexicon.server:${APP_IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: Dockerfile
     container_name: lexicon-server
+    logging: *default-logging
+    # The JVM sizes its heap from this (-XX:MaxRAMPercentage=75 in the Dockerfile); without a limit
+    # it would size against the whole VPS, which Postgres and Metabase share.
+    mem_limit: ${APP_MEM_LIMIT:-1536m}
     depends_on:
       postgres:
         condition: service_healthy
     environment:
+      # One JSON object per log line (Elastic Common Schema) incl. MDC requestId and access-log fields;
+      # set LOG_FORMAT= (empty) in .env for plain text while debugging on the box
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ${LOG_FORMAT-ecs}
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lexicondb}
       DATABASE_USERNAME: ${POSTGRES_USER:-lexicon_user}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -68,7 +87,23 @@ services:
       AVATAR_BASE_URL: ${AVATAR_BASE_URL:-}
       TELEGRAM_ADMIN_BOT_TOKEN: ${TELEGRAM_ADMIN_BOT_TOKEN:-}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
+      TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
       ADMIN_NOTIFICATIONS_ENABLED: ${ADMIN_NOTIFICATIONS_ENABLED:-true}
+      # X-Admin-Key for /admin/** and the dashboard at /admin-ui/notifications.
+      # Empty disables admin access; dashboard sign-in needs 32+ chars (openssl rand -base64 36)
+      APP_SECURITY_ADMINAPIKEY: ${APP_SECURITY_ADMINAPIKEY:-}
+      # MCP server for AI apps (docs/mcp.md). Off unless MCP_ENABLED=true in .env.
+      # The signing key sits on the jwt_keys volume so connected apps survive redeploys.
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_ISSUER: ${MCP_ISSUER:-https://lexicon.alirezaiyan.com}
+      MCP_SIGNING_KEY_PATH: ${MCP_SIGNING_KEY_PATH:-/app/keys/mcp-signing-key.json}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_FIREBASE_WEB_API_KEY: ${MCP_FIREBASE_WEB_API_KEY:-}
+      MCP_FIREBASE_AUTH_DOMAIN: ${MCP_FIREBASE_AUTH_DOMAIN:-}
+      MCP_FIREBASE_PROJECT_ID: ${MCP_FIREBASE_PROJECT_ID:-}
+      # Trust Caddy's X-Forwarded-Proto/For (Tomcat RemoteIpValve): requests are seen as https, so the
+      # MCP sign-in session cookie is Secure and redirects stay on https. remoteAddr becomes the client IP.
+      SERVER_FORWARD_HEADERS_STRATEGY: ${SERVER_FORWARD_HEADERS_STRATEGY:-native}
       PORT: 8080
     volumes:
       # Persist JWT keys across container restarts
@@ -76,7 +111,7 @@ services:
       # Persist avatar uploads
       - avatar_uploads:/var/www/uploads/avatars
     ports:
-      - "127.0.0.1:8080:8080"  # Localhost only; use nginx (HTTPS) for external access
+      - "127.0.0.1:8080:8080"  # Localhost only; Caddy terminates HTTPS in front of it
     networks:
       - lexicon-network
     restart: unless-stopped
@@ -89,8 +124,11 @@ services:
 
   # Metabase Analytics Dashboard
   metabase:
-    image: metabase/metabase:latest
+    # Pinned: `latest` could jump a major version on any restart, and Metabase can't downgrade its
+    # application database. Dependabot proposes upgrades.
+    image: metabase/metabase:v0.64.1.5
     container_name: lexicon-metabase
+    logging: *default-logging
     depends_on:
       postgres:
         condition: service_healthy

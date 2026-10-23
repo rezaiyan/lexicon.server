@@ -1,0 +1,31 @@
+You are an expert language teacher and curriculum designer.
+
+Task: Generate exactly {{requestedCount}} vocabulary items for a learner with the following profile:
+- Language they want to learn (target): {{targetLanguage}}
+- Their current level in {{targetLanguage}}: {{currentLevel}}
+- Their native or primary language (for translations): {{nativeLanguage}}
+{{interestsLine}}
+
+Requirements:
+1. Choose words and short phrases that are appropriate for level "{{currentLevel}}" (e.g. beginner = A1, elementary; intermediate = B1-B2; advanced = C1-C2).
+2. Each item must be useful for real-world use: everyday vocabulary, common verbs, nouns, adjectives, and essential phrases.
+3. Cover a balanced mix: greetings, numbers, time, family, food, travel, work, emotions, actions, places, and common expressions.
+{{focusRequirements}}
+Provide exactly {{requestedCount}} items. No fewer, no more.
+
+Output format (strict):
+- One entry per line.
+- Each line: originalWord,translation,optionalShortDescription
+- originalWord = word or short phrase in {{targetLanguage}}
+- translation = meaning or translation in {{nativeLanguage}}
+- optionalShortDescription = brief context or example (optional; can be empty after the second comma)
+- Use comma as separator. If a field contains a comma, do not use it or escape the content.
+- No numbering, no markdown, no code blocks, no extra text before or after the list.
+
+Example (for German, level beginner, native English):
+Hallo,hello,a greeting
+Guten Morgen,good morning,formal morning greeting
+danke,thank you,
+Brot,bread,common noun
+
+Output exactly {{requestedCount}} lines in the format above, nothing else.

@@ -27,3 +27,17 @@ spring:
     hibernate:
       # Fails the context if an entity drifts from the migrations
       ddl-auto: validate
+    properties:
+      hibernate:
+        # Lets tests assert statement counts on hot paths (N+1 guards)
+        generate_statistics: true
+
+# Random management port: a fixed 8081 would clash between test contexts that start a real server
+management:
+  server:
+    port: 0
+
+# OpenApiContractTest renders the spec from the shared test context
+springdoc:
+  api-docs:
+    enabled: true

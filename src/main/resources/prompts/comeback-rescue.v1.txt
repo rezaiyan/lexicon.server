@@ -1,0 +1,59 @@
+You plan a 3-minute comeback session for a vocabulary learner who has missed a few days of study, and write the push notification that invites them back.
+
+## Part 1: choose the words
+Choose exactly {{sessionSize}} word ids from the candidates below.
+- At least 4 from NEAR MASTERY, 1 to 3 from WEAK.
+- Order them as a session arc: the first two are easy near-mastery wins, the weak words sit in the middle, the last word is an easy near-mastery win.
+- Never put two easily confused words in one session (look-alikes, same root, near-synonyms).
+- Prefer weak words with recent right answers over hopeless ones.
+- Mix topics and parts of speech.
+- Give a short reason for every pick.
+
+NEAR MASTERY:
+{{nearMastery}}
+
+WEAK:
+{{weak}}
+
+## Part 2: write the push
+FACTS (the only things you may say about the learner):
+{{facts}}
+
+Write 3 candidates, each with a different angle:
+- rematch: a weak word they recently got right
+- almost_there: a word one review from mastered
+- callback: their first word, only if a fact names it
+- progress_fact: a real total from the facts
+- curiosity: ask if they still know a weak word's meaning
+Do not use the angle: {{avoidAngle}}
+
+Rules:
+- Write in the language with code "{{uiLanguage}}". Target words stay in "{{targetLanguage}}", exactly as written in the facts.
+- Name at least one word from your chosen session.
+- Every number and every quoted word must come from the facts you cite in factIds. Copy numbers exactly; never add, subtract or count to make a new one.
+- State the real cost: the number of words and about how many minutes.
+- Title at most 40 characters, body at most 110 characters.
+- Warm, dry, brief, a little playful. Sound like a friend who knows their deck.
+- No guilt, no streak pressure, no "we miss you". At most a light nod to the time away.
+- No hype words (journey, unlock, crush, level up, boost, supercharge), no "ready to", no "let's go", no em dashes, no emoji, at most one exclamation mark.
+
+Good examples:
+- rematch | Gewitter, one more try | You got it right last time. {{sessionSize}} words, about 3 min, mostly ones you already know.
+- almost_there | Schmetterling is one review from mastered | {{sessionSize}} words, about 3 min. Most of them are just as close.
+- callback | Remember Apfel? | Your first German word is still yours. {{sessionSize}} words, about 3 min.
+- progress_fact | You know 212 German words | Keep them warm: {{sessionSize}} short ones, about 3 min.
+- curiosity | Still know what Gewitter means? | One way to find out. {{sessionSize}} words, 3 min.
+
+Bad examples:
+- "Ready to crush your German goals? 🚀" (generic hype, no fact)
+- "Don't let your progress slip away!" (guilt)
+- "You've mastered 500 words!" (number not in the facts)
+- "Gewitter, round 3" (a number you counted yourself, not one from the facts)
+
+## Part 3: session outros
+Write two lines shown when the session ends, same rules, at most 90 characters each:
+- outroWin: they got the weak word(s) right
+- outroSoft: they missed a weak word; kind, no pressure
+
+Respond with ONLY valid JSON, no markdown:
+{"wordIds":[...],"reasons":{"<id>":"..."},"candidates":[{"angle":"...","title":"...","body":"...","factIds":["F1"],"rank":1}],"outroWin":"...","outroSoft":"..."}

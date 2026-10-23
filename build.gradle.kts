@@ -1,9 +1,25 @@
+// The Spring Boot Gradle plugin brings Jackson and Apache HttpClient onto the build classpath at
+// older versions; keep them on the same patched releases as the app (the extra[...] overrides below)
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.eachDependency {
+			when {
+				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
+					useVersion("2.21.7")
+				requested.group == "org.apache.httpcomponents.client5" -> useVersion("5.6.4")
+				requested.group == "org.apache.httpcomponents.core5" -> useVersion("5.4.3")
+			}
+		}
+	}
+}
+
 plugins {
 	alias(libs.plugins.kotlin.jvm)
 	alias(libs.plugins.kotlin.spring)
 	alias(libs.plugins.kotlin.jpa)
 	alias(libs.plugins.spring.boot)
 	alias(libs.plugins.spring.dependency.management)
+	alias(libs.plugins.detekt)
 	jacoco
 }
 
@@ -13,6 +29,15 @@ description = "Lexicon Server Application"
 
 // The Spring Boot BOM pins Kotlin libraries to its own baseline; keep them on the compiler's version
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
+// Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
+// each override once the BOM catches up.
+extra["tomcat.version"] = "10.1.60"
+extra["netty.version"] = "4.1.137.Final"
+extra["jackson-bom.version"] = "2.21.7"
+extra["postgresql.version"] = "42.7.12"
+// firebase-admin asks for httpclient5 5.6.x; the BOM would pin the older, vulnerable 5.5/core 5.3
+extra["httpclient5.version"] = "5.6.4"
+extra["httpcore5.version"] = "5.4.3"
 
 repositories {
 	mavenCentral()
@@ -21,12 +46,30 @@ repositories {
 dependencies {
 	// Spring Boot Starters
 	implementation(libs.spring.boot.starter.web)
+	// Event publication registry: cross-feature events persisted in Postgres until their listeners complete
+	implementation(libs.spring.modulith.starter.jdbc)
+	// OpenAPI spec of the API, rendered in tests and committed as openapi.json (no UI, route off in prod)
+	implementation(libs.springdoc.openapi.webmvc.api)
 	implementation(libs.spring.boot.starter.data.jpa)
 	implementation(libs.spring.boot.starter.security)
-	implementation(libs.spring.boot.starter.oauth2.client)
 	implementation(libs.spring.boot.starter.validation)
 	implementation(libs.spring.boot.starter.actuator)
 	implementation(libs.spring.boot.starter.mail)
+	// MCP server (/mcp): learner tools over the word services, for AI clients
+	implementation(platform(libs.spring.ai.bom))
+	implementation(libs.spring.ai.starter.mcp.server.webmvc)
+	// Spring AI 1.1.8 pins MCP SDK 0.18.3; 0.18.4 bounds HTTP request reads (security backport)
+	constraints {
+		listOf("mcp", "mcp-core", "mcp-json-jackson2", "mcp-spring-webmvc").forEach {
+			implementation("io.modelcontextprotocol.sdk:$it:0.18.4")
+		}
+	}
+	// OAuth 2.1 for MCP clients: we are the authorization server, /mcp is the resource server
+	implementation(libs.spring.security.oauth2.authorization.server)
+	implementation(libs.spring.security.oauth2.resource.server)
+
+	// Metrics, scraped from the internal management port
+	implementation(libs.micrometer.registry.prometheus)
 
 	// Kotlin
 	implementation(libs.kotlin.reflect)
@@ -45,19 +88,21 @@ dependencies {
 	runtimeOnly(libs.jjwt.jackson)
 
 	// Firebase Admin SDK for push notifications
-	implementation(libs.firebase.admin)
-
-	// Google API Client for OAuth
-	implementation(libs.google.api.client)
+	implementation(libs.firebase.admin) {
+		// Pulled in by google-cloud-storage (unused: only Auth + Messaging). On the classpath it makes
+		// Spring MVC answer requests without an explicit Accept header in XML instead of JSON.
+		exclude(group = "com.fasterxml.jackson.dataformat", module = "jackson-dataformat-xml")
+	}
 
 	// Rate Limiting
 	implementation(libs.bucket4j.core)
+	// Expiring, size-bounded map of rate-limit buckets (version managed by the Spring Boot BOM)
+	implementation("com.github.ben-manes.caffeine:caffeine")
+	// Fetches MCP client metadata documents with an address-checking DNS resolver
+	implementation(libs.httpclient5)
 
-	// Password Hashing (for refresh tokens)
+	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)
-
-	// Argon2 for refresh token hashing
-	implementation(libs.bouncycastle.bcprov)
 
 	// GeoIP
 	implementation(libs.geoip2)
@@ -70,9 +115,20 @@ dependencies {
 	testImplementation(libs.spring.security.test)
 	testImplementation(libs.kotlin.test.junit5)
 	testImplementation(libs.mockk)
+	// Architecture rules as tests (src/test/.../architecture)
+	testImplementation(libs.konsist)
+	// Feature-module boundaries (ModularityTest)
+	testImplementation(libs.spring.modulith.starter.test)
 	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
 	testImplementation(libs.testcontainers.postgresql)
 	testRuntimeOnly(libs.junit.platform.launcher)
+}
+
+// Hibernate proxies subclass entities; final classes made every LAZY to-one association load eagerly
+allOpen {
+	annotation("jakarta.persistence.Entity")
+	annotation("jakarta.persistence.MappedSuperclass")
+	annotation("jakarta.persistence.Embeddable")
 }
 
 kotlin {
@@ -83,13 +139,58 @@ kotlin {
 			// Annotations on constructor properties (@JsonProperty, @NotBlank, ...) also land on the
 			// property/field — the Kotlin 2.x future default; opting in now silences the migration warning
 			"-Xannotation-default-target=param-property",
+			// Writes annotations on type arguments to bytecode, so Bean Validation sees element
+			// constraints such as List<@Size(max = 40) String>; without it they are silently dropped
+			"-Xemit-jvm-type-annotations",
 		)
 	}
 }
 
+// META-INF/build-info.properties: lets /api/v1/health report the real version instead of "development"
+springBoot {
+	buildInfo()
+}
+
+// Same ruleset as the client (Lexicon/detekt.yml), minus the Compose/Android rules. Runs in `check`,
+// so CI fails on new findings; existing ones are recorded in detekt-baseline.xml.
+detekt {
+	buildUponDefaultConfig = true
+	config.setFrom(files("$rootDir/detekt.yml"))
+	baseline = file("$rootDir/detekt-baseline.xml")
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+	jvmTarget = "21"
+	reports {
+		sarif.required = true
+	}
+}
+
+// detekt 1.23 embeds the Kotlin 1.9 compiler; keep the Spring BOM from lifting its classpath to ours
+configurations.matching { it.name == "detekt" }.configureEach {
+	resolutionStrategy.eachDependency {
+		if (requested.group == "org.jetbrains.kotlin") {
+			useVersion(io.gitlab.arturbosch.detekt.getSupportedKotlinVersion())
+		}
+	}
+}
+
+// One stable artifact name for the Dockerfile and scripts; the plain (non-boot) jar isn't used
+tasks.bootJar {
+	archiveFileName = "app.jar"
+}
+
+tasks.jar {
+	enabled = false
+}
+
 tasks.test {
 	useJUnitPlatform()
+	// Spring caches one context per test configuration; the default 512m worker heap ran out (2026-10-15)
+	maxHeapSize = "1g"
 	finalizedBy(tasks.jacocoTestReport)
+	// `./gradlew test -PupdateOpenApi=true` rewrites openapi.json instead of failing on a diff
+	systemProperty("openapi.update", providers.gradleProperty("updateOpenApi").getOrElse("false"))
 }
 
 // JaCoCo configuration

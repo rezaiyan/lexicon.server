@@ -1,35 +1,74 @@
 name: Release
 
+# Releases only a commit CI already passed on main: the tag must point at a commit whose
+# ghcr.io/<repo>:sha-<commit> image exists, which CI publishes only after build, tests, detekt,
+# coverage and the image scan pass. Tag after main's CI is green (re-run this workflow if not).
+
 on:
   push:
     tags:
       - 'v*'
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
+  verify:
+    name: Verify CI passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      source: ${{ steps.image.outputs.source }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find the CI image for this commit
+        id: image
+        run: |
+          source="$IMAGE:sha-${GITHUB_SHA::7}"
+          if ! docker buildx imagetools inspect "$source" > /dev/null; then
+            echo "::error::$source not found: CI hasn't passed on main for $GITHUB_SHA. Tag a green main commit, or re-run once CI finishes."
+            exit 1
+          fi
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
   release:
     name: Build & Release
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: verify
 
     permissions:
       contents: write
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '21'
           distribution: 'temurin'
-          cache: gradle
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Extract version from tag
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # Tests already passed in CI for this exact commit (the verify job)
       - name: Build JAR
-        run: ./gradlew bootJar -x test --stacktrace
+        run: ./gradlew bootJar --stacktrace
 
       - name: Rename JAR
         run: |
@@ -49,7 +88,8 @@ jobs:
               text,
               re.DOTALL,
           )
-          notes = match.group(1).strip() if match else "See CHANGELOG.md for details."
+          # Drop the "---" divider that ends each section
+          notes = match.group(1).strip().rstrip("-").strip() if match else "See CHANGELOG.md for details."
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write("NOTES<<EOF\n")
@@ -65,3 +105,29 @@ jobs:
           files: build/libs/lexicon-server-${{ steps.version.outputs.VERSION }}.jar
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
+
+  image:
+    # Versioned image (ghcr.io/<repo>:1.2.3 and :v1.2.3), deployable with the Deploy workflow.
+    # Re-tags the image CI built and scanned for this commit instead of rebuilding it.
+    name: Release Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: verify
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag the CI image
+        env:
+          SOURCE: ${{ needs.verify.outputs.source }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          docker buildx imagetools create -t "$IMAGE:$version" -t "$IMAGE:$GITHUB_REF_NAME" "$SOURCE"
+          echo "Tagged $SOURCE as $version and $GITHUB_REF_NAME"

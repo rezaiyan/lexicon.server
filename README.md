@@ -64,15 +64,10 @@ curl http://localhost:8080/api/v1/health
 docker-compose up -d
 ```
 
-### Production (PostgreSQL)
+### Production
 
-```bash
-# 1. Create the database
-./scripts/setup-db.sh
-
-# 2. Start in production mode
-./scripts/start-prod.sh
-```
+Production runs the CI-built Docker image with Docker Compose (PostgreSQL, the app, Metabase) behind
+Caddy. See [docs/deployment.md](docs/deployment.md) for VPS setup, automatic deploys, rollback and backups.
 
 ## Configuration
 
@@ -101,12 +96,9 @@ All configuration is injected via environment variables. Copy `env.example` to `
 |---|---|---|
 | `FIREBASE_PROJECT_ID` | — | Required for Google Sign-In token verification |
 | `FIREBASE_SERVICE_ACCOUNT_PATH` | — | Path to service account JSON (enables push notifications) |
+| `FIREBASE_CREDENTIALS_JSON` | — | The service account JSON itself; takes precedence over the path |
 | `REVENUECAT_WEBHOOK_SECRET` | — | Webhook signature secret |
 | `REVENUECAT_API_KEY` | — | RevenueCat REST API key |
-| `GITHUB_TOKEN` | — | GitHub token for vocabulary collections (raises rate limit to 5000/hr) |
-| `PREMIUM_FEATURES_ENABLED` | `true` | Enable premium feature gate |
-| `AI_IMAGE_EXTRACTION_ENABLED` | `true` | Enable image OCR extraction |
-| `AI_DAILY_INSIGHT_ENABLED` | `true` | Enable AI daily push insights |
 | `PUSH_NOTIFICATIONS_ENABLED` | `true` | Enable push notifications |
 | `PORT` | `8080` | HTTP server port |
 
@@ -202,7 +194,7 @@ src/main/kotlin/com/alirezaiyan/vokab/server/
 
 src/main/resources/
 ├── application.yml
-└── db/migration/    # Flyway V1–V14
+└── db/migration/    # Flyway migrations
 ```
 
 ## Development
@@ -238,7 +230,11 @@ ACCESS_TOKEN=your_jwt ./scripts/test-endpoints.sh
 
 ## Deployment
 
-The application ships as a Docker image and can be deployed anywhere containers run:
+CI publishes a Docker image for every `main` commit to `ghcr.io/rezaiyan/lexicon.server`, and the
+Deploy workflow can roll it out to the VPS with a health check and automatic rollback. Setup,
+rollbacks and database backups: **[docs/deployment.md](docs/deployment.md)**.
+
+The image runs anywhere containers run:
 
 - **AWS ECS / Fargate**
 - **Google Cloud Run**

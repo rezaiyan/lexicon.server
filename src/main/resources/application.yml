@@ -9,6 +9,27 @@ spring:
     url: ${DATABASE_URL:}
     username: ${DATABASE_USERNAME:}
     password: ${DATABASE_PASSWORD:}
+    hikari:
+      # With virtual threads request concurrency is effectively unbounded; the pool is what caps
+      # concurrent DB work. Waiting longer than this for a connection fails the request instead of
+      # piling up threads behind an overloaded database.
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      connection-timeout: 10000   # ms (Hikari binds a raw long, not a Duration)
+
+  # Requests, @Async and @Scheduled run on virtual threads (all I/O here is blocking JDBC/HTTP).
+  threads:
+    virtual:
+      enabled: true
+  task:
+    execution:
+      simple:
+        # Bounds fire-and-forget @Async work (audit log, events, geo lookup) so it can't drain the pool
+        concurrency-limit: 16
+    scheduling:
+      simple:
+        # Each cron run gets a fresh virtual thread; 1 keeps the jobs serialized as before, so a slow
+        # notification dispatch can never overlap itself and double-send.
+        concurrency-limit: 1
 
   sql:
     init:
@@ -31,6 +52,22 @@ spring:
       hibernate:
         # Dialect is detected from the JDBC connection (PostgreSQL in prod, H2 in dev/tests).
         format_sql: true
+        # Paginating a query that fetch-joins a collection pages in memory over every row; fail instead
+        query:
+          fail_on_pagination_over_collection_fetch: true
+
+  # MCP server for AI clients at POST /mcp (JWT-protected like the rest of the API).
+  # Off until OAuth for third-party clients exists; MCP_ENABLED=true for local spikes.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:false}
+        name: lexicon
+        version: 0.1.0
+        protocol: STATELESS
+        instructions: >-
+          Lexicon is the learner's vocabulary notebook. Use these tools to look up the words and
+          tags they have saved. Word levels run from 0 (new) to 6 (mastered).
 
   h2:
     console:
@@ -52,6 +89,10 @@ spring.servlet.multipart:
   max-request-size: 6MB
 
 app:
+  comeback-rescue:
+    # Kill switch. On by default; RescueGuard pauses sends on its own when rescued learners opt out
+    send-enabled: ${COMEBACK_RESCUE_SEND_ENABLED:true}
+
   avatar:
     upload-dir: ${AVATAR_UPLOAD_DIR:/var/www/uploads/avatars}
     base-url: ${AVATAR_BASE_URL:}
@@ -71,7 +112,11 @@ app:
     api-key: ${OPENROUTER_API_KEY:}
     base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
     model: ${OPENROUTER_MODEL:anthropic/claude-haiku-4.5}
+    judge-model: ${OPENROUTER_JUDGE_MODEL:}
     timeout-seconds: ${OPENROUTER_TIMEOUT_SECONDS:60}
+    # max_tokens for short answers (insights, reminders, translation, judges). Photo extraction and
+    # vocabulary suggestions (8192) and comeback rescue (2048) have their own caps in AiOperation.
+    max-tokens: ${OPENROUTER_MAX_TOKENS:1024}
 
   apple:
     # Accepted `aud` values for Apple ID tokens (iOS bundle id; add a Services ID if web sign-in ships).
@@ -82,6 +127,43 @@ app:
     # for onboarding and suggest-vocabulary flows.
     # Can be overridden via VOCABULARY_SUGGESTION_COUNT in the environment.
     suggestionCount: ${VOCABULARY_SUGGESTION_COUNT:50}
+
+  # AI credits (see CreditService). Allowances reset monthly per tier and never roll over; the
+  # signup bonus never expires. The app reads costs and allowances from GET /api/v1/credits.
+  credits:
+    signup-bonus: ${CREDITS_SIGNUP_BONUS:15}
+    free-monthly-allowance: ${CREDITS_FREE_MONTHLY:5}
+    trial-monthly-allowance: ${CREDITS_TRIAL_MONTHLY:30}
+    premium-monthly-allowance: ${CREDITS_PREMIUM_MONTHLY:300}
+    costs:
+      # One flat price per source, own words or not; the _GUIDED actions only label the ledger
+      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:4}
+      PHOTO_EXTRACTION_GUIDED: ${CREDITS_COST_PHOTO:4}
+      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:3}
+      AI_SUGGESTION_GUIDED: ${CREDITS_COST_SUGGESTION:3}
+      TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
+
+  # Per-user call limits on the AI endpoints; each limit resets in full every window.
+  rate-limit:
+    window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
+    photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
+    ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+    # Per-IP sign-in (/auth/google, /apple, /ci-token) and /auth/refresh limits, per minute
+    auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}
+    refresh-per-minute: ${REFRESH_RATE_LIMIT_PER_MINUTE:60}
+    # Unauthenticated onboarding AI calls from all IPs together (caps the bill under IP rotation);
+    # past either limit onboarding answers 429 until it refills.
+    onboarding-global-per-hour: ${ONBOARDING_AI_GLOBAL_PER_HOUR:200}
+    onboarding-global-per-day: ${ONBOARDING_AI_GLOBAL_PER_DAY:2000}
+    # Failed admin key attempts from all IPs per hour before admin key auth pauses for everyone
+    admin-failures-global-per-hour: ${ADMIN_AUTH_GLOBAL_FAILURES_PER_HOUR:50}
+
+  # Learners' own instructions to the AI (see InstructionGuard): refusals per user before
+  # instructions pause, and how long to wait for the judge before failing closed.
+  ai-instructions:
+    max-rejections: ${AI_INSTRUCTION_REJECTIONS:5}
+    rejection-window-minutes: ${AI_INSTRUCTION_REJECTION_WINDOW_MINUTES:60}
+    judge-timeout-seconds: ${AI_INSTRUCTION_JUDGE_TIMEOUT_SECONDS:8}
 
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.
@@ -96,12 +178,11 @@ app:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8081}
 
   features:
-    premium-features-enabled: ${PREMIUM_FEATURES_ENABLED:true}
-    ai-image-extraction-enabled: ${AI_IMAGE_EXTRACTION_ENABLED:true}
-    ai-daily-insight-enabled: ${AI_DAILY_INSIGHT_ENABLED:true}
     push-notifications-enabled: ${PUSH_NOTIFICATIONS_ENABLED:true}
-    subscriptions-enabled: ${SUBSCRIPTIONS_ENABLED:true}
-    free-ai-extraction-limit: ${FREE_AI_EXTRACTION_LIMIT:10}
+
+  firebase:
+    # Service account JSON file for push notifications; FIREBASE_CREDENTIALS_JSON (the JSON itself) wins
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:}
 
   security:
     # Comma-separated list of test emails that bypass active check
@@ -109,11 +190,9 @@ app:
     testEmails: ${TEST_EMAILS:}
 
   logging:
-    # Request/Response logging configuration
+    # One access-log line per request (AccessLogFilter)
     enabled: ${REQUEST_LOGGING_ENABLED:true}
-    max-body-size: ${REQUEST_LOGGING_MAX_BODY_SIZE:50000}
-    exclude-patterns: ${REQUEST_LOGGING_EXCLUDE_PATTERNS:/actuator/health,/h2-console/**}
-    log-level: ${REQUEST_LOGGING_LEVEL:INFO}
+    exclude-patterns: ${REQUEST_LOGGING_EXCLUDE_PATTERNS:/api/v1/health,/actuator/**,/h2-console/**}
 
   email:
     enabled: ${EMAIL_ENABLED:false}
@@ -137,16 +216,19 @@ app:
       telegram:
         bot-token: ${TELEGRAM_ADMIN_BOT_TOKEN:}
         chat-id: ${TELEGRAM_ADMIN_CHAT_ID:}
+        webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
 
   geolocation:
     database-path: ${GEOLITE2_COUNTRY_DB_PATH:}
 
-  github-vocabulary:
-    repo-url: ${GITHUB_REPO_URL:https://api.github.com/repos/rezaiyan/Vokab-collection}
-    # GitHub personal access token for higher rate limits (5000/hour instead of 60/hour)
-    # Generate at: https://github.com/settings/tokens
-    # Set in environment variable: GITHUB_TOKEN=your_token_here
-    token: ${GITHUB_TOKEN:}
+  # OAuth 2.1 for MCP clients (only active with MCP_ENABLED=true)
+  mcp:
+    issuer: ${MCP_ISSUER:http://localhost:8080}
+    signing-key-path: ${MCP_SIGNING_KEY_PATH:./keys/mcp-signing-key.json}
+    allowed-origins: ${MCP_ALLOWED_ORIGINS:}
+    firebase-web-api-key: ${MCP_FIREBASE_WEB_API_KEY:}
+    firebase-auth-domain: ${MCP_FIREBASE_AUTH_DOMAIN:}
+    firebase-project-id: ${MCP_FIREBASE_PROJECT_ID:}
 
 logging:
   level:
@@ -158,15 +240,41 @@ logging:
     org.hibernate: ERROR
 
 management:
+  server:
+    # Actuator lives on its own port: not published by docker-compose and not routed by Caddy
+    # (which only forwards /api/* to 8080), so metrics and health details stay internal.
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:
-        include: "health"
-        exclude: "env,beans,conditions,configprops,flyway,heapdump,info,loggers,mappings,metrics,scheduledtasks,shutdown,threaddump"
+        include: "health,info,prometheus"
   endpoint:
     health:
       show-details: never
-  trace:
-    http:
-      enabled: false
+      # /actuator/health/liveness and /readiness (internal port). Readiness = can serve traffic:
+      # app state + database. Firebase/OpenRouter stay out: their outages degrade single features.
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
+# The spec is rendered by OpenApiContractTest into openapi.json; no public docs route.
+springdoc:
+  api-docs:
+    enabled: false
+  writer-with-order-by-keys: true
+
+# Cross-feature events (Spring Modulith): persisted in event_publication until each listener completes.
+# The table is created by Flyway (V39); completed rows are deleted, failed ones are retried by
+# EventPublicationRetry.
+spring.modulith:
+  events:
+    jdbc:
+      schema-initialization:
+        enabled: false
+    completion-mode: delete
+    republish-outstanding-events-on-restart: false

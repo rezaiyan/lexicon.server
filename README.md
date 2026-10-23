@@ -64,15 +64,10 @@ curl http://localhost:8080/api/v1/health
 docker-compose up -d
 ```
 
-### Production (PostgreSQL)
+### Production
 
-```bash
-# 1. Create the database
-./scripts/setup-db.sh
-
-# 2. Start in production mode
-./scripts/start-prod.sh
-```
+Production runs the CI-built Docker image with Docker Compose (PostgreSQL, the app, Metabase) behind
+Caddy. See [docs/deployment.md](docs/deployment.md) for VPS setup, automatic deploys, rollback and backups.
 
 ## Configuration
 

@@ -65,12 +65,12 @@ class AppleIdTokenVerifierTest {
     @Test
     fun `verify rejects a token signed with a different key`() {
         val otherKey = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
-        assertNull(verifier.verify(token(signingKey = otherKey)))
+        assertNull(verifier.verify(token(key = SigningKey(KID, otherKey))))
     }
 
     @Test
     fun `verify rejects a token with an unknown key id`() {
-        assertNull(verifier.verify(token(kid = "unknown")))
+        assertNull(verifier.verify(token(key = SigningKey("unknown", keyPair))))
     }
 
     @Test
@@ -127,10 +127,9 @@ class AppleIdTokenVerifierTest {
         audience: String = BUNDLE_ID,
         issuer: String = "https://appleid.apple.com",
         expiresAt: Instant = Instant.now().plusSeconds(600),
-        kid: String = KID,
-        signingKey: KeyPair = keyPair,
+        key: SigningKey = SigningKey(KID, keyPair),
     ): String = Jwts.builder()
-        .header().keyId(kid).and()
+        .header().keyId(key.kid).and()
         .issuer(issuer)
         .audience().add(audience).and()
         .apply { subject?.let { subject(it) } }
@@ -138,8 +137,11 @@ class AppleIdTokenVerifierTest {
         .apply { nonce?.let { claim("nonce", it) } }
         .issuedAt(Date())
         .expiration(Date.from(expiresAt))
-        .signWith(signingKey.private, Jwts.SIG.RS256)
+        .signWith(key.keyPair.private, Jwts.SIG.RS256)
         .compact()
+
+    /** The key a test token is signed with, and the `kid` its header names. */
+    private data class SigningKey(val kid: String, val keyPair: KeyPair)
 
     private companion object {
         const val KID = "test-kid"

@@ -85,7 +85,10 @@ class JwtAuthenticationFilter(
                         return
                     }
                     if (!userAccessCache.isTokenAllowed(userId, verified.issuedAt)) {
-                        log.warn { "❌ JWT Filter [REVOKED]: token issued before revocation cutoff for userId=$userId - 401 for $path" }
+                        log.warn {
+                            "❌ JWT Filter [REVOKED]: token issued before revocation cutoff " +
+                                "for userId=$userId - 401 for $path"
+                        }
                         response.status = HttpServletResponse.SC_UNAUTHORIZED
                         response.writer.write("""{"success":false,"message":"Token has been revoked"}""")
                         response.contentType = "application/json"

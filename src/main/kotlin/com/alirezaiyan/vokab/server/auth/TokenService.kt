@@ -58,8 +58,7 @@ class TokenService(
             .orElseThrow { AuthRejectedException("Refresh token not found") }
         val now = Instant.now(clock)
 
-        if (tokenEntity.revoked) throw AuthRejectedException("Refresh token has been revoked")
-        if (!tokenEntity.expiresAt.isAfter(now)) throw AuthRejectedException("Refresh token has expired")
+        unusableReason(tokenEntity, now)?.let { throw AuthRejectedException(it) }
 
         val user = tokenEntity.user
         val userId = user.requireId()
@@ -67,11 +66,7 @@ class TokenService(
 
         val usedAt = tokenEntity.usedAt
         if (usedAt != null && !now.isBefore(usedAt.plusMillis(appProperties.jwt.refreshTokenGracePeriodMs))) {
-            // Revocation must commit even though the request fails (noRollbackFor above)
-            val revoked = refreshTokenRepository.revokeFamily(familyId)
-            logger.error { "Refresh token reuse detected for userId=$userId; revoked $revoked tokens in its family" }
-            auditLogService.logTokenReuse(userId, familyId, null)
-            throw AuthRejectedException("Refresh token has been revoked")
+            revokeReusedFamily(userId, familyId)
         }
         if (!user.active) throw AuthRejectedException("User account is deactivated")
 
@@ -87,6 +82,21 @@ class TokenService(
         }
         auditLogService.logRefresh(userId, user.email, familyId, null, null)
         return response
+    }
+
+    private fun unusableReason(token: RefreshToken, now: Instant): String? = when {
+        token.revoked -> "Refresh token has been revoked"
+        !token.expiresAt.isAfter(now) -> "Refresh token has expired"
+        else -> null
+    }
+
+    /** Reuse after the grace window: revokes the whole family, audits it and rejects the request. */
+    private fun revokeReusedFamily(userId: Long, familyId: String): Nothing {
+        // Revocation must commit even though the request fails (rotate's noRollbackFor)
+        val revoked = refreshTokenRepository.revokeFamily(familyId)
+        logger.error { "Refresh token reuse detected for userId=$userId; revoked $revoked tokens in its family" }
+        auditLogService.logTokenReuse(userId, familyId, null)
+        throw AuthRejectedException("Refresh token has been revoked")
     }
 
     /** Revokes one refresh token. */

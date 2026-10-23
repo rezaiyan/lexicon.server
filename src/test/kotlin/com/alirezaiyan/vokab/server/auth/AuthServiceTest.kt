@@ -10,7 +10,6 @@ import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import io.mockk.every
 import io.mockk.just
-import io.mockk.mockk
 import io.mockk.Runs
 import io.mockk.verify
 import io.mockk.verifyOrder

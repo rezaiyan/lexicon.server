@@ -55,9 +55,8 @@ class AuthService(
         ipAddress: String? = null,
     ): AuthResponse {
         val claims = firebaseIdTokenVerifier.verify(idToken)
-            ?: throw AuthRejectedException("Invalid Firebase ID token")
-        if (!claims.isGoogleSignIn) {
-            logger.warn { "Google sign-in rejected: Firebase sign-in provider is ${claims.signInProvider}" }
+        if (claims == null || !claims.isGoogleSignIn) {
+            claims?.let { logger.warn { "Google sign-in rejected: Firebase sign-in provider is ${it.signInProvider}" } }
             throw AuthRejectedException("Invalid Firebase ID token")
         }
         val email = claims.email

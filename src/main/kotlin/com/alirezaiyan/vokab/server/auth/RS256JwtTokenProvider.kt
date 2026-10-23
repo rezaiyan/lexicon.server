@@ -92,7 +92,7 @@ class RS256JwtTokenProvider(
                     throw IllegalStateException("JWT key files exist but could not be loaded", e)
                 }
             }
-            privateExists || publicExists -> throw IllegalStateException(
+            privateExists || publicExists -> error(
                 "Only one JWT key file exists (private=$privateExists, public=$publicExists); refusing to overwrite it"
             )
             else -> {
@@ -181,7 +181,9 @@ class RS256JwtTokenProvider(
         if (ownerOnly && posix) {
             Files.createFile(path, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")))
         } else {
-            if (ownerOnly) logger.warn { "Filesystem has no POSIX permissions; private key file uses default permissions" }
+            if (ownerOnly) {
+                logger.warn { "Filesystem has no POSIX permissions; private key file uses default permissions" }
+            }
             Files.createFile(path)
         }
         Files.write(path, content, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING)

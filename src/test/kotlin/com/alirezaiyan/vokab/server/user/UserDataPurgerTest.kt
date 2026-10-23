@@ -9,6 +9,10 @@ import org.springframework.context.annotation.Import
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.ActiveProfiles
 
+private const val INSERT_REFRESH_TOKEN =
+    "INSERT INTO refresh_tokens (token_hash, user_id, expires_at, family_id, family_expires_at) " +
+        "VALUES (?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)"
+
 /** Runs the real purge SQL against the migrated PostgreSQL test schema. */
 @DataJpaTest
 @ActiveProfiles("test")
@@ -112,7 +116,7 @@ class UserDataPurgerTest {
             "INSERT INTO listening_session_words (session_id, user_id, word_id, source_language, target_language, heard_at) VALUES (?, ?, ?, 'en', 'de', 0)",
             listeningId, id, wordId,
         )
-        jdbc.update("INSERT INTO refresh_tokens (token_hash, user_id, expires_at, family_id) VALUES (?, ?, CURRENT_TIMESTAMP, ?)", "hash-$email", id, "family-$email")
+        jdbc.update(INSERT_REFRESH_TOKEN, "hash-$email", id, "family-$email")
         jdbc.update("INSERT INTO push_tokens (user_id, token, platform) VALUES (?, ?, 'IOS')", id, "push-$email")
         jdbc.update("INSERT INTO daily_insights (user_id, insight_text, generated_at, date) VALUES (?, 'hi', CURRENT_TIMESTAMP, '2026-10-02')", id)
         jdbc.update("INSERT INTO daily_activities (user_id, activity_date) VALUES (?, DATE '2026-10-02')", id)

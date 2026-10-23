@@ -22,6 +22,8 @@ data class AppleIdClaims(
     val subject: String,
     /** Absent when the user hides their email or on repeat sign-ins. */
     val email: String?,
+    /** `email_verified`; Apple sends it as a boolean or as the string "true". */
+    val emailVerified: Boolean = false,
 )
 
 /**
@@ -66,6 +68,11 @@ class AppleIdTokenVerifier(
         return AppleIdClaims(
             subject = subject,
             email = claims.get("email", String::class.java)?.takeIf { it.isNotBlank() },
+            emailVerified = when (val verified = claims["email_verified"]) {
+                is Boolean -> verified
+                is String -> verified.equals("true", ignoreCase = true)
+                else -> false
+            },
         )
     }
 

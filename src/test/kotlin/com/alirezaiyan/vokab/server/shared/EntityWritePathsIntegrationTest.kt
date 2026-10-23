@@ -152,7 +152,8 @@ class EntityWritePathsIntegrationTest {
     fun `refresh token grace expiry persists`() {
         val user = newUser()
         val token = refreshTokenRepository.save(
-            RefreshToken(tokenHash = "hash-${System.nanoTime()}", user = user, expiresAt = now.plusSeconds(3600), familyId = "test-family")
+            RefreshToken(tokenHash = "hash-${System.nanoTime()}", user = user, expiresAt = now.plusSeconds(3600), familyId = "test-family",
+                familyExpiresAt = now.plusSeconds(7200))
         )
 
         token.expiresAt = now.plusSeconds(30)

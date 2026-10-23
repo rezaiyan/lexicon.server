@@ -2,17 +2,18 @@ package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.jsonwebtoken.Claims
+import io.jsonwebtoken.JwtParser
 import io.jsonwebtoken.Jwts
-import io.jsonwebtoken.security.Keys
 import org.springframework.stereotype.Component
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.interfaces.RSAPrivateKey
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.PKCS8EncodedKeySpec
 import java.security.spec.X509EncodedKeySpec
+import java.math.BigInteger
 import java.time.Clock
 import java.util.*
 import java.util.Base64
@@ -29,10 +30,19 @@ private val logger = KotlinLogging.logger {}
 /** A signature-checked access token: its user and `iat` (null if the token carries none). */
 data class VerifiedAccessToken(val userId: Long, val issuedAt: Instant?)
 
+private const val ACCESS_TOKEN_TYPE = "access"
+
+/** Base64URL of [value]'s unsigned big-endian bytes, as JWK `n` and `e` require. */
+internal fun base64UrlUnsigned(value: BigInteger): String {
+    val bytes = value.toByteArray()
+    val unsigned = if (bytes.size > 1 && bytes[0] == 0.toByte()) bytes.copyOfRange(1, bytes.size) else bytes
+    return Base64.getUrlEncoder().withoutPadding().encodeToString(unsigned)
+}
+
 /**
  * JWT token provider using RS256 algorithm (asymmetric keys)
  * Automatically generates and persists RSA keys to ensure tokens remain valid across server restarts.
- * Supports key rotation and JWKS endpoint.
+ * Issued tokens carry the key's [keyId] as `kid`, the same value the JWKS endpoint publishes.
  */
 @Component
 class RS256JwtTokenProvider(
@@ -40,6 +50,26 @@ class RS256JwtTokenProvider(
     private val clock: Clock,
 ) {
     private val keyPair: KeyPair = initializeKeyPair()
+
+    /** RFC 7638 thumbprint of the public key: the `kid` of issued tokens and of the JWKS entry. */
+    val keyId: String = run {
+        val key = keyPair.public as RSAPublicKey
+        // Required members only, in lexicographic order, no whitespace (RFC 7638 section 3)
+        val e = base64UrlUnsigned(key.publicExponent)
+        val n = base64UrlUnsigned(key.modulus)
+        val canonical = """{"e":"$e","kty":"RSA","n":"$n"}"""
+        val digest = MessageDigest.getInstance("SHA-256").digest(canonical.toByteArray(Charsets.UTF_8))
+        Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
+    }
+
+    // Built once: only access tokens (type=access) from our issuer, for our audience
+    private val parser: JwtParser = Jwts.parser()
+        .verifyWith(keyPair.public as RSAPublicKey)
+        .clock { Date.from(clock.instant()) }
+        .requireIssuer(appProperties.jwt.issuer)
+        .requireAudience(appProperties.jwt.audience)
+        .require("type", ACCESS_TOKEN_TYPE)
+        .build()
 
     /**
      * Initialize key pair with the following strategy:
@@ -197,9 +227,10 @@ class RS256JwtTokenProvider(
         val expiryDate = Date(now.time + appProperties.jwt.expirationMs)
         
         return Jwts.builder()
+            .header().keyId(keyId).and()
             .subject(userId.toString())
             .claim("email", email)
-            .claim("type", "access")
+            .claim("type", ACCESS_TOKEN_TYPE)
             .id(jti)
             .issuer(appProperties.jwt.issuer)
             .audience().add(appProperties.jwt.audience).and()
@@ -209,33 +240,13 @@ class RS256JwtTokenProvider(
             .compact()
     }
     
-    fun getUserIdFromToken(token: String): Long? {
-        return try {
-            val claims = getClaims(token)
-            claims.subject.toLong()
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to extract user ID from token" }
-            null
-        }
-    }
-    
-    fun validateToken(token: String): Boolean {
-        return try {
-            getClaims(token)
-            true
-        } catch (e: Exception) {
-            logger.debug(e) { "Token validation failed" }
-            false
-        }
-    }
-    
     /**
      * Verifies [token] once and returns its subject and `iat`, or null if it is invalid or its
      * subject isn't a user id.
      */
     fun verifyAccessToken(token: String): VerifiedAccessToken? {
         val claims = try {
-            getClaims(token)
+            parser.parseSignedClaims(token).payload
         } catch (e: Exception) {
             logger.debug(e) { "Token validation failed" }
             return null
@@ -245,17 +256,6 @@ class RS256JwtTokenProvider(
     }
 
     fun getExpirationTime(): Long = appProperties.jwt.expirationMs
-    
-    private fun getClaims(token: String): Claims {
-        return Jwts.parser()
-            .verifyWith(publicKey)
-            .clock { Date.from(clock.instant()) }
-            .requireIssuer(appProperties.jwt.issuer)
-            .requireAudience(appProperties.jwt.audience)
-            .build()
-            .parseSignedClaims(token)
-            .payload
-    }
 }
 
 

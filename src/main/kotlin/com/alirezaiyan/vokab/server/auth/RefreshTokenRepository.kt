@@ -26,10 +26,6 @@ interface RefreshTokenRepository : JpaRepository<RefreshToken, Long> {
     fun revokeAllByUser(user: User): Int
 
     @Modifying
-    @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.tokenHash = :tokenHash")
-    fun revokeByTokenHash(tokenHash: String): Int
-
-    @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.familyId = :familyId")
     fun revokeFamily(familyId: String): Int
 

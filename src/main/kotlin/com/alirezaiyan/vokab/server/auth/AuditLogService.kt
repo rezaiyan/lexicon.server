@@ -88,6 +88,18 @@ class AuditLogService(
         )
     }
 
+    @Async
+    fun logAccountReactivation(userId: Long, email: String, provider: String, ipAddress: String?) {
+        logger.info { "AUDIT: ACCOUNT_REACTIVATION userId=$userId provider=$provider ip=$ipAddress" }
+        save(
+            eventType = AuditEventType.ACCOUNT_REACTIVATION,
+            userId = userId,
+            email = email,
+            ipAddress = ipAddress,
+            metadata = """{"provider":"$provider"}"""
+        )
+    }
+
     // Not @Async — account deletion audit must be committed before the user row is deleted
     fun logAccountDeletion(userId: Long, email: String, ipAddress: String?) {
         logger.warn { "AUDIT: ACCOUNT_DELETION userId=$userId ip=$ipAddress" }

@@ -98,12 +98,17 @@ class AuthController(
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
     
+    /** Public: the refresh token is the credential (see [TokenService.logout]). */
     @PostMapping("/logout")
     fun logout(
-        @AuthenticationPrincipal user: AuthUser,
-        @Valid @RequestBody request: RefreshTokenRequest
+        @Valid @RequestBody request: RefreshTokenRequest,
+        httpRequest: HttpServletRequest,
     ): ResponseEntity<ApiResponse<Unit>> {
-        tokenService.logout(user.id, request.refreshToken)
+        val ipAddress = httpRequest.clientAddress()
+        rateLimitConfig.getRefreshBucket(ipAddress).consumeOrThrow {
+            logger.warn { "Logout rate limit exceeded for IP $ipAddress" }
+        }
+        tokenService.logout(request.refreshToken, ipAddress)
         return ResponseEntity.ok(ApiResponse(success = true, message = "Logged out successfully"))
     }
     

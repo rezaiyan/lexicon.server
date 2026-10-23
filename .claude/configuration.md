@@ -25,7 +25,8 @@ All secrets + env-specific values injected via env vars. Without `DATABASE_URL` 
 | Env Var | Default | Description |
 |---|---|---|
 | `PORT` | `8080` | HTTP server port |
-| `JWT_EXPIRATION_MS` | `86400000` | Access token TTL (24h) |
+| `JWT_EXPIRATION_MS` | `900000` | Access token TTL (15 min; docker-compose uses 1h for now) |
+| `JWT_REFRESH_FAMILY_MAX_AGE_MS` | `15552000000` | Absolute session length (180 days), however often it refreshes |
 | `JWT_REFRESH_EXPIRATION_MS` | `7776000000` | Refresh token TTL (90d) |
 | `JWT_ISSUER` | `vokab-server` | JWT `iss` claim |
 | `JWT_AUDIENCE` | `vokab-client` | JWT `aud` claim |

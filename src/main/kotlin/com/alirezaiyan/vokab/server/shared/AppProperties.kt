@@ -45,9 +45,10 @@ data class McpConfig(
 )
 
 data class JwtConfig(
-    var expirationMs: Long = 86400000,
+    var expirationMs: Long = 900_000, // 15 minutes
     var refreshExpirationMs: Long = 7_776_000_000, // 90 days
     var refreshTokenGracePeriodMs: Long = 30_000, // 30 seconds grace period for rotated tokens
+    var refreshFamilyMaxAgeMs: Long = 15_552_000_000, // 180 days: a session ends then, however often it refreshes
     var privateKeyPath: String = "",
     var publicKeyPath: String = "",
     var privateKey: String = "", // Base64-encoded RSA private key (for ephemeral deployments)

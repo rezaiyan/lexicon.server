@@ -1,9 +1,7 @@
 package com.alirezaiyan.vokab.server.auth
 
-import com.alirezaiyan.vokab.server.shared.AppProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
 import org.springframework.security.config.http.SessionCreationPolicy
@@ -13,12 +11,37 @@ import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 
+/**
+ * Endpoints anyone may call. [SecurityConfig] permits them and [JwtAuthenticationFilter] skips them,
+ * both from this one list so the two can't drift apart.
+ */
+internal val PUBLIC_PATHS = listOf(
+    "/api/v1/auth/google",
+    "/api/v1/auth/apple",
+    "/api/v1/auth/refresh",
+    // The refresh token in the body is the credential, so an expired access token can still log out
+    "/api/v1/auth/logout",
+    "/api/v1/auth/ci-token",
+    "/api/v1/auth/jwks",
+    "/api/v1/webhooks/**",
+    "/api/v1/health",
+    "/api/v1/version",
+    "/api/v1/users/feature-flags",
+    "/api/v1/onboarding/**",
+    "/h2-console/**",
+    // Admin dashboard page and its sign-in; the data endpoints stay behind ROLE_ADMIN
+    "/admin-ui/**",
+    ADMIN_SESSION_PATH,
+    // Only served on the internal management port (management.server.port)
+    "/actuator/**",
+    "/error",
+)
+
 @Configuration
 @EnableWebSecurity
 class SecurityConfig(
     private val jwtAuthenticationFilter: JwtAuthenticationFilter,
     private val adminAuthenticationFilter: AdminAuthenticationFilter,
-    private val appProperties: AppProperties
 ) {
     
     @Bean
@@ -30,28 +53,10 @@ class SecurityConfig(
             .authorizeHttpRequests { authorize ->
                 authorize
                     // Public endpoints - authentication not required
-                    .requestMatchers(
-                        "/api/v1/auth/google",
-                        "/api/v1/auth/apple",
-                        "/api/v1/auth/refresh",
-                        "/api/v1/auth/ci-token",
-                        "/api/v1/auth/jwks",
-                        "/api/v1/webhooks/**",
-                        "/api/v1/health",
-                        "/api/v1/version",
-                        "/api/v1/users/feature-flags",
-                        "/api/v1/onboarding/**",
-                        "/h2-console/**",
-                        // Admin dashboard page and its sign-in; the data endpoints stay behind ROLE_ADMIN
-                        "/admin-ui/**",
-                        ADMIN_SESSION_PATH,
-                        // Only served on the internal management port (management.server.port)
-                        "/actuator/**",
-                        "/error"
-                    ).permitAll()
+                    .requestMatchers(*PUBLIC_PATHS.toTypedArray()).permitAll()
                     // Admin endpoints require ADMIN role
                     .requestMatchers("/admin/**").hasRole("ADMIN")
-                    // All other endpoints require authentication (including /auth/logout, /auth/delete-account)
+                    // All other endpoints require authentication (including /auth/logout-all, /auth/delete-account)
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)
@@ -62,15 +67,16 @@ class SecurityConfig(
         return http.build()
     }
     
+    /**
+     * Any origin may call the API. It authenticates with bearer tokens only, never cookies, and CORS
+     * never allows credentials, so a foreign page can't act as a signed-in user. The one cookie (the
+     * admin dashboard session) is SameSite=Strict and also needs a custom header.
+     */
     @Bean
     fun corsConfigurationSource(): CorsConfigurationSource {
         val configuration = CorsConfiguration()
-        
-        // Allow configured origins (web apps) and null origin (mobile apps)
-        val origins = appProperties.cors.allowedOrigins.split(",").toMutableList()
-        // Mobile native apps don't send Origin header, so we need to allow all origins for API
-        configuration.allowedOriginPatterns = listOf("*")  // Allow all origins including mobile apps
-        
+        configuration.allowedOriginPatterns = listOf("*")
+
         configuration.allowedMethods = listOf("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         configuration.allowedHeaders = listOf("*")
         configuration.exposedHeaders = listOf("Authorization", "Content-Type")

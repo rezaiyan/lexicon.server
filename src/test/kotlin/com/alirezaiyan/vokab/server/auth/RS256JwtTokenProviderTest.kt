@@ -20,7 +20,9 @@ import java.time.temporal.ChronoUnit
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.util.Base64
+import java.util.Date
 import java.util.UUID
+import io.jsonwebtoken.Jwts
 
 class RS256JwtTokenProviderTest {
 
@@ -62,7 +64,7 @@ class RS256JwtTokenProviderTest {
 
         // Act
         val token = provider.generateAccessToken(userId, email)
-        val extractedId = provider.getUserIdFromToken(token)
+        val extractedId = provider.verifyAccessToken(token)?.userId
 
         // Assert
         assertEquals(userId, extractedId)
@@ -78,7 +80,7 @@ class RS256JwtTokenProviderTest {
         val token = provider.generateAccessToken(userId, email)
 
         // Assert
-        assertTrue(provider.validateToken(token))
+        assertNotNull(provider.verifyAccessToken(token))
     }
 
     @Test
@@ -90,7 +92,7 @@ class RS256JwtTokenProviderTest {
         val token = provider.generateAccessToken(1L, "test@example.com", jti = jti)
 
         // Assert — token is valid (jti embedded correctly)
-        assertTrue(provider.validateToken(token))
+        assertNotNull(provider.verifyAccessToken(token))
     }
 
     @Test
@@ -103,43 +105,43 @@ class RS256JwtTokenProviderTest {
         assertTrue(token1 != token2)
     }
 
-    // ── validateToken ─────────────────────────────────────────────────────────
+    // ── verifyAccessToken ─────────────────────────────────────────────────────────
 
     @Test
-    fun `validateToken should return true for a freshly issued token`() {
+    fun `verifyAccessToken should accept for a freshly issued token`() {
         // Arrange
         val token = provider.generateAccessToken(1L, "valid@example.com")
 
         // Act
-        val isValid = provider.validateToken(token)
+        val isValid = provider.verifyAccessToken(token) != null
 
         // Assert
         assertTrue(isValid)
     }
 
     @Test
-    fun `validateToken should return false for a malformed token`() {
+    fun `verifyAccessToken should reject for a malformed token`() {
         // Arrange
         val malformed = "this.is.not.a.real.jwt"
 
         // Act
-        val isValid = provider.validateToken(malformed)
+        val isValid = provider.verifyAccessToken(malformed) != null
 
         // Assert
         assertFalse(isValid)
     }
 
     @Test
-    fun `validateToken should return false for an empty string`() {
+    fun `verifyAccessToken should reject for an empty string`() {
         // Act
-        val isValid = provider.validateToken("")
+        val isValid = provider.verifyAccessToken("") != null
 
         // Assert
         assertFalse(isValid)
     }
 
     @Test
-    fun `validateToken should return false for a token signed with a different key`() {
+    fun `verifyAccessToken should reject for a token signed with a different key`() {
         // Arrange — generate a second key pair and sign a token with it
         val otherKeyPair = generateTestKeyPair()
         val otherProps = createAppPropertiesWithInMemoryKeys(otherKeyPair)
@@ -147,14 +149,14 @@ class RS256JwtTokenProviderTest {
         val alienToken = otherProvider.generateAccessToken(1L, "alien@example.com")
 
         // Act — validate with the original provider
-        val isValid = provider.validateToken(alienToken)
+        val isValid = provider.verifyAccessToken(alienToken) != null
 
         // Assert
         assertFalse(isValid)
     }
 
     @Test
-    fun `validateToken should return false for an expired token`() {
+    fun `verifyAccessToken should reject for an expired token`() {
         // Arrange — create a provider with a 1ms expiration
         val shortLivedProps = createAppPropertiesWithInMemoryKeys(testKeyPair, expirationMs = 1L)
         val shortLivedProvider = RS256JwtTokenProvider(shortLivedProps, clock)
@@ -163,14 +165,14 @@ class RS256JwtTokenProviderTest {
         clock.advance(Duration.ofSeconds(1))
 
         // Act
-        val isValid = shortLivedProvider.validateToken(token)
+        val isValid = shortLivedProvider.verifyAccessToken(token) != null
 
         // Assert
         assertFalse(isValid)
     }
 
     @Test
-    fun `validateToken should return false for a token with wrong issuer`() {
+    fun `verifyAccessToken should reject for a token with wrong issuer`() {
         // Arrange — token signed with matching key but different issuer
         val wrongIssuerProps = createAppPropertiesWithInMemoryKeys(
             testKeyPair,
@@ -180,40 +182,40 @@ class RS256JwtTokenProviderTest {
         val token = wrongIssuerProvider.generateAccessToken(1L, "test@example.com")
 
         // Act — validate with the original provider that expects the default issuer
-        val isValid = provider.validateToken(token)
+        val isValid = provider.verifyAccessToken(token) != null
 
         // Assert
         assertFalse(isValid)
     }
 
-    // ── getUserIdFromToken ────────────────────────────────────────────────────
+    // ── verifyAccessToken: user id ───────────────────────────────────────────────
 
     @Test
-    fun `getUserIdFromToken should return correct user ID`() {
+    fun `verifyAccessToken should return correct user ID`() {
         // Arrange
         val userId = 99L
         val token = provider.generateAccessToken(userId, "test@example.com")
 
         // Act
-        val result = provider.getUserIdFromToken(token)
+        val result = provider.verifyAccessToken(token)?.userId
 
         // Assert
         assertEquals(userId, result)
     }
 
     @Test
-    fun `getUserIdFromToken should return null for an invalid token`() {
+    fun `verifyAccessToken should return null for an invalid token`() {
         // Act
-        val result = provider.getUserIdFromToken("garbage.token.here")
+        val result = provider.verifyAccessToken("garbage.token.here")?.userId
 
         // Assert
         assertNull(result)
     }
 
     @Test
-    fun `getUserIdFromToken should return null for an empty token`() {
+    fun `verifyAccessToken should return null for an empty token`() {
         // Act
-        val result = provider.getUserIdFromToken("")
+        val result = provider.verifyAccessToken("")?.userId
 
         // Assert
         assertNull(result)
@@ -267,6 +269,59 @@ class RS256JwtTokenProviderTest {
         assertNull(provider.verifyAccessToken("garbage.token.here"))
     }
 
+    @Test
+    fun `verifyAccessToken rejects a correctly signed token that is not an access token`() {
+        val token = Jwts.builder()
+            .subject("1")
+            .claim("type", "refresh")
+            .issuer("vokab-server")
+            .audience().add("vokab-client").and()
+            .issuedAt(Date.from(clock.instant()))
+            .expiration(Date.from(clock.instant().plusSeconds(60)))
+            .signWith(testKeyPair.private)
+            .compact()
+
+        assertNull(provider.verifyAccessToken(token))
+    }
+
+    // ── key id ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `generateAccessToken puts the key id in the token header`() {
+        val token = provider.generateAccessToken(1L, "test@example.com")
+
+        val header = Jwts.parser()
+            .verifyWith(provider.publicKey)
+            .clock { Date.from(clock.instant()) }
+            .build()
+            .parseSignedClaims(token)
+            .header
+
+        assertEquals(provider.keyId, header.keyId)
+    }
+
+    @Test
+    fun `keyId is the RFC 7638 thumbprint of the public key`() {
+        // RFC 7638 section 3.1 example key and its published thumbprint
+        val n = "0vx7agoebGcQSuuPiLJXZptN9nndrQmbXEps2aiAFbWhM78LhWx4cbbfAAtVT86zwu1RK7aPFFxuhDR1L6tSoc_BJECP" +
+            "ebWKRXjBZCiFV4n3oknjhMstn64tZ_2W-5JsGY4Hc5n9yBXArwl93lqt7_RN5w6Cf0h4QyQ5v-65YGjQR0_FDW2QvzqY368QQ" +
+            "MicAtaSqzs8KJZgnYb9c7d0zgdAZHzu6qMQvRL5hajrn1n91CbOpbISD08qNLyrdkt-bFTWhAI4vMQFh6WeZu0fM4lFd2NcRw" +
+            "r3XPksINHaQ-G_xBniIqbw0Ls1jF44-csFCur-kEgU8awapJzKnqDKgw"
+        val modulus = java.math.BigInteger(1, Base64.getUrlDecoder().decode(n))
+        val exponent = java.math.BigInteger.valueOf(65537)
+        val keyFactory = java.security.KeyFactory.getInstance("RSA")
+        val publicKey = keyFactory.generatePublic(java.security.spec.RSAPublicKeySpec(modulus, exponent))
+        // Any private key will do: only the public key feeds the thumbprint
+        val props = AppProperties().apply {
+            jwt = JwtConfig(
+                privateKey = Base64.getEncoder().encodeToString(testKeyPair.private.encoded),
+                publicKey = Base64.getEncoder().encodeToString(publicKey.encoded),
+            )
+        }
+
+        assertEquals("NzbLsXh8uDCcd-6MNwXF4W_7noWXFZAfHkxZsRGC9Xs", RS256JwtTokenProvider(props, clock).keyId)
+    }
+
     // ── key loading and generation ────────────────────────────────────────────
 
     @Test
@@ -284,7 +339,7 @@ class RS256JwtTokenProviderTest {
 
         val second = RS256JwtTokenProvider(fileProps(dir), clock)
 
-        assertTrue(second.validateToken(token))
+        assertNotNull(second.verifyAccessToken(token))
     }
 
     @Test

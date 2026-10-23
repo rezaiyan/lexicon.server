@@ -8,8 +8,10 @@ import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
+import org.springframework.http.server.PathContainer
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
+import org.springframework.web.util.pattern.PathPatternParser
 import com.alirezaiyan.vokab.server.shared.AuthUser
 
 private val log = KotlinLogging.logger {}
@@ -20,34 +22,24 @@ class JwtAuthenticationFilter(
     private val userAccessCache: UserAccessCache,
 ) : OncePerRequestFilter() {
     
-    // Paths that should skip JWT authentication
-    private val excludedPaths = listOf(
-        "/api/v1/auth/google",
-        "/api/v1/auth/apple",
-        "/api/v1/auth/refresh",
-        "/api/v1/auth/ci-token",
-        "/api/v1/auth/jwks",
-        "/api/v1/webhooks/",
-        "/api/v1/health",
-        "/api/v1/version",
-        "/api/v1/users/feature-flags",
-        "/api/v1/onboarding/",
-        "/h2-console/",
-        "/admin-ui/",
-        // Admin auth (key or dashboard session) is AdminAuthenticationFilter's job
-        ADMIN_PATH_PREFIX,
-        "/actuator/",
-        "/error",
-        // MCP and its OAuth server have their own filter chains and token types (McpAuthorizationServerConfig)
-        "/mcp",
-        "/oauth/",
-        "/oauth2/",
-        "/.well-known/",
-    )
-    
+    // Paths that skip JWT authentication: the public endpoints, plus those another filter authenticates.
+    // As a @Component this filter also runs outside the security chain, on every request.
+    private val excludedPaths = (
+        PUBLIC_PATHS + listOf(
+            // Admin auth (key or dashboard session) is AdminAuthenticationFilter's job
+            "$ADMIN_PATH_PREFIX**",
+            // MCP and its OAuth server have their own filter chains and token types (McpAuthorizationServerConfig)
+            "/mcp",
+            "/mcp/**",
+            "/oauth/**",
+            "/oauth2/**",
+            "/.well-known/**",
+        )
+    ).map(PathPatternParser.defaultInstance::parse)
+
     override fun shouldNotFilter(request: HttpServletRequest): Boolean {
-        val path = request.requestURI
-        return excludedPaths.any { path.startsWith(it) }
+        val path = PathContainer.parsePath(request.requestURI)
+        return excludedPaths.any { it.matches(path) }
     }
     
     override fun doFilterInternal(

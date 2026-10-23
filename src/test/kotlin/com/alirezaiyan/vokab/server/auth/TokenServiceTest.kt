@@ -243,6 +243,44 @@ class TokenServiceTest : AuthServiceTestFixture() {
     }
 
     @Test
+    fun `rotate keeps the family's session end on the successor`() {
+        val original = createRefreshToken(user = createUser(id = 39L), tokenHash = "h39")
+        stubRotation(original)
+        val saved = mutableListOf<RefreshToken>()
+        every { refreshTokenRepository.save(capture(saved)) } answers { firstArg() }
+
+        tokenService.rotate("presented")
+
+        assertEquals(original.familyExpiresAt, saved.first { it !== original }.familyExpiresAt)
+    }
+
+    @Test
+    fun `rotate never gives the successor an expiry past the family's session end`() {
+        // Sliding expiry is 90 days; the family ends in 10
+        val familyEnd = TEST_NOW.plusSeconds(10L * 24 * 3600)
+        val original = createRefreshToken(user = createUser(id = 40L), tokenHash = "h40", expiresAt = familyEnd)
+        stubRotation(original)
+        val saved = mutableListOf<RefreshToken>()
+        every { refreshTokenRepository.save(capture(saved)) } answers { firstArg() }
+
+        tokenService.rotate("presented")
+
+        assertEquals(familyEnd, saved.first { it !== original }.expiresAt)
+    }
+
+    @Test
+    fun `issue ends a new sign-in's session after the family max age`() {
+        val user = createUser(id = 41L)
+        stubTokenGeneration(user)
+        val saved = mutableListOf<RefreshToken>()
+        every { refreshTokenRepository.save(capture(saved)) } answers { firstArg() }
+
+        tokenService.issue(user, 41L)
+
+        assertEquals(TEST_NOW.plusMillis(appProperties.jwt.refreshFamilyMaxAgeMs), saved.single().familyExpiresAt)
+    }
+
+    @Test
     fun `issue starts a new family for every sign-in`() {
         val user = createUser(id = 38L)
         stubTokenGeneration(user)
@@ -258,59 +296,38 @@ class TokenServiceTest : AuthServiceTestFixture() {
     // ── logout ────────────────────────────────────────────────────────────────
 
     @Test
-    fun `logout should revoke the refresh token by its lookup hash`() {
-        // Arrange
-        val userId = 10L
-        val refreshToken = "my-refresh-token"
-        val lookupHash = "my-hash"
-        val user = createUser(id = userId)
+    fun `logout revokes the whole family of the presented refresh token`() {
+        val token = createRefreshToken(user = createUser(id = 10L), tokenHash = "my-hash", familyId = "fam-10")
+        every { refreshTokenHashService.createLookupHash("my-refresh-token") } returns "my-hash"
+        every { refreshTokenRepository.findByTokenHash("my-hash") } returns Optional.of(token)
+        every { refreshTokenRepository.revokeFamily("fam-10") } returns 2
 
-        every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
-        every { userRepository.findById(userId) } returns Optional.of(user)
+        tokenService.logout("my-refresh-token", "203.0.113.5")
 
-        // Act
-        tokenService.logout(userId, refreshToken)
-
-        // Assert
-        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash) }
+        verify(exactly = 1) { refreshTokenRepository.revokeFamily("fam-10") }
     }
 
     @Test
-    fun `logout should call audit log when user is found`() {
-        // Arrange
-        val userId = 11L
-        val refreshToken = "audit-token"
-        val lookupHash = "audit-hash"
-        val user = createUser(id = userId)
+    fun `logout audits the token owner and the caller's address`() {
+        val user = createUser(id = 11L)
+        val token = createRefreshToken(user = user, tokenHash = "audit-hash", familyId = "fam-11")
+        every { refreshTokenHashService.createLookupHash("audit-token") } returns "audit-hash"
+        every { refreshTokenRepository.findByTokenHash("audit-hash") } returns Optional.of(token)
+        every { refreshTokenRepository.revokeFamily("fam-11") } returns 1
 
-        every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
-        every { userRepository.findById(userId) } returns Optional.of(user)
+        tokenService.logout("audit-token", "203.0.113.6")
 
-        // Act
-        tokenService.logout(userId, refreshToken)
-
-        // Assert
-        verify(exactly = 1) { auditLogService.logLogout(userId, user.email, lookupHash, null) }
+        verify(exactly = 1) { auditLogService.logLogout(11L, user.email, "audit-hash", "203.0.113.6") }
     }
 
     @Test
-    fun `logout should still revoke token even when user is not found in repository`() {
-        // Arrange
-        val userId = 12L
-        val refreshToken = "orphan-token"
-        val lookupHash = "orphan-hash"
+    fun `logout with an unknown refresh token does nothing and does not fail`() {
+        every { refreshTokenHashService.createLookupHash("unknown-token") } returns "unknown-hash"
+        every { refreshTokenRepository.findByTokenHash("unknown-hash") } returns Optional.empty()
 
-        every { refreshTokenHashService.createLookupHash(refreshToken) } returns lookupHash
-        every { refreshTokenRepository.revokeByTokenHash(lookupHash) } returns 1
-        every { userRepository.findById(userId) } returns Optional.empty()
+        assertDoesNotThrow { tokenService.logout("unknown-token", null) }
 
-        // Act — must not throw even if the user row is gone
-        assertDoesNotThrow { tokenService.logout(userId, refreshToken) }
-
-        // Assert
-        verify(exactly = 1) { refreshTokenRepository.revokeByTokenHash(lookupHash) }
+        verify(exactly = 0) { refreshTokenRepository.revokeFamily(any()) }
         verify(exactly = 0) { auditLogService.logLogout(any(), any(), any(), any()) }
     }
 

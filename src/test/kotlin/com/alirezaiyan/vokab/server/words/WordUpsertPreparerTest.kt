@@ -110,6 +110,49 @@ class WordUpsertPreparerTest {
     }
 
     @Test
+    fun `prepareUpsertEntities never reuses an id that belongs to another user`() {
+        val caller = createUser(id = 1L)
+        // 99 is another user's word id; the caller owns no word with it.
+        val dto = createWordDto(id = 99L, originalWord = "stolen", translation = "gestohlen", level = 6)
+        every { wordRepository.findAllByUserAndIdIn(caller, listOf(99L)) } returns emptyList()
+        every { wordRepository.findAllByUser(caller) } returns emptyList()
+
+        val entity = wordUpsertPreparer.prepareUpsertEntities(caller, listOf(dto)).single()
+
+        assertNull(entity.id)
+        assertEquals(caller, entity.user)
+    }
+
+    @Test
+    fun `prepareUpsertEntities updates the caller's own word matched by id when its text changed`() {
+        val user = createUser()
+        val existing = createWord(id = 42L, user = user, originalWord = "aple", translation = "Apfel")
+        every { wordRepository.findAllByUserAndIdIn(user, listOf(42L)) } returns listOf(existing)
+
+        val result = wordUpsertPreparer.prepareUpsertEntities(
+            user,
+            listOf(createWordDto(id = 42L, originalWord = "apple", translation = "Apfel")),
+        )
+
+        assertEquals(42L, result.single().id)
+        assertEquals("apple", result.single().originalWord)
+    }
+
+    @Test
+    fun `prepareUpsertEntities clamps spaced-repetition fields into range`() {
+        val user = createUser()
+        every { wordRepository.findAllByUser(user) } returns emptyList()
+        val dto = createWordDto(level = 99, easeFactor = -1f, interval = -5, repetitions = Int.MAX_VALUE)
+
+        val entity = wordUpsertPreparer.prepareUpsertEntities(user, listOf(dto)).single()
+
+        assertEquals(6, entity.level)
+        assertEquals(0f, entity.easeFactor)
+        assertEquals(0, entity.interval)
+        assertEquals(SrsLimits.MAX_REPETITIONS, entity.repetitions)
+    }
+
+    @Test
     fun `prepareUpsertEntities should handle duplicate keys by using last write`() {
         val user = createUser()
         val dto1 = createWordDto(originalWord = "apple", translation = "Apfel", level = 1)

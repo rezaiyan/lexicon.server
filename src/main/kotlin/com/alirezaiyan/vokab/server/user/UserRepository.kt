@@ -12,7 +12,8 @@ import java.util.*
 /** The columns the auth filter needs, without loading the entity. */
 interface UserAccessView {
     val active: Boolean
-    val email: String
+    /** Access tokens issued before this are revoked; null = no cutoff. */
+    val tokensValidAfter: Instant?
 }
 
 interface UserRepository : JpaRepository<User, Long> {
@@ -64,6 +65,12 @@ interface UserRepository : JpaRepository<User, Long> {
         @Param("reason") reason: String?,
         @Param("now") now: Instant,
     ): Int
+
+    /** Revokes every access token issued before [cutoff] (see User.tokensValidAfter). */
+    @Transactional
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE User u SET u.tokensValidAfter = :cutoff, u.updatedAt = :cutoff WHERE u.id = :id")
+    fun updateTokensValidAfter(@Param("id") id: Long, @Param("cutoff") cutoff: Instant): Int
 
     /** Links a RevenueCat app user id once; never overwrites an existing link. */
     @Transactional

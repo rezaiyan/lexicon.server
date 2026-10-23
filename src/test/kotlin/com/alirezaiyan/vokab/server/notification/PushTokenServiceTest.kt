@@ -92,15 +92,36 @@ class PushTokenServiceTest {
     // --- deactivateToken ---
 
     @Test
-    fun `deactivateToken should call deactivateByToken on repository`() {
-        // Arrange
-        every { pushTokenRepository.deactivateByToken("stale-token") } returns 1
+    fun `deactivateToken only deactivates the caller's own token`() {
+        every { pushTokenRepository.deactivateByUserIdAndToken(1L, "stale-token") } returns 1
 
-        // Act
-        pushTokenService.deactivateToken("stale-token")
+        pushTokenService.deactivateToken(1L, "stale-token")
 
-        // Assert
-        verify(exactly = 1) { pushTokenRepository.deactivateByToken("stale-token") }
+        verify(exactly = 1) { pushTokenRepository.deactivateByUserIdAndToken(1L, "stale-token") }
+    }
+
+    @Test
+    fun `a token the push provider rejected is deactivated for whoever owns it`() {
+        every { pushTokenRepository.findByToken("dead-token") } returns
+            Optional.of(PushToken(user = createUser(id = 5L), token = "dead-token", platform = Platform.ANDROID))
+        every { pushTokenRepository.deactivateByUserIdAndToken(5L, "dead-token") } returns 1
+
+        pushTokenService.deactivateInvalidToken("dead-token")
+
+        verify(exactly = 1) { pushTokenRepository.deactivateByUserIdAndToken(5L, "dead-token") }
+    }
+
+    @Test
+    fun `registerToken moves a token registered by another account to the caller`() {
+        every { userRepository.findById(2L) } returns Optional.of(createUser(id = 2L))
+        every { pushTokenRepository.insertTokenIfAbsent(any(), any(), any(), any()) } returns 0
+        every { pushTokenRepository.findByToken("shared-device-token") } returns
+            Optional.of(PushToken(user = createUser(id = 1L), token = "shared-device-token", platform = Platform.IOS))
+        every { pushTokenRepository.reassignToken(any(), any(), any(), any()) } returns 1
+
+        pushTokenService.registerToken(2L, "shared-device-token", Platform.IOS, "device-1")
+
+        verify(exactly = 1) { pushTokenRepository.reassignToken(2L, "shared-device-token", Platform.IOS.name, "device-1") }
     }
 
     // --- deactivateAllUserTokens ---

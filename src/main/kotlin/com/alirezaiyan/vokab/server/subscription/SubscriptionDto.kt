@@ -29,6 +29,7 @@ data class RevenueCatEvent(
     /** Stable across renewals of the same subscription; used as our subscription key. */
     val original_transaction_id: String? = null,
     val transaction_id: String? = null,
+    /** SANDBOX or PRODUCTION. */
     val environment: String? = null,
     val cancel_reason: String? = null,
     /** EXPIRATION only; SUBSCRIPTION_PAUSED when a Google Play pause took effect. */
@@ -42,6 +43,9 @@ data class RevenueCatEvent(
     val transferred_to: List<String>? = null,
 ) {
     val isTrial: Boolean get() = period_type == "TRIAL"
+
+    /** A test-store purchase (TestFlight, sandbox account, Play license tester): nobody paid. */
+    val isSandbox: Boolean get() = environment.equals("SANDBOX", ignoreCase = true)
 
     /** Key that identifies one subscription across all its lifecycle events. */
     val subscriptionKey: String get() = original_transaction_id ?: transaction_id ?: id

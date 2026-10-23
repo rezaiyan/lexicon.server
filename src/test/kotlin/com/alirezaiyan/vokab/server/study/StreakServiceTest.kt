@@ -101,6 +101,20 @@ class StreakServiceTest {
     }
 
     @Test
+    fun `should clamp a negative or oversized review count`() {
+        val user = createUser(id = 1L, currentStreak = 3, longestStreak = 5)
+        val existingActivity = createDailyActivity(user, TEST_TODAY, reviewCount = 2)
+        every { userRepository.findById(1L) } returns Optional.of(user)
+        every { dailyActivityRepository.findByUserAndActivityDate(user, TEST_TODAY) } returns Optional.of(existingActivity)
+        every { dailyActivityRepository.save(existingActivity) } returns existingActivity
+
+        streakService.recordActivity(1L, count = -50)
+        streakService.recordActivity(1L, count = Int.MAX_VALUE)
+
+        assertEquals(2 + MAX_REVIEWS_PER_RECORD, existingActivity.reviewCount)
+    }
+
+    @Test
     fun `should throw IllegalArgumentException when user not found`() {
         // Arrange
         every { userRepository.findById(99L) } returns Optional.empty()

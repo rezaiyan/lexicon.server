@@ -52,9 +52,10 @@ interface PushTokenRepository : JpaRepository<PushToken, Long> {
         @Param("deviceId") deviceId: String?
     ): Int
 
+    /** Deactivates [token] only if it belongs to [userId]: a caller can't switch off someone else's device. */
     @Modifying
-    @Query("UPDATE PushToken p SET p.active = false WHERE p.token = :token")
-    fun deactivateByToken(token: String): Int
+    @Query("UPDATE PushToken p SET p.active = false WHERE p.token = :token AND p.user.id = :userId")
+    fun deactivateByUserIdAndToken(userId: Long, token: String): Int
 
     @Modifying
     @Query("UPDATE PushToken p SET p.active = false WHERE p.user = :user")

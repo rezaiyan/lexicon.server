@@ -112,6 +112,19 @@ class User(
     var subscriptionPauseResumesAt: Instant? = null
         protected set
 
+    /**
+     * Access tokens issued (`iat`) before this instant are rejected; set by logout-all. Written only by
+     * UserRepository.updateTokensValidAfter, so a stale whole-row save can't clear it.
+     */
+    @Column(name = "tokens_valid_after", updatable = false)
+    var tokensValidAfter: Instant? = null
+        protected set
+
+    /** Reflects a UserRepository.updateTokensValidAfter write. */
+    fun mirrorTokensValidAfter(cutoff: Instant) {
+        tokensValidAfter = cutoff
+    }
+
     /** Reflects a UserRepository.updateSubscription write (or sets the value for a not-yet-inserted user). */
     fun mirrorSubscription(status: SubscriptionStatus, expiresAt: Instant?) {
         subscriptionStatus = status

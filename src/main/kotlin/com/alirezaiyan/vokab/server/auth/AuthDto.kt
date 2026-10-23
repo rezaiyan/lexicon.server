@@ -14,7 +14,14 @@ data class AppleAuthRequest(
     val idToken: String,
     val authorizationCode: String? = null,
     val fullName: String? = null,
-    val appleUserId: String? = null
+    val appleUserId: String? = null,
+    /**
+     * The raw (unhashed) nonce the client generated for this sign-in. The client must send
+     * `SHA-256(nonce)` as lowercase hex to Apple in the authorization request; the server checks the
+     * ID token's `nonce` claim equals that hash. Optional for now — becomes mandatory once all
+     * clients send it.
+     */
+    val nonce: String? = null
 )
 
 data class RefreshTokenRequest(

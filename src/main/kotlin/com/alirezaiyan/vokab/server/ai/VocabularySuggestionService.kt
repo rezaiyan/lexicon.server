@@ -94,7 +94,8 @@ class VocabularySuggestionService(
     }
 
     /** Client-supplied topics end up in the prompt, so they get the same treatment as language names. */
-    private fun List<String>.toPromptLabels(): List<String> = map { it.asPromptLabel() }.filter { it.isNotBlank() }
+    private fun List<String>.toPromptLabels(): List<String> =
+        take(MAX_INTERESTS).map { it.asPromptLabel() }.filter { it.isNotBlank() }
 
     /** Items with a non-blank word not in [existingKeys], first occurrence only (case-insensitive). */
     private fun uniqueNewItems(

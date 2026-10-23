@@ -1,9 +1,9 @@
 package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.MutableClock
+import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.user.UserAccessView
 import com.alirezaiyan.vokab.server.user.UserRepository
-import com.alirezaiyan.vokab.server.admin.AppConfigService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -11,17 +11,17 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.time.Duration
+import java.time.Instant
 
 class UserAccessCacheTest {
 
     private val clock = MutableClock()
     private val userRepository = mockk<UserRepository>()
-    private val appConfigService = mockk<AppConfigService> { every { getTestEmails() } returns emptySet() }
-    private val cache = UserAccessCache(userRepository, appConfigService, clock)
+    private val cache = UserAccessCache(userRepository, clock)
 
-    private fun access(active: Boolean, email: String = "u@example.com"): UserAccessView = object : UserAccessView {
+    private fun access(active: Boolean, tokensValidAfter: Instant? = null): UserAccessView = object : UserAccessView {
         override val active = active
-        override val email = email
+        override val tokensValidAfter = tokensValidAfter
     }
 
     @Test
@@ -38,14 +38,6 @@ class UserAccessCacheTest {
 
         assertFalse(cache.isAllowed(1L))
         assertFalse(cache.isAllowed(2L))
-    }
-
-    @Test
-    fun `isAllowed when inactive user is a test account returns true`() {
-        every { appConfigService.getTestEmails() } returns setOf("ci@example.com")
-        every { userRepository.findAccessById(1L) } returns access(active = false, email = "ci@example.com")
-
-        assertTrue(cache.isAllowed(1L))
     }
 
     @Test
@@ -79,5 +71,42 @@ class UserAccessCacheTest {
         cache.evict(1L)
 
         assertFalse(cache.isAllowed(1L))
+    }
+
+    // ── isTokenAllowed (logout-all cutoff) ────────────────────────────────────
+
+    @Test
+    fun `isTokenAllowed accepts any token when the user has no cutoff`() {
+        every { userRepository.findAccessById(1L) } returns access(active = true)
+
+        assertTrue(cache.isTokenAllowed(1L, TEST_NOW.minusSeconds(3600)))
+    }
+
+    @Test
+    fun `isTokenAllowed rejects a token issued before the cutoff`() {
+        every { userRepository.findAccessById(1L) } returns access(active = true, tokensValidAfter = TEST_NOW)
+
+        assertFalse(cache.isTokenAllowed(1L, TEST_NOW.minusSeconds(1)))
+    }
+
+    @Test
+    fun `isTokenAllowed accepts a token issued at or after the cutoff`() {
+        every { userRepository.findAccessById(1L) } returns access(active = true, tokensValidAfter = TEST_NOW)
+
+        assertTrue(cache.isTokenAllowed(1L, TEST_NOW))
+    }
+
+    @Test
+    fun `isTokenAllowed rejects a token without iat once a cutoff exists`() {
+        every { userRepository.findAccessById(1L) } returns access(active = true, tokensValidAfter = TEST_NOW)
+
+        assertFalse(cache.isTokenAllowed(1L, null))
+    }
+
+    @Test
+    fun `isTokenAllowed rejects any token of an inactive user`() {
+        every { userRepository.findAccessById(1L) } returns access(active = false)
+
+        assertFalse(cache.isTokenAllowed(1L, TEST_NOW))
     }
 }

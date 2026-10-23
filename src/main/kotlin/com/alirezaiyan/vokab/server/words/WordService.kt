@@ -65,10 +65,10 @@ class WordService(
         entity.description = request.description
         entity.sourceLanguage = request.sourceLanguage
         entity.targetLanguage = request.targetLanguage
-        entity.level = request.level
-        entity.easeFactor = request.easeFactor
-        entity.interval = request.interval
-        entity.repetitions = request.repetitions
+        entity.level = SrsLimits.level(request.level)
+        entity.easeFactor = SrsLimits.easeFactor(request.easeFactor)
+        entity.interval = SrsLimits.interval(request.interval)
+        entity.repetitions = SrsLimits.repetitions(request.repetitions)
         entity.lastReviewDate = request.lastReviewDate
         entity.nextReviewDate = request.nextReviewDate
         entity.updatedAt = Instant.now(clock)

@@ -114,6 +114,9 @@ app:
     model: ${OPENROUTER_MODEL:anthropic/claude-haiku-4.5}
     judge-model: ${OPENROUTER_JUDGE_MODEL:}
     timeout-seconds: ${OPENROUTER_TIMEOUT_SECONDS:60}
+    # max_tokens for short answers (insights, reminders, translation, judges). Photo extraction and
+    # vocabulary suggestions (8192) and comeback rescue (2048) have their own caps in AiOperation.
+    max-tokens: ${OPENROUTER_MAX_TOKENS:1024}
 
   apple:
     # Accepted `aud` values for Apple ID tokens (iOS bundle id; add a Services ID if web sign-in ships).
@@ -145,6 +148,15 @@ app:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
     photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
     ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+    # Per-IP sign-in (/auth/google, /apple, /ci-token) and /auth/refresh limits, per minute
+    auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}
+    refresh-per-minute: ${REFRESH_RATE_LIMIT_PER_MINUTE:60}
+    # Unauthenticated onboarding AI calls from all IPs together (caps the bill under IP rotation);
+    # past either limit onboarding answers 429 until it refills.
+    onboarding-global-per-hour: ${ONBOARDING_AI_GLOBAL_PER_HOUR:200}
+    onboarding-global-per-day: ${ONBOARDING_AI_GLOBAL_PER_DAY:2000}
+    # Failed admin key attempts from all IPs per hour before admin key auth pauses for everyone
+    admin-failures-global-per-hour: ${ADMIN_AUTH_GLOBAL_FAILURES_PER_HOUR:50}
 
   # Learners' own instructions to the AI (see InstructionGuard): refusals per user before
   # instructions pause, and how long to wait for the judge before failing closed.

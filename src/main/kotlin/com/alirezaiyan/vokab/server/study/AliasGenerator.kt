@@ -1,8 +1,18 @@
 package com.alirezaiyan.vokab.server.study
 
 import org.springframework.stereotype.Component
-import kotlin.math.abs
+import java.nio.ByteBuffer
+import java.security.MessageDigest
 
+/** Fixed, app-specific salt so the alias is not a plain hash of the id. Changing it renames every default alias. */
+private const val ALIAS_SALT = "lexicon-leaderboard-alias-v1:"
+
+/**
+ * Default leaderboard name for users without a chosen alias, e.g. "SwiftOwl0427".
+ *
+ * Recomputed on every request, so it must be stable per user; it is derived from a SHA-256 of the
+ * salted user id so that neither the words nor the digits reveal the id.
+ */
 @Component
 class AliasGenerator {
 
@@ -19,10 +29,11 @@ class AliasGenerator {
     )
 
     fun generate(userId: Long): String {
-        val hash = abs(userId.hashCode())
-        val adjective = adjectives[hash % adjectives.size]
-        val noun = nouns[(hash / adjectives.size) % nouns.size]
-        val suffix = (hash % 10000).toString().padStart(4, '0')
+        val digest = MessageDigest.getInstance("SHA-256").digest("$ALIAS_SALT$userId".toByteArray())
+        val bytes = ByteBuffer.wrap(digest)
+        val adjective = adjectives[Math.floorMod(bytes.getInt(0), adjectives.size)]
+        val noun = nouns[Math.floorMod(bytes.getInt(4), nouns.size)]
+        val suffix = Math.floorMod(bytes.getInt(8), 10000).toString().padStart(4, '0')
         return "$adjective$noun$suffix"
     }
 }

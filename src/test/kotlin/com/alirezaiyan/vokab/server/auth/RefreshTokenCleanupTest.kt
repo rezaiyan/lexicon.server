@@ -22,7 +22,7 @@ class RefreshTokenCleanupTest {
     @Autowired lateinit var em: EntityManager
 
     private fun token(user: User, expiresAt: java.time.Instant) = refreshTokenRepository.save(
-        RefreshToken(tokenHash = "hash-${System.nanoTime()}", user = user, expiresAt = expiresAt)
+        RefreshToken(tokenHash = "hash-${System.nanoTime()}", user = user, expiresAt = expiresAt, familyId = "test-family")
     )
 
     @Test

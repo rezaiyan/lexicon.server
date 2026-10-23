@@ -215,7 +215,32 @@ class AuthServiceTest : AuthServiceTestFixture() {
         assertDoesNotThrow { authService.authenticateForCi(platform = "ios") }
     }
 
+    @Test
+    fun `authenticateForCi refuses when the CI email belongs to a Google account`() {
+        val realUser = createUser(id = 70L, email = "ci@test.vokab.dev", googleId = "g-real")
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(realUser)
+
+        assertThrows<AuthRejectedException> { authService.authenticateForCi() }
+        verify(exactly = 0) { refreshTokenRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateForCi refuses when the CI email belongs to an Apple account`() {
+        val realUser = createUser(id = 71L, email = "ci@test.vokab.dev", appleId = "apple-real")
+        every { userRepository.findByEmail("ci@test.vokab.dev") } returns Optional.of(realUser)
+
+        assertThrows<AuthRejectedException> { authService.authenticateForCi() }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
     // ── authenticateWithGoogle ────────────────────────────────────────────────
+
+    private fun googleClaims(
+        uid: String,
+        email: String?,
+        emailVerified: Boolean = true,
+        provider: String = FirebaseIdClaims.GOOGLE_SIGN_IN_PROVIDER,
+    ) = FirebaseIdClaims(uid = uid, email = email, name = "G", emailVerified = emailVerified, signInProvider = provider)
 
     @Test
     fun `authenticateWithGoogle rejects a token that fails verification`() {
@@ -227,10 +252,57 @@ class AuthServiceTest : AuthServiceTestFixture() {
 
     @Test
     fun `authenticateWithGoogle rejects a token without an email`() {
-        every { firebaseIdTokenVerifier.verify("token") } returns FirebaseIdClaims(uid = "g-1", email = null, name = null)
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-1", email = null)
 
         assertThrows<AuthRejectedException> { authService.authenticateWithGoogle("token") }
         verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle rejects a Firebase token from another sign-in provider`() {
+        every { firebaseIdTokenVerifier.verify("token") } returns
+            googleClaims(uid = "pw-1", email = "victim@example.com", provider = "password")
+
+        assertThrows<AuthRejectedException> { authService.authenticateWithGoogle("token") }
+        verify(exactly = 0) { userRepository.findByEmail(any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle does not link an existing account by an unverified email`() {
+        every { firebaseIdTokenVerifier.verify("token") } returns
+            googleClaims(uid = "g-new", email = "victim@example.com", emailVerified = false)
+        every { userRepository.findByGoogleId("g-new") } returns Optional.empty()
+
+        assertThrows<AuthRejectedException> { authService.authenticateWithGoogle("token") }
+        verify(exactly = 0) { userRepository.findByEmail(any()) }
+        verify(exactly = 0) { userRepository.save(any()) }
+    }
+
+    @Test
+    fun `authenticateWithGoogle links an existing account by a verified email`() {
+        val existing = createUser(id = 6L, email = "v@example.com", appleId = "apple-6")
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-6", email = "v@example.com")
+        every { userRepository.findByGoogleId("g-6") } returns Optional.empty()
+        every { userRepository.findByEmail("v@example.com") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithGoogle("token")
+
+        assertEquals(6L, result.user.id)
+        assertEquals("g-6", existing.googleId)
+    }
+
+    @Test
+    fun `authenticateWithGoogle signs in a known Google account even when email is unverified`() {
+        val existing = createUser(id = 9L, email = "g9@example.com", googleId = "g-9")
+        every { firebaseIdTokenVerifier.verify("token") } returns
+            googleClaims(uid = "g-9", email = "g9@example.com", emailVerified = false)
+        every { userRepository.findByGoogleId("g-9") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        assertEquals(9L, authService.authenticateWithGoogle("token").user.id)
     }
 
     @Test
@@ -243,7 +315,7 @@ class AuthServiceTest : AuthServiceTestFixture() {
     @Test
     fun `authenticateWithGoogle signs in existing user found by Google id`() {
         val existing = createUser(id = 5L, email = "g@example.com", googleId = "g-5")
-        every { firebaseIdTokenVerifier.verify("token") } returns FirebaseIdClaims(uid = "g-5", email = "g@example.com", name = "G")
+        every { firebaseIdTokenVerifier.verify("token") } returns googleClaims(uid = "g-5", email = "g@example.com")
         every { userRepository.findByGoogleId("g-5") } returns Optional.of(existing)
         every { userRepository.save(any()) } answers { firstArg() }
         stubTokenGeneration(existing)
@@ -278,6 +350,16 @@ class AuthServiceTest : AuthServiceTestFixture() {
     }
 
     @Test
+    fun `authenticateWithApple passes the client nonce to the verifier`() {
+        every { appleIdTokenVerifier.verify("token", "raw-nonce") } returns null
+
+        assertThrows<AuthRejectedException> {
+            authService.authenticateWithApple("token", null, null, nonce = "raw-nonce")
+        }
+        verify(exactly = 1) { appleIdTokenVerifier.verify("token", "raw-nonce") }
+    }
+
+    @Test
     fun `authenticateWithApple signs in existing user found by token subject`() {
         val existing = createUser(id = 7L, email = "a@b.com", appleId = "real-sub")
         every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "real-sub", email = "a@b.com")
@@ -300,7 +382,7 @@ class AuthServiceTest : AuthServiceTestFixture() {
         every { jwtTokenProvider.generateAccessToken(42L, "apple_abc_123@apple.hidden", any()) } returns "access-token"
         every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
         every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
-        every { refreshTokenRepository.save(any()) } returns mockk()
+        every { refreshTokenRepository.save(any()) } answers { firstArg() }
         every { jwtTokenProvider.getExpirationTime() } returns 86400L
 
         val result = authService.authenticateWithApple("token", "Jane Doe", null)

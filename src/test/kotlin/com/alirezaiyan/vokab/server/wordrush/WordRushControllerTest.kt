@@ -206,13 +206,50 @@ class WordRushControllerTest {
 
     // -- factory functions ----------------------------------------------------
 
-    private fun createSyncRequest(): SyncWordRushRequest = SyncWordRushRequest(
+    @Test
+    fun `POST sync should return 400 when correctCount exceeds totalQuestions`() {
+        mockMvc.perform(
+            post("/api/v1/word-rush/sync")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSyncRequest(correctCount = 16)))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST sync should return 400 when score is above the maximum`() {
+        mockMvc.perform(
+            post("/api/v1/word-rush/sync")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSyncRequest(score = 2_000_000)))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST sync should return 400 when clientGameId is too long`() {
+        mockMvc.perform(
+            post("/api/v1/word-rush/sync")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createSyncRequest(clientGameId = "x".repeat(129))))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    private fun createSyncRequest(
+        clientGameId: String = "game-1",
+        score: Int = 120,
+        correctCount: Int = 12,
+    ): SyncWordRushRequest = SyncWordRushRequest(
         games = listOf(
             SyncWordRushGameRequest(
-                clientGameId = "game-1",
-                score = 120,
+                clientGameId = clientGameId,
+                score = score,
                 totalQuestions = 15,
-                correctCount = 12,
+                correctCount = correctCount,
                 bestStreak = 5,
                 durationMs = 45000,
                 avgResponseMs = 3000,

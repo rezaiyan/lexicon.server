@@ -4,7 +4,7 @@ Spring Boot (Kotlin) backend for the Lexicon vocabulary learning app. Provides s
 
 ## Tech Stack
 
-- **Kotlin** 1.9.25 / **Java** 21 (toolchain)
+- **Kotlin** 1.9.25 / **Java** 21 (toolchain), Java 25 runtime in the Docker image
 - **Spring Boot** 3.5.6 — web, data-jpa, security, oauth2-client, validation, actuator, mail, webflux
 - **PostgreSQL** (prod) + **H2** (dev/test), **Flyway** 11.8.0 for migrations
 - **JJWT** 0.12.3 (RS256/HS256), **Firebase Admin SDK** 9.2.0

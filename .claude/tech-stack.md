@@ -5,7 +5,7 @@
 |---|---|
 | Language | Kotlin 1.9.25 |
 | Framework | Spring Boot 3.5.6 |
-| JVM | Java 21+ |
+| JVM | Java 21 toolchain (bytecode target); production image runs on Java 25 (see Dockerfile) |
 | Build | Gradle 8.x (Kotlin DSL — `build.gradle.kts`) |
 
 ## Persistence

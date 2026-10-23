@@ -127,7 +127,7 @@ class RateLimitConfig(private val appProperties: AppProperties) {
      */
     fun getAdminAuthGlobalBucket(): Bucket = adminAuthGlobal
 
-    /** Token refreshes per IP: `app.rate-limit.refresh-per-minute` (an app start may refresh). */
+    /** Token refreshes and logouts per IP: `app.rate-limit.refresh-per-minute` (an app start may refresh). */
     fun getRefreshBucket(ipAddress: String): Bucket {
         val perMinute = appProperties.rateLimit.refreshPerMinute
         return cache.get("refresh_${ipKey(ipAddress)}") { perMinuteBucket(perMinute) }

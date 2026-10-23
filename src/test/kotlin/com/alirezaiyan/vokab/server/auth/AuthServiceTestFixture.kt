@@ -183,6 +183,8 @@ abstract class AuthServiceTestFixture {
         user = user,
         expiresAt = expiresAt,
         familyId = familyId,
+        // A token never outlives its family, so the family ends when this token does
+        familyExpiresAt = expiresAt,
         usedAt = usedAt,
         revoked = revoked
     )

@@ -37,11 +37,14 @@ class TokenService(
      * token family and storing only the refresh token's hash. Runs inside the caller's sign-in
      * transaction.
      */
-    fun issue(user: User, userId: Long): AuthResponse = issue(user, userId, UUID.randomUUID().toString()).first
+    fun issue(user: User, userId: Long): AuthResponse {
+        val familyExpiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshFamilyMaxAgeMs)
+        return issue(user, userId, UUID.randomUUID().toString(), familyExpiresAt).first
+    }
 
     /**
      * Rotates tokens: issues a new access + refresh token in the same family and retires the
-     * presented refresh token.
+     * presented refresh token. The new token never outlives the family's session end.
      *
      * - First use: the token is marked used and its successor recorded.
      * - Reuse within the grace window, counted from the first use (the client crashed before
@@ -70,7 +73,7 @@ class TokenService(
         }
         if (!user.active) throw AuthRejectedException("User account is deactivated")
 
-        val (response, successor) = issue(user, userId, familyId)
+        val (response, successor) = issue(user, userId, familyId, tokenEntity.familyExpiresAt)
         if (usedAt == null) tokenEntity.usedAt = now
         tokenEntity.replacedBy = successor.id
         refreshTokenRepository.save(tokenEntity)
@@ -99,18 +102,23 @@ class TokenService(
         throw AuthRejectedException("Refresh token has been revoked")
     }
 
-    /** Revokes one of [userId]'s refresh tokens; a token belonging to anyone else is left alone. */
+    /**
+     * Ends the session [refreshToken] belongs to. The refresh token is the credential, so this works
+     * after the access token has expired. Revokes the whole family, so a sibling minted in the retry
+     * grace window ends with it. An unknown token is ignored, telling the caller nothing.
+     */
     @Transactional
-    fun logout(userId: Long, refreshToken: String) {
-        logger.info { "Logging out user: $userId" }
+    fun logout(refreshToken: String, ipAddress: String?) {
         val lookupHash = refreshTokenHashService.createLookupHash(refreshToken)
-        if (refreshTokenRepository.revokeByTokenHash(lookupHash, userId) == 0) {
-            logger.warn { "Logout for userId=$userId matched none of their refresh tokens" }
+        val token = refreshTokenRepository.findByTokenHash(lookupHash).orElse(null) ?: run {
+            logger.info { "Logout with an unknown refresh token" }
+            return
         }
-
-        userRepository.findById(userId).orElse(null)?.let { user ->
-            auditLogService.logLogout(userId, user.email, lookupHash, null)
-        }
+        val user = token.user
+        val userId = user.requireId()
+        refreshTokenRepository.revokeFamily(token.familyId)
+        logger.info { "Logged out userId=$userId" }
+        auditLogService.logLogout(userId, user.email, lookupHash, ipAddress)
     }
 
     /**
@@ -158,15 +166,22 @@ class TokenService(
         userAccessCache.evict(userId)
     }
 
-    private fun issue(user: User, userId: Long, familyId: String): Pair<AuthResponse, RefreshToken> {
+    private fun issue(
+        user: User,
+        userId: Long,
+        familyId: String,
+        familyExpiresAt: Instant,
+    ): Pair<AuthResponse, RefreshToken> {
         val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
         val refreshToken = refreshTokenHashService.generateSecureToken(REFRESH_TOKEN_BYTES)
+        val slidingExpiry = Instant.now(clock).plusMillis(appProperties.jwt.refreshExpirationMs)
         val saved = refreshTokenRepository.save(
             RefreshToken(
                 tokenHash = refreshTokenHashService.createLookupHash(refreshToken),
                 user = user,
-                expiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshExpirationMs),
+                expiresAt = minOf(slidingExpiry, familyExpiresAt),
                 familyId = familyId,
+                familyExpiresAt = familyExpiresAt,
             )
         )
         val response = AuthResponse(

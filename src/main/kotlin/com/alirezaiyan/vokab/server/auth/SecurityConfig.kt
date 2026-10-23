@@ -19,6 +19,8 @@ internal val PUBLIC_PATHS = listOf(
     "/api/v1/auth/google",
     "/api/v1/auth/apple",
     "/api/v1/auth/refresh",
+    // The refresh token in the body is the credential, so an expired access token can still log out
+    "/api/v1/auth/logout",
     "/api/v1/auth/ci-token",
     "/api/v1/auth/jwks",
     "/api/v1/webhooks/**",
@@ -54,7 +56,7 @@ class SecurityConfig(
                     .requestMatchers(*PUBLIC_PATHS.toTypedArray()).permitAll()
                     // Admin endpoints require ADMIN role
                     .requestMatchers("/admin/**").hasRole("ADMIN")
-                    // All other endpoints require authentication (including /auth/logout, /auth/delete-account)
+                    // All other endpoints require authentication (including /auth/logout-all, /auth/delete-account)
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter::class.java)

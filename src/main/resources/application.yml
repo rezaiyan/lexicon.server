@@ -98,9 +98,12 @@ app:
     base-url: ${AVATAR_BASE_URL:}
 
   jwt:
-    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+    # Access tokens are short-lived: single-device logout only revokes the refresh token
+    expiration-ms: ${JWT_EXPIRATION_MS:900000}
     refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:7776000000}
     refresh-token-grace-period-ms: ${JWT_REFRESH_TOKEN_GRACE_PERIOD_MS:30000}
+    # Absolute session length: rotation never extends a refresh token past its sign-in + this
+    refresh-family-max-age-ms: ${JWT_REFRESH_FAMILY_MAX_AGE_MS:15552000000}
     private-key-path: ${JWT_PRIVATE_KEY_PATH:}
     public-key-path: ${JWT_PUBLIC_KEY_PATH:}
     private-key: ${JWT_PRIVATE_KEY:}
@@ -148,7 +151,7 @@ app:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
     photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
     ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
-    # Per-IP sign-in (/auth/google, /apple, /ci-token) and /auth/refresh limits, per minute
+    # Per-IP sign-in (/auth/google, /apple, /ci-token) and /auth/refresh + /auth/logout limits, per minute
     auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}
     refresh-per-minute: ${REFRESH_RATE_LIMIT_PER_MINUTE:60}
     # Unauthenticated onboarding AI calls from all IPs together (caps the bill under IP rotation);

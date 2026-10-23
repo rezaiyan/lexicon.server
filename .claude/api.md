@@ -18,7 +18,7 @@ _Last regenerated from source: 2026-08-01._
 | POST | `/apple` | No | Apple Sign-In (ID token) |
 | POST | `/ci-token` | No (gated by `X-CI-Secret`) | CI/dev auth, only when `ciAuth.enabled` |
 | POST | `/refresh` | No | Rotate access + refresh tokens |
-| POST | `/logout` | Yes | Revoke one refresh token |
+| POST | `/logout` | No (refresh token in body) | End that device's session (revokes its refresh token family) |
 | POST | `/logout-all` | Yes | Revoke all sessions for the user |
 | DELETE | `/delete-account` | Yes | Delete account |
 | GET | `/jwks` | No | Public RSA key set (JWKS, for RS256 verification) |

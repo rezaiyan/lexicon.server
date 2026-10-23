@@ -97,6 +97,7 @@ class BackwardCompatibilityTest {
                 user = user,
                 expiresAt = Instant.now().plusSeconds(3600),
                 familyId = "test-family",
+                familyExpiresAt = Instant.now().plusSeconds(7200),
             )
         )
 

@@ -52,9 +52,11 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-lexicondb}
       DATABASE_USERNAME: ${POSTGRES_USER:-lexicon_user}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
-      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+      # 1h while clients adjust to refreshing more often; then drop to the app default (15 min)
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-3600000}
       JWT_REFRESH_EXPIRATION_MS: ${JWT_REFRESH_EXPIRATION_MS:-7776000000}
       JWT_REFRESH_TOKEN_GRACE_PERIOD_MS: ${JWT_REFRESH_TOKEN_GRACE_PERIOD_MS:-30000}
+      JWT_REFRESH_FAMILY_MAX_AGE_MS: ${JWT_REFRESH_FAMILY_MAX_AGE_MS:-15552000000}
       JWT_PRIVATE_KEY_PATH: ${JWT_PRIVATE_KEY_PATH:-/app/keys/jwt-private-key.pem}
       JWT_PUBLIC_KEY_PATH: ${JWT_PUBLIC_KEY_PATH:-/app/keys/jwt-public-key.pem}
       JWT_PRIVATE_KEY: ${JWT_PRIVATE_KEY:-}

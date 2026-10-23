@@ -11,6 +11,7 @@ import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -36,16 +37,56 @@ class FirebaseIdTokenVerifierTest {
             every { this@mockk.errorCode } returns errorCode
         }
 
+    private fun firebaseToken(
+        emailVerified: Boolean = true,
+        claims: Map<String, Any> = mapOf("firebase" to mapOf("sign_in_provider" to "google.com")),
+    ): FirebaseToken = mockk {
+        every { uid } returns "uid-1"
+        every { email } returns "a@example.com"
+        every { name } returns "A"
+        every { isEmailVerified } returns emailVerified
+        every { this@mockk.claims } returns claims
+    }
+
     @Test
     fun `verify returns claims for a valid token`() {
-        val token = mockk<FirebaseToken> {
-            every { uid } returns "uid-1"
-            every { email } returns "a@example.com"
-            every { name } returns "A"
-        }
-        every { firebaseAuth.verifyIdToken("good") } returns token
+        every { firebaseAuth.verifyIdToken("good") } returns firebaseToken()
 
-        assertEquals(FirebaseIdClaims(uid = "uid-1", email = "a@example.com", name = "A"), verifier.verify("good"))
+        assertEquals(
+            FirebaseIdClaims(
+                uid = "uid-1",
+                email = "a@example.com",
+                name = "A",
+                emailVerified = true,
+                signInProvider = "google.com",
+            ),
+            verifier.verify("good"),
+        )
+    }
+
+    @Test
+    fun `verify reports an unverified email`() {
+        every { firebaseAuth.verifyIdToken("good") } returns firebaseToken(emailVerified = false)
+
+        assertFalse(verifier.verify("good")!!.emailVerified)
+    }
+
+    @Test
+    fun `verify reports a non-Google sign-in provider`() {
+        every { firebaseAuth.verifyIdToken("good") } returns
+            firebaseToken(claims = mapOf("firebase" to mapOf("sign_in_provider" to "password")))
+
+        val claims = verifier.verify("good")!!
+
+        assertEquals("password", claims.signInProvider)
+        assertFalse(claims.isGoogleSignIn)
+    }
+
+    @Test
+    fun `verify reports no provider when the firebase claim is missing`() {
+        every { firebaseAuth.verifyIdToken("good") } returns firebaseToken(claims = emptyMap())
+
+        assertNull(verifier.verify("good")!!.signInProvider)
     }
 
     @Test

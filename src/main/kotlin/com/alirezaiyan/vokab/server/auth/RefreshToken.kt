@@ -11,7 +11,8 @@ import com.alirezaiyan.vokab.server.user.User
     indexes = [
         Index(name = "idx_refresh_tokens_user_id", columnList = "user_id"),
         Index(name = "idx_refresh_tokens_hash", columnList = "token_hash"),
-        Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at")
+        Index(name = "idx_refresh_tokens_expires_at", columnList = "expires_at"),
+        Index(name = "idx_refresh_tokens_family_id", columnList = "family_id")
     ]
 )
 class RefreshToken(
@@ -29,10 +30,21 @@ class RefreshToken(
     @Column(name = "expires_at", nullable = false)
     var expiresAt: Instant,
 
+    /** Shared by every token rotated from one sign-in; reuse of a retired token revokes the family. */
+    @Column(name = "family_id", nullable = false, length = 64, updatable = false)
+    val familyId: String,
+
+    /** When the token was first exchanged; the retry grace window counts from here. Null = unused. */
+    @Column(name = "used_at")
+    var usedAt: Instant? = null,
+
+    /** Id of the latest token minted from this one (informational). */
+    @Column(name = "replaced_by")
+    var replacedBy: Long? = null,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: Instant = Instant.now(),
 
     @Column(nullable = false)
     val revoked: Boolean = false
 ) : JpaEntity<Long>()
-

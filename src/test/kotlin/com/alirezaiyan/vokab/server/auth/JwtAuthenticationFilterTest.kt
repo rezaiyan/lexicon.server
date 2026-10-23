@@ -9,7 +9,6 @@ import com.alirezaiyan.vokab.server.user.SubscriptionStatus
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserAccessView
 import com.alirezaiyan.vokab.server.user.UserRepository
-import com.alirezaiyan.vokab.server.admin.AppConfigService
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -26,6 +25,7 @@ import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.core.context.SecurityContextHolder
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.time.Instant
 import java.util.Base64
 import jakarta.servlet.http.HttpServletResponse
 import com.alirezaiyan.vokab.server.shared.AuthUser
@@ -37,7 +37,6 @@ class JwtAuthenticationFilterTest {
     private lateinit var jwtTokenProvider: RS256JwtTokenProvider
     private lateinit var userRepository: UserRepository
     private lateinit var appProperties: AppProperties
-    private lateinit var appConfigService: AppConfigService
     private lateinit var filter: JwtAuthenticationFilter
 
     private lateinit var testKeyPair: KeyPair
@@ -48,9 +47,7 @@ class JwtAuthenticationFilterTest {
         appProperties = createAppProperties(testKeyPair)
         jwtTokenProvider = RS256JwtTokenProvider(appProperties, clock)
         userRepository = mockk()
-        appConfigService = mockk()
-        every { appConfigService.getTestEmails() } returns emptySet()
-        filter = JwtAuthenticationFilter(jwtTokenProvider, UserAccessCache(userRepository, appConfigService, clock))
+        filter = JwtAuthenticationFilter(jwtTokenProvider, UserAccessCache(userRepository, clock))
         SecurityContextHolder.clearContext()
     }
 
@@ -332,34 +329,39 @@ class JwtAuthenticationFilterTest {
         assertNull(SecurityContextHolder.getContext().authentication)
     }
 
-    // ── Test email bypass (active check) ──────────────────────────────────────
+    // ── Revocation cutoff (logout-all) ────────────────────────────────────────
 
     @Test
-    fun `should allow inactive test email user through when email is in testEmails`() {
-        // Arrange — configure a test email in appProperties
-        val testEmail = "ci@test.example.com"
-        val propsWithTestEmail = createAppProperties(testKeyPair, testEmails = testEmail)
-        val providerForTest = RS256JwtTokenProvider(propsWithTestEmail, clock)
-        val configServiceForTest = mockk<AppConfigService>()
-        every { configServiceForTest.getTestEmails() } returns setOf(testEmail)
-        val filterForTest = JwtAuthenticationFilter(
-            providerForTest, UserAccessCache(userRepository, configServiceForTest, clock)
-        )
-
-        val user = createUser(id = 7L, email = testEmail, active = false)
-        val token = providerForTest.generateAccessToken(7L, testEmail)
+    fun `should return 401 for a token issued before the user's revocation cutoff`() {
+        val user = createUser(id = 7L)
+        val token = jwtTokenProvider.generateAccessToken(7L, user.email)
+        clock.advance(Duration.ofSeconds(5))
+        every { userRepository.findAccessById(7L) } returns access(user, tokensValidAfter = clock.instant())
         val request = MockHttpServletRequest().apply {
             requestURI = "/api/v1/words"
             addHeader("Authorization", "Bearer $token")
         }
         val response = MockHttpServletResponse()
-        val chain = MockFilterChain()
-        every { userRepository.findAccessById(7L) } returns access(user)
 
-        // Act
-        filterForTest.doFilter(request, response, chain)
+        filter.doFilter(request, response, MockFilterChain())
 
-        // Assert — chain was called, authentication was set
+        assertEquals(HttpServletResponse.SC_UNAUTHORIZED, response.status)
+        assertNull(SecurityContextHolder.getContext().authentication)
+    }
+
+    @Test
+    fun `should authenticate a token issued after the user's revocation cutoff`() {
+        val user = createUser(id = 8L)
+        every { userRepository.findAccessById(8L) } returns access(user, tokensValidAfter = clock.instant())
+        clock.advance(Duration.ofSeconds(5))
+        val token = jwtTokenProvider.generateAccessToken(8L, user.email)
+        val request = MockHttpServletRequest().apply {
+            requestURI = "/api/v1/words"
+            addHeader("Authorization", "Bearer $token")
+        }
+
+        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
+
         assertNotNull(SecurityContextHolder.getContext().authentication)
     }
 
@@ -425,9 +427,9 @@ class JwtAuthenticationFilterTest {
         longestStreak = 0,
     )
 
-    private fun access(user: User): UserAccessView = object : UserAccessView {
+    private fun access(user: User, tokensValidAfter: Instant? = null): UserAccessView = object : UserAccessView {
         override val active = user.active
-        override val email = user.email
+        override val tokensValidAfter = tokensValidAfter
     }
 
     private fun generateTestKeyPair(): KeyPair =

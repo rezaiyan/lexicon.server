@@ -11,6 +11,8 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
 import java.time.Instant
+import java.time.temporal.ChronoUnit
+import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 
@@ -26,55 +28,64 @@ class TokenService(
     private val appProperties: AppProperties,
     private val auditLogService: AuditLogService,
     private val deviceDataWipe: DeviceDataWipe,
+    private val userAccessCache: UserAccessCache,
     private val clock: Clock,
 ) {
 
     /**
-     * Issues an RS256 access token plus an opaque refresh token, storing only the refresh token's
-     * hash. Runs inside the caller's sign-in transaction.
+     * Issues an RS256 access token plus an opaque refresh token for a new sign-in, starting a new
+     * token family and storing only the refresh token's hash. Runs inside the caller's sign-in
+     * transaction.
      */
-    fun issue(user: User, userId: Long): AuthResponse {
-        val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
-        val refreshToken = refreshTokenHashService.generateSecureToken(REFRESH_TOKEN_BYTES)
-        refreshTokenRepository.save(
-            RefreshToken(
-                tokenHash = refreshTokenHashService.createLookupHash(refreshToken),
-                user = user,
-                expiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshExpirationMs),
-            )
-        )
-        return AuthResponse(
-            accessToken = accessToken,
-            refreshToken = refreshToken,
-            expiresIn = jwtTokenProvider.getExpirationTime(),
-            user = user.toDto(userId),
-        )
-    }
+    fun issue(user: User, userId: Long): AuthResponse = issue(user, userId, UUID.randomUUID().toString()).first
 
     /**
-     * Rotates tokens: issues a new access + refresh token and shortens the old refresh token to a
-     * grace window, so a client that crashes before persisting the new pair can retry.
+     * Rotates tokens: issues a new access + refresh token in the same family and retires the
+     * presented refresh token.
      *
-     * @throws AuthRejectedException if the refresh token is unknown, revoked or expired
+     * - First use: the token is marked used and its successor recorded.
+     * - Reuse within the grace window, counted from the first use (the client crashed before
+     *   persisting the new pair): a fresh pair in the same family; the window is not extended.
+     * - Reuse after the grace window: treated as theft. The whole family is revoked and the reuse
+     *   audited, so both the attacker's and the victim's copies stop working.
+     *
+     * @throws AuthRejectedException if the refresh token is unknown, revoked, expired or reused
      */
-    @Transactional
+    @Transactional(noRollbackFor = [AuthRejectedException::class])
     fun rotate(refreshToken: String): AuthResponse {
         val lookupHash = refreshTokenHashService.createLookupHash(refreshToken)
-        val tokenEntity = refreshTokenRepository.findByTokenHash(lookupHash)
+        val tokenEntity = refreshTokenRepository.findForRotationByTokenHash(lookupHash)
             .orElseThrow { AuthRejectedException("Refresh token not found") }
+        val now = Instant.now(clock)
 
         if (tokenEntity.revoked) throw AuthRejectedException("Refresh token has been revoked")
-        if (!tokenEntity.expiresAt.isAfter(Instant.now(clock))) throw AuthRejectedException("Refresh token has expired")
+        if (!tokenEntity.expiresAt.isAfter(now)) throw AuthRejectedException("Refresh token has expired")
 
         val user = tokenEntity.user
         val userId = user.requireId()
-        val response = issue(user, userId)
+        val familyId = tokenEntity.familyId
 
-        tokenEntity.expiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshTokenGracePeriodMs)
+        val usedAt = tokenEntity.usedAt
+        if (usedAt != null && !now.isBefore(usedAt.plusMillis(appProperties.jwt.refreshTokenGracePeriodMs))) {
+            // Revocation must commit even though the request fails (noRollbackFor above)
+            val revoked = refreshTokenRepository.revokeFamily(familyId)
+            logger.error { "Refresh token reuse detected for userId=$userId; revoked $revoked tokens in its family" }
+            auditLogService.logTokenReuse(userId, familyId, null)
+            throw AuthRejectedException("Refresh token has been revoked")
+        }
+        if (!user.active) throw AuthRejectedException("User account is deactivated")
+
+        val (response, successor) = issue(user, userId, familyId)
+        if (usedAt == null) tokenEntity.usedAt = now
+        tokenEntity.replacedBy = successor.id
         refreshTokenRepository.save(tokenEntity)
 
-        logger.info { "✅ Tokens rotated for userId=$userId" }
-        auditLogService.logRefresh(userId, user.email, "N/A", null, null)
+        if (usedAt == null) {
+            logger.info { "✅ Tokens rotated for userId=$userId" }
+        } else {
+            logger.warn { "Refresh token re-used within grace window for userId=$userId (client retry)" }
+        }
+        auditLogService.logRefresh(userId, user.email, familyId, null, null)
         return response
     }
 
@@ -82,15 +93,17 @@ class TokenService(
     @Transactional
     fun logout(userId: Long, refreshToken: String) {
         logger.info { "Logging out user: $userId" }
-        refreshTokenRepository.revokeByTokenHash(refreshTokenHashService.createLookupHash(refreshToken))
+        val lookupHash = refreshTokenHashService.createLookupHash(refreshToken)
+        refreshTokenRepository.revokeByTokenHash(lookupHash)
 
         userRepository.findById(userId).orElse(null)?.let { user ->
-            auditLogService.logLogout(userId, user.email, refreshToken, null)
+            auditLogService.logLogout(userId, user.email, lookupHash, null)
         }
     }
 
     /**
-     * Revokes every refresh token of the user and tells their devices to clear local data.
+     * Revokes every refresh token of the user, invalidates every access token issued so far and
+     * tells their devices to clear local data.
      *
      * @throws IllegalArgumentException if the user doesn't exist
      */
@@ -108,7 +121,40 @@ class TokenService(
         )
 
         refreshTokenRepository.revokeAllByUser(user)
+        revokeAccessTokens(user, userId)
         auditLogService.logLogoutAll(userId, user.email, null)
+    }
+
+    /**
+     * Rejects every access token issued up to now. JWT `iat` has whole-second precision, so the
+     * cutoff is truncated to the second: tokens issued later in this same second stay valid rather
+     * than a new sign-in right after being rejected.
+     */
+    private fun revokeAccessTokens(user: User, userId: Long) {
+        val cutoff = Instant.now(clock).truncatedTo(ChronoUnit.SECONDS)
+        userRepository.updateTokensValidAfter(userId, cutoff)
+        user.mirrorTokensValidAfter(cutoff)
+        userAccessCache.evict(userId)
+    }
+
+    private fun issue(user: User, userId: Long, familyId: String): Pair<AuthResponse, RefreshToken> {
+        val accessToken = jwtTokenProvider.generateAccessToken(userId, user.email)
+        val refreshToken = refreshTokenHashService.generateSecureToken(REFRESH_TOKEN_BYTES)
+        val saved = refreshTokenRepository.save(
+            RefreshToken(
+                tokenHash = refreshTokenHashService.createLookupHash(refreshToken),
+                user = user,
+                expiresAt = Instant.now(clock).plusMillis(appProperties.jwt.refreshExpirationMs),
+                familyId = familyId,
+            )
+        )
+        val response = AuthResponse(
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+            expiresIn = jwtTokenProvider.getExpirationTime(),
+            user = user.toDto(userId),
+        )
+        return response to saved
     }
 
     private fun User.toDto(userId: Long): UserDto = UserDto(

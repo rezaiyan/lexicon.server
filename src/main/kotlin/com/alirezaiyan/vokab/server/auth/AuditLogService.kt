@@ -39,15 +39,19 @@ class AuditLogService(
         )
     }
 
+    /**
+     * @param tokenLookupHash the refresh token's lookup hash (never the plaintext token); only a short
+     *   prefix is stored, enough to correlate with the refresh_tokens row.
+     */
     @Async
-    fun logLogout(userId: Long, email: String, refreshToken: String, ipAddress: String?) {
+    fun logLogout(userId: Long, email: String, tokenLookupHash: String, ipAddress: String?) {
         logger.info { "AUDIT: LOGOUT userId=$userId ip=$ipAddress" }
         save(
             eventType = AuditEventType.LOGOUT,
             userId = userId,
             email = email,
             ipAddress = ipAddress,
-            metadata = """{"tokenPrefix":"${refreshToken.take(8)}"}"""
+            metadata = metadataJson.writeValueAsString(mapOf("tokenHashPrefix" to tokenLookupHash.take(8)))
         )
     }
 

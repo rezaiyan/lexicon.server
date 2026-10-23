@@ -28,6 +28,7 @@ class WordMcpTools(
     private val wordAdditionService: WordAdditionService,
     private val tagService: TagService,
     private val auditLog: AuditLogService,
+    private val deleteLimiter: McpDeleteLimiter,
 ) {
 
     @McpTool(
@@ -152,6 +153,7 @@ class WordMcpTools(
         name = "delete_words",
         description = "Permanently delete some of the learner's words, with their review progress, on all " +
             "their devices. Ids that aren't the learner's are ignored. Confirm with the learner first. " +
+            "At most ${McpDeleteLimiter.WORDS_PER_HOUR} words can be deleted per hour. " +
             "Get word ids from search_words or get_due_words.",
         title = "Delete Lexicon words",
         annotations = McpTool.McpAnnotations(
@@ -165,6 +167,7 @@ class WordMcpTools(
     ): DeletedWordIds {
         val userId = context.userIdWithScope(McpScopes.WORDS_DELETE)
         require(wordIds.isNotEmpty() && wordIds.size <= MAX_BATCH) { "Send between 1 and $MAX_BATCH word ids" }
+        deleteLimiter.acquire(userId, wordIds.distinct().size)
         val deleted = wordService.deleteOwned(userId, wordIds)
         if (deleted.isNotEmpty()) auditLog.logMcpWrite(userId, context.clientId(), "delete_words", deleted)
         return DeletedWordIds(deleted = deleted, notFound = wordIds.distinct() - deleted.toSet())

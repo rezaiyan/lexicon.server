@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController
  */
 @RestController
 @ConditionalOnProperty("spring.ai.mcp.server.enabled", havingValue = "true")
-class McpConsentController(private val oauthService: McpOAuthService) {
+class McpConsentController(private val consentClients: McpConsentClients) {
 
     @GetMapping(McpAuthorizationServerConfig.CONSENT_PATH, produces = ["text/html;charset=UTF-8"])
     fun consentPage(
@@ -24,7 +24,7 @@ class McpConsentController(private val oauthService: McpOAuthService) {
         @RequestParam("scope", defaultValue = "") scope: String,
         response: HttpServletResponse,
     ): ResponseEntity<String> {
-        val client = oauthService.consentClient(clientId)
+        val client = consentClients.consentClient(clientId)
             ?: return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Unknown app")
         response.setHeader("Content-Security-Policy", McpConsentPage.CSP)
         response.setHeader("Referrer-Policy", "no-referrer")

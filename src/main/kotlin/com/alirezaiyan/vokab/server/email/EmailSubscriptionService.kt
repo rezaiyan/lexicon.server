@@ -21,6 +21,7 @@ class EmailSubscriptionService(
 
     @Transactional
     fun subscribe(userId: Long, category: String): EmailSubscription {
+        requireKnownCategory(category)
         val existing = emailSubscriptionRepository.findByUserIdAndCategory(userId, category)
         return if (existing != null) {
             existing.subscribed = true
@@ -35,6 +36,7 @@ class EmailSubscriptionService(
 
     @Transactional
     fun unsubscribe(userId: Long, category: String): EmailSubscription {
+        requireKnownCategory(category)
         val existing = emailSubscriptionRepository.findByUserIdAndCategory(userId, category)
         return if (existing != null) {
             existing.subscribed = false
@@ -62,7 +64,14 @@ class EmailSubscriptionService(
         }
     }
 
+    private fun requireKnownCategory(category: String) {
+        require(category in KNOWN_CATEGORIES) { "Unknown email category" }
+    }
+
     companion object {
         val DEFAULT_CATEGORIES = listOf("newsletter", "product_updates", "weekly_digest")
+
+        /** Every category users can opt in or out of (see V31__create_email_tables.sql). */
+        val KNOWN_CATEGORIES = (DEFAULT_CATEGORIES + "streak_summary").toSet()
     }
 }

@@ -80,6 +80,7 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
         clients: RegisteredClientRepository,
         jwkSource: JWKSource<SecurityContext>,
         tokenCustomizer: OAuth2TokenCustomizer<JwtEncodingContext>,
+        authorizationService: OAuth2AuthorizationService,
         clock: Clock,
     ): SecurityFilterChain {
         val authorizationServer = OAuth2AuthorizationServerConfigurer.authorizationServer()
@@ -90,6 +91,10 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
         http
             .securityMatcher(authorizationServer.endpointsMatcher)
             .addFilterBefore(resource.tokenRequestFilter(TOKEN_PATH), DisableEncodeUrlFilter::class.java)
+            .addFilterBefore(
+                McpRefreshTokenReuseDetection(authorizationService, TOKEN_PATH),
+                DisableEncodeUrlFilter::class.java,
+            )
             .with(authorizationServer) { server ->
                 server.tokenGenerator(DelegatingOAuth2TokenGenerator(jwtGenerator, McpRefreshTokenGenerator(clock)))
                 server.authorizationServerMetadataEndpoint { endpoint ->

@@ -9,6 +9,7 @@ class NotificationControllerHandler(
     private val pushTokenService: PushTokenService,
     private val pushNotificationService: PushNotificationService,
     private val notificationEngagementService: NotificationEngagementService,
+    private val selfPushGuard: SelfPushGuard = SelfPushGuard(),
 ) {
     
     fun registerToken(userId: Long, request: RegisterPushTokenRequest): ResponseEntity<ApiResponse<Unit>> {
@@ -25,7 +26,7 @@ class NotificationControllerHandler(
     
     fun deactivateToken(userId: Long, token: String): ResponseEntity<ApiResponse<Unit>> {
         return execute<Unit> {
-            pushTokenService.deactivateToken(token)
+            pushTokenService.deactivateToken(userId, token)
             ApiResponse(success = true, message = "Token deactivated successfully")
         }
     }
@@ -38,6 +39,7 @@ class NotificationControllerHandler(
     }
     
     fun sendNotification(userId: Long, request: SendNotificationRequest): ResponseEntity<ApiResponse<List<NotificationResponse>>> {
+        selfPushGuard.check(userId, request)
         return execute<List<NotificationResponse>> {
             val responses = pushNotificationService.sendNotificationToUser(
                 userId = userId,

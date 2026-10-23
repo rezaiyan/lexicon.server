@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Size
 import java.time.Instant
@@ -20,19 +20,19 @@ data class StoredCandidate(
 /** Reads the `candidates` JSON the planner stores (`[{"candidate": {...}, "violations": [...]}]`). */
 fun ObjectMapper.readStoredCandidates(json: String?): List<StoredCandidate> {
     if (json.isNullOrBlank()) return emptyList()
-    return readTree(json).map { node ->
+    return readTree(json).values().map { node ->
         val c = node.path("candidate")
         StoredCandidate(
             candidate = RescueCopyCandidate(
-                angle = c.path("angle").asText(),
-                title = c.path("title").asText(),
-                body = c.path("body").asText(),
-                factIds = c.path("factIds").map { it.asText() },
+                angle = c.path("angle").asString(),
+                title = c.path("title").asString(),
+                body = c.path("body").asString(),
+                factIds = c.path("factIds").values().map { it.asString() },
                 rank = c.path("rank").asInt(Int.MAX_VALUE),
             ),
-            violations = node.path("violations").map { it.asText() },
+            violations = node.path("violations").values().map { it.asString() },
             judge = node.path("judge").takeIf { it.isObject }?.let {
-                JudgeVerdict(it.path("pass").asBoolean(false), it.path("reason").asText())
+                JudgeVerdict(it.path("pass").asBoolean(false), it.path("reason").asString())
             },
         )
     }

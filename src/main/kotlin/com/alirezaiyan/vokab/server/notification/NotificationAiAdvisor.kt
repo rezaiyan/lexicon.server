@@ -2,7 +2,7 @@ package com.alirezaiyan.vokab.server.notification
 
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import com.alirezaiyan.vokab.server.ai.AiClient

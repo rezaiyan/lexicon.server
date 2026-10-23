@@ -2,13 +2,13 @@ package com.alirezaiyan.vokab.server.architecture
 
 import com.alirezaiyan.vokab.server.shared.ControllerTestSecurityConfig
 import com.alirezaiyan.vokab.server.shared.AuthUser
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.databind.node.ObjectNode
+import tools.jackson.databind.SerializationFeature
+import tools.jackson.databind.json.JsonMapper
+import tools.jackson.databind.node.ObjectNode
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.context.annotation.Import
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -34,9 +34,10 @@ class OpenApiContractTest {
 
     private val specFile = File("openapi.json")
 
-    private val canonical = ObjectMapper()
+    private val canonical = JsonMapper.builder()
         .enable(SerializationFeature.INDENT_OUTPUT)
         .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
+        .build()
 
     @Test
     fun `the rendered API spec matches the committed openapi json`() {

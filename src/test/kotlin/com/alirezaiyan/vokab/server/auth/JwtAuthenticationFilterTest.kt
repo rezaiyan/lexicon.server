@@ -144,7 +144,7 @@ class JwtAuthenticationFilterTest {
 
         // Assert
         assertNotNull(SecurityContextHolder.getContext().authentication)
-        assertEquals(AuthUser(1L), SecurityContextHolder.getContext().authentication.principal)
+        assertEquals(AuthUser(1L), SecurityContextHolder.getContext().authentication?.principal)
     }
 
     @Test

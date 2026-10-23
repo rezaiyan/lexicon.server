@@ -1,9 +1,9 @@
 package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.shared.UserFacingException
-import com.fasterxml.jackson.core.JsonProcessingException
-import com.fasterxml.jackson.databind.DeserializationFeature
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import tools.jackson.core.JacksonException
+import tools.jackson.databind.DeserializationFeature
+import tools.jackson.module.kotlin.jacksonMapperBuilder
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
@@ -12,8 +12,9 @@ private const val MAX_TERM_LENGTH = 200
 private const val MAX_NOTE_LENGTH = 1_000
 private const val MAX_EXTRACTED_ITEMS = 200
 
-private val extractionMapper = jacksonObjectMapper()
-    .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+private val extractionMapper = jacksonMapperBuilder()
+    .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+    .build()
 
 private data class RawExtractionPayload(val items: List<RawExtractedItem> = emptyList())
 
@@ -35,7 +36,7 @@ internal object ExtractedWordsParser {
         }
         return try {
             extractionMapper.readValue(raw.substring(start, end + 1), RawExtractionPayload::class.java).items
-        } catch (e: JsonProcessingException) {
+        } catch (e: JacksonException) {
             logger.warn { "[AI] Unparseable extraction JSON: ${e.originalMessage}" }
             throw UserFacingException("Failed to read vocabulary from the image. Please try a clearer image.")
         }

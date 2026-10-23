@@ -1,8 +1,8 @@
 package com.alirezaiyan.vokab.server.mcp
 
 import com.alirezaiyan.vokab.server.shared.AppProperties
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.core.ClientAuthenticationMethod
@@ -139,8 +139,8 @@ internal class McpRegisteredClientRepository(
             logger.info { "Rejected client metadata document ${URI(clientId).host}: $problem" }
             return null
         }
-        val redirects = document["redirect_uris"].map { it.asText() }
-        val name = document["client_name"]?.asText()?.trim()?.take(MAX_CLIENT_NAME)?.takeIf { it.isNotEmpty() }
+        val redirects = document["redirect_uris"].values().map { it.asString() }
+        val name = document["client_name"]?.asString()?.trim()?.take(MAX_CLIENT_NAME)?.takeIf { it.isNotEmpty() }
             ?: URI(clientId).host
         return RegisteredClient.withId(existingId ?: UUID.randomUUID().toString())
             .clientId(clientId)
@@ -159,13 +159,13 @@ internal class McpRegisteredClientRepository(
     /** Empty when acceptable; otherwise why not. */
     private fun problemWith(clientId: String, document: JsonNode): String {
         val redirects = document["redirect_uris"]
-        val authMethod = document["token_endpoint_auth_method"]?.asText() ?: NONE
-        val grantTypes = document["grant_types"]?.map { it.asText() } ?: listOf(AUTHORIZATION_CODE)
+        val authMethod = document["token_endpoint_auth_method"]?.asString() ?: NONE
+        val grantTypes = document["grant_types"]?.values()?.map { it.asString() } ?: listOf(AUTHORIZATION_CODE)
         return when {
-            document["client_id"]?.asText() != clientId -> "client_id does not match its URL"
+            document["client_id"]?.asString() != clientId -> "client_id does not match its URL"
             redirects == null || !redirects.isArray || redirects.isEmpty || redirects.size() > MAX_REDIRECT_URIS ->
                 "needs 1-$MAX_REDIRECT_URIS redirect_uris"
-            redirects.any { !McpRedirectUris.isAllowed(it.asText()) } -> "redirect_uris must be https or loopback"
+            redirects.any { !McpRedirectUris.isAllowed(it.asString()) } -> "redirect_uris must be https or loopback"
             authMethod != NONE -> "only public clients (token_endpoint_auth_method none) are supported"
             document.has("client_secret") -> "metadata documents must not carry a client_secret"
             // Grants we don't offer are ignored (Claude also lists jwt-bearer); the client gets ours.

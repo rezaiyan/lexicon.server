@@ -3,7 +3,7 @@ package com.alirezaiyan.vokab.server.mcp
 import com.alirezaiyan.vokab.server.auth.UserAccessCache
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import com.nimbusds.jose.jwk.JWKSet
 import com.nimbusds.jose.jwk.RSAKey
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet
@@ -41,7 +41,7 @@ import org.springframework.security.oauth2.server.authorization.OAuth2TokenType
 import org.springframework.security.oauth2.server.authorization.authentication.OAuth2AuthorizationCodeRequestAuthenticationProvider
 import org.springframework.security.oauth2.server.authorization.client.JdbcRegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
-import org.springframework.security.oauth2.server.authorization.config.annotation.web.configurers.OAuth2AuthorizationServerConfigurer
+import org.springframework.security.config.annotation.web.configurers.oauth2.server.authorization.OAuth2AuthorizationServerConfigurer
 import org.springframework.security.oauth2.server.authorization.settings.AuthorizationServerSettings
 import org.springframework.security.oauth2.server.authorization.token.JwtEncodingContext
 import org.springframework.security.oauth2.server.authorization.token.DelegatingOAuth2TokenGenerator
@@ -83,7 +83,7 @@ class McpAuthorizationServerConfig(private val appProperties: AppProperties) {
         authorizationService: OAuth2AuthorizationService,
         clock: Clock,
     ): SecurityFilterChain {
-        val authorizationServer = OAuth2AuthorizationServerConfigurer.authorizationServer()
+        val authorizationServer = OAuth2AuthorizationServerConfigurer()
         val resource = McpResourceParameter(mcpResource())
         val responses = McpAuthorizationResponses(issuer)
         val publicRefresh = PublicClientRefreshAuthentication(clients)

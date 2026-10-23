@@ -2,7 +2,7 @@ package com.alirezaiyan.vokab.server.notification.rescue
 
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals

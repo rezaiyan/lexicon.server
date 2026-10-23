@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.subscription
 
 import com.alirezaiyan.vokab.server.shared.ApiResponse
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus

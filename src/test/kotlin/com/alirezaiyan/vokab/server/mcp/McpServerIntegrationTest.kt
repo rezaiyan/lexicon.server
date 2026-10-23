@@ -9,14 +9,14 @@ import com.alirezaiyan.vokab.server.words.TagService
 import com.alirezaiyan.vokab.server.words.Word
 import com.alirezaiyan.vokab.server.words.WordRepository
 import com.alirezaiyan.vokab.server.words.WordService
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.ObjectMapper
 import com.nimbusds.jose.jwk.source.JWKSource
 import com.nimbusds.jose.proc.SecurityContext
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.http.MediaType
 import org.springframework.security.oauth2.server.authorization.OAuth2AuthorizationService
@@ -106,7 +106,7 @@ class McpServerIntegrationTest {
 
     @Test
     fun `tools list marks which tools only read, which add and which destroy`() {
-        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asText() }
+        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asString() }
 
         assertEquals(READ_TOOLS + WRITE_TOOLS + DESTRUCTIVE_TOOLS, tools.keys)
         READ_TOOLS.forEach { assertTrue(tools.getValue(it)["annotations"]["readOnlyHint"].asBoolean(), it) }
@@ -122,10 +122,10 @@ class McpServerIntegrationTest {
         val tools = call(rpc("tools/list"))["result"]["tools"]
 
         tools.forEach { tool ->
-            val name = tool["name"].asText()
-            assertTrue(tool["title"]?.asText().orEmpty().isNotBlank(), "$name has no title")
+            val name = tool["name"].asString()
+            assertTrue(tool["title"]?.asString().orEmpty().isNotBlank(), "$name has no title")
             assertFalse(tool["annotations"]["openWorldHint"].asBoolean(), "$name claims an open world")
-            assertEquals("object", tool["outputSchema"]?.get("type")?.asText(), "$name has no object output schema")
+            assertEquals("object", tool["outputSchema"]?.get("type")?.asString(), "$name has no object output schema")
         }
     }
 
@@ -133,30 +133,30 @@ class McpServerIntegrationTest {
     fun `tool results come back as structured content with a text copy`() {
         val result = call(rpc("tools/call", mapOf("name" to "list_tags", "arguments" to emptyMap<String, Any>())))["result"]
 
-        assertEquals("fruit", result["structuredContent"]["tags"][0]["name"].asText())
-        assertEquals(result["structuredContent"], objectMapper.readTree(result["content"][0]["text"].asText()))
+        assertEquals("fruit", result["structuredContent"]["tags"][0]["name"].asString())
+        assertEquals(result["structuredContent"], objectMapper.readTree(result["content"][0]["text"].asString()))
     }
 
     @Test
     fun `add_words tells the AI client exactly what a word needs`() {
-        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asText() }
+        val tools = call(rpc("tools/list"))["result"]["tools"].associateBy { it["name"].asString() }
         val item = tools.getValue("add_words")["inputSchema"]["properties"]["words"]["items"]
 
         assertEquals(
             setOf("word", "translation", "language", "translationLanguage", "note", "tags"),
-            item["properties"].fieldNames().asSequence().toSet(),
+            item["properties"].propertyNames().toSet(),
         )
-        assertEquals(setOf("word", "translation", "language"), item["required"].map { it.asText() }.toSet())
+        assertEquals(setOf("word", "translation", "language"), item["required"].values().map { it.asString() }.toSet())
     }
 
     @Test
     fun `search_words finds only the caller's matching words`() {
         val words = toolResult("search_words", mapOf("query" to "apple"))["words"]
 
-        assertEquals(setOf("Apfel", "manzana"), words.map { it["word"].asText() }.toSet())
-        val apfel = words.single { it["word"].asText() == "Apfel" }
-        assertEquals("de", apfel["language"].asText())
-        assertEquals("en", apfel["translationLanguage"].asText())
+        assertEquals(setOf("Apfel", "manzana"), words.values().map { it["word"].asString() }.toSet())
+        val apfel = words.single { it["word"].asString() == "Apfel" }
+        assertEquals("de", apfel["language"].asString())
+        assertEquals("en", apfel["translationLanguage"].asString())
     }
 
     @Test
@@ -165,8 +165,8 @@ class McpServerIntegrationTest {
         val fruit = toolResult("search_words", mapOf("tag" to "Fruit"))["words"]
         val unknownTag = toolResult("search_words", mapOf("tag" to "nope"))["words"]
 
-        assertEquals(setOf("Apfel", "Birne"), german.map { it["word"].asText() }.toSet())
-        assertEquals(listOf("Apfel"), fruit.map { it["word"].asText() })
+        assertEquals(setOf("Apfel", "Birne"), german.values().map { it["word"].asString() }.toSet())
+        assertEquals(listOf("Apfel"), fruit.values().map { it["word"].asString() })
         assertEquals(0, unknownTag.size())
     }
 
@@ -177,11 +177,11 @@ class McpServerIntegrationTest {
         val newest = toolResult("search_words", mapOf("limit" to 1, "newestFirst" to true))
         val older = toolResult("search_words", mapOf("limit" to 2, "newestFirst" to true, "cursor" to newest["nextCursor"].asLong()))
 
-        assertEquals(listOf("Apfel", "Birne"), first["words"].map { it["word"].asText() })
-        assertEquals(listOf("manzana"), rest["words"].map { it["word"].asText() })
+        assertEquals(listOf("Apfel", "Birne"), first["words"].values().map { it["word"].asString() })
+        assertEquals(listOf("manzana"), rest["words"].values().map { it["word"].asString() })
         assertFalse(rest.has("nextCursor"), "last page has no cursor")
-        assertEquals(listOf("manzana"), newest["words"].map { it["word"].asText() })
-        assertEquals(listOf("Birne", "Apfel"), older["words"].map { it["word"].asText() })
+        assertEquals(listOf("manzana"), newest["words"].values().map { it["word"].asString() })
+        assertEquals(listOf("Birne", "Apfel"), older["words"].values().map { it["word"].asString() })
         assertFalse(older.has("nextCursor"))
     }
 
@@ -193,7 +193,7 @@ class McpServerIntegrationTest {
         val underscore = toolResult("search_words", mapOf("query" to "_"))["words"]
         val limited = toolResult("search_words", mapOf("limit" to 2))["words"]
 
-        assertEquals(listOf("100% sicher"), percent.map { it["word"].asText() })
+        assertEquals(listOf("100% sicher"), percent.values().map { it["word"].asString() })
         assertEquals(0, underscore.size())
         assertEquals(2, limited.size())
     }
@@ -205,7 +205,7 @@ class McpServerIntegrationTest {
         val due = toolResult("get_due_words", mapOf("limit" to 1))
 
         assertEquals(4, due["dueCount"].asInt())
-        assertEquals(listOf("Gestern"), due["words"].map { it["word"].asText() })
+        assertEquals(listOf("Gestern"), due["words"].values().map { it["word"].asString() })
     }
 
     @Test
@@ -213,7 +213,7 @@ class McpServerIntegrationTest {
         val tags = toolResult("list_tags", emptyMap())["tags"]
 
         assertEquals(1, tags.size())
-        assertEquals("fruit", tags[0]["name"].asText())
+        assertEquals("fruit", tags[0]["name"].asString())
         assertEquals(1, tags[0]["wordCount"].asLong())
     }
 
@@ -225,8 +225,8 @@ class McpServerIntegrationTest {
                 "tags" to listOf("fruit", "news")),
         )))
 
-        assertEquals(listOf("Kirsche"), result["added"].map { it["word"].asText() })
-        assertEquals(listOf("Apfel"), result["skipped"].map { it.asText() })
+        assertEquals(listOf("Kirsche"), result["added"].values().map { it["word"].asString() })
+        assertEquals(listOf("Apfel"), result["skipped"].values().map { it.asString() })
         val kirsche = wordRepository.findAllByUserWithTags(learner).single { it.originalWord == "Kirsche" }
         assertEquals("de", kirsche.targetLanguage)
         assertEquals("en", kirsche.sourceLanguage, "translation language defaults to the learner's usual one")
@@ -242,9 +242,9 @@ class McpServerIntegrationTest {
 
         val entry = auditLogRepository.findAll().single { it.userId == learner.id && it.eventType == AuditEventType.MCP_WRITE }
         val metadata = objectMapper.readTree(entry.metadata)
-        assertEquals("add_words", metadata["tool"].asText())
-        assertEquals(listOf(added), metadata["wordIds"].map { it.asLong() })
-        assertTrue(metadata["client"].asText().startsWith("test_"))
+        assertEquals("add_words", metadata["tool"].asString())
+        assertEquals(listOf(added), metadata["wordIds"].values().map { it.asLong() })
+        assertTrue(metadata["client"].asString().startsWith("test_"))
         assertTrue("Pflaume" !in requireNotNull(entry.metadata), "no word text in the audit log")
     }
 
@@ -255,13 +255,13 @@ class McpServerIntegrationTest {
 
         val result = toolResult("delete_words", mapOf("wordIds" to listOf(mine, theirs)))
 
-        assertEquals(listOf(mine), result["deleted"].map { it.asLong() })
-        assertEquals(listOf(theirs), result["notFound"].map { it.asLong() })
+        assertEquals(listOf(mine), result["deleted"].values().map { it.asLong() })
+        assertEquals(listOf(theirs), result["notFound"].values().map { it.asLong() })
         assertFalse(wordRepository.existsById(mine))
         assertTrue(wordRepository.existsById(theirs), "another learner's word is untouched")
         assertEquals(listOf(mine), wordService.deletedSince(learner.requireId(), java.time.Instant.EPOCH))
         val entry = auditLogRepository.findAll().single { it.userId == learner.id && it.eventType == AuditEventType.MCP_WRITE }
-        assertEquals("delete_words", objectMapper.readTree(entry.metadata)["tool"].asText())
+        assertEquals("delete_words", objectMapper.readTree(entry.metadata)["tool"].asString())
     }
 
     @Test
@@ -308,7 +308,7 @@ class McpServerIntegrationTest {
         val result = toolResult("tag_words", mapOf("wordIds" to listOf(birne.id), "tags" to listOf("fruit")))
 
         assertEquals(1, result["tagged"].asInt())
-        assertEquals(setOf("Apfel", "Birne"), toolResult("search_words", mapOf("tag" to "fruit"))["words"].map { it["word"].asText() }.toSet())
+        assertEquals(setOf("Apfel", "Birne"), toolResult("search_words", mapOf("tag" to "fruit"))["words"].values().map { it["word"].asString() }.toSet())
     }
 
     @Test
@@ -318,7 +318,7 @@ class McpServerIntegrationTest {
         val due = toolResult("get_due_words", emptyMap())
 
         assertEquals(3, due["dueCount"].asInt())
-        assertTrue("Morgen" !in due["words"].map { it["word"].asText() })
+        assertTrue("Morgen" !in due["words"].values().map { it["word"].asString() })
     }
 
     @Test
@@ -337,7 +337,7 @@ class McpServerIntegrationTest {
     private fun toolError(name: String, arguments: Map<String, Any>): String {
         val result = call(rpc("tools/call", mapOf("name" to name, "arguments" to arguments)))["result"]
         assertTrue(result["isError"]?.asBoolean() ?: false, "expected a tool error: $result")
-        return result["content"][0]["text"].asText()
+        return result["content"][0]["text"].asString()
     }
 
     private fun call(body: String): JsonNode {

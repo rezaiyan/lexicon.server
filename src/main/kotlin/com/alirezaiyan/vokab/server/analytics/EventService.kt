@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.analytics
 
 import io.micrometer.core.instrument.MeterRegistry
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service

@@ -7,7 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
-import org.springframework.boot.actuate.health.Status
+import org.springframework.boot.health.contributor.Status
 import java.time.Duration
 import com.alirezaiyan.vokab.server.ai.AiCallTracker
 import com.alirezaiyan.vokab.server.ai.OpenRouterHealthIndicator

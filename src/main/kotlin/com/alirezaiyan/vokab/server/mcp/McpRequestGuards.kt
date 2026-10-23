@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.mcp
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import jakarta.servlet.FilterChain
 import jakarta.servlet.ReadListener
@@ -69,7 +69,7 @@ internal class McpScopeFilter(
             return
         }
         val needed = requiredScope(body)
-        val granted = token.authorities.map { it.authority }
+        val granted = token.authorities.mapNotNull { it.authority }
             .filter { it.startsWith(SCOPE_PREFIX) }
             .map { it.removePrefix(SCOPE_PREFIX) }
         if (needed != null && needed !in granted) {
@@ -88,8 +88,8 @@ internal class McpScopeFilter(
     /** The scope a `tools/call` needs; null for other methods, unknown tools and unparsable bodies. */
     private fun requiredScope(body: ByteArray): String? {
         val message = runCatching { objectMapper.readTree(body) }.getOrNull() ?: return null
-        if (message.path("method").asText() != "tools/call") return null
-        return McpScopes.BY_TOOL[message.path("params").path("name").asText()]
+        if (message.path("method").asString() != "tools/call") return null
+        return McpScopes.BY_TOOL[message.path("params").path("name").asString()]
     }
 
     private class ReplayableRequest(request: HttpServletRequest, private val body: ByteArray) :

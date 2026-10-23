@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.shared
 
 import org.springframework.beans.factory.annotation.Qualifier
-import org.springframework.boot.autoconfigure.web.client.RestClientBuilderConfigurer
+import org.springframework.boot.restclient.autoconfigure.RestClientBuilderConfigurer
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.context.annotation.Primary

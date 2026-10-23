@@ -1,6 +1,6 @@
 package com.alirezaiyan.vokab.server.mcp
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 
 /** The sign-in page an MCP client opens in the browser. Values reach the script JSON-encoded only. */
 internal object McpLoginPage {

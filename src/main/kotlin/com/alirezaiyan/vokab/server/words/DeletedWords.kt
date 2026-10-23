@@ -38,7 +38,7 @@ class DeletedWords(
         "SELECT word_id FROM deleted_words WHERE user_id = :userId AND deleted_at > :since ORDER BY deleted_at",
         mapOf("userId" to userId, "since" to Timestamp.from(since)),
         Long::class.java,
-    )
+    ).filterNotNull()
 
     /**
      * Devices that haven't synced for [RETENTION] start over with a full sync anyway, so older

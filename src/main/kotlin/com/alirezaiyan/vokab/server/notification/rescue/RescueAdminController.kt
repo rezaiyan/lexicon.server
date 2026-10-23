@@ -1,7 +1,7 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
 import com.alirezaiyan.vokab.server.shared.ApiResponse
-import com.fasterxml.jackson.databind.ObjectMapper
+import tools.jackson.databind.ObjectMapper
 import jakarta.validation.Valid
 import org.springframework.http.MediaType
 import org.springframework.http.ResponseEntity

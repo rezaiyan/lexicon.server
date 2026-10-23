@@ -3950,6 +3950,7 @@
             "type" : [ "string", "null" ]
           },
           "speechRate" : {
+            "exclusiveMinimum" : 0,
             "format" : "float",
             "type" : "number"
           },

@@ -13,6 +13,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
+import java.util.Locale
 import com.alirezaiyan.vokab.server.analytics.LearnerSignals
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -28,6 +29,32 @@ data class NotificationPayload(
     val type: NotificationType
 )
 
+/** Words store ISO codes ("de"); learners should read "German". Unknown codes stay as stored. */
+private fun languageName(code: String): String {
+    val name = Locale.forLanguageTag(code).getDisplayLanguage(Locale.ENGLISH)
+    return if (name.isBlank() || name.equals(code, ignoreCase = true)) code else name
+}
+
+/**
+ * Streak days are UTC days (see StreakService), so the user's local midnight is not the
+ * deadline; say how long is left instead.
+ */
+private fun streakDeadline(now: Instant): String {
+    val nextUtcMidnight = LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1)
+        .atStartOfDay().toInstant(ZoneOffset.UTC)
+    val hoursLeft = Duration.between(now, nextUtcMidnight).toHours()
+    return if (hoursLeft < 1) "within the hour" else "in ${hoursLeft}h"
+}
+
+private fun biteBody(bite: DueBite?): String = when {
+    bite == null -> "A short review keeps them fresh."
+    bite.mostlyKnown -> "Most of them you already know. Quick win?"
+    else -> "A short round, then you're done for now."
+}
+
+private fun biteLink(bite: DueBite?, fallback: String): String =
+    bite?.let { "vokab://review/words?ids=${it.wordIds.joinToString(",")}" } ?: fallback
+
 @Service
 class NotificationContentBuilder(
     private val aiService: AiService,
@@ -35,6 +62,7 @@ class NotificationContentBuilder(
     private val learnerSignals: LearnerSignals,
     private val dailyInsightService: DailyInsightService,
     private val milestoneDetector: MilestoneDetector,
+    private val dueWordQueries: DueWordQueries,
     private val clock: Clock,
 ) {
     fun build(user: User, type: NotificationType, contentHint: String? = null): NotificationPayload {
@@ -50,13 +78,14 @@ class NotificationContentBuilder(
             ADD_WORDS          -> buildAddWords()
             WORD_RUSH,
             LISTENING          -> buildPracticeNudge(user, type)
+            COMEBACK_RESCUE    -> error("Comeback rescue pushes are built from their plan by RescuePushBuilder")
             NONE               -> error("Should not build payload for NONE type")
         }
     }
 
     private fun buildStreakRisk(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        val deadline = streakDeadline()
+        val deadline = streakDeadline(Instant.now(clock))
         val fallback = "Your ${user.currentStreak}-day streak resets $deadline. One short review keeps it alive! 🔥"
         val body = aiCopyOr(fallback) {
             aiService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
@@ -71,18 +100,6 @@ class NotificationContentBuilder(
             ),
             type = STREAK_RISK
         )
-    }
-
-    /**
-     * Streak days are UTC days (see StreakService), so the user's local midnight is not the
-     * deadline; say how long is left instead.
-     */
-    private fun streakDeadline(): String {
-        val now = Instant.now(clock)
-        val nextUtcMidnight = LocalDate.ofInstant(now, ZoneOffset.UTC).plusDays(1)
-            .atStartOfDay().toInstant(ZoneOffset.UTC)
-        val hoursLeft = Duration.between(now, nextUtcMidnight).toHours()
-        return if (hoursLeft < 1) "within the hour" else "in ${hoursLeft}h"
     }
 
     private fun buildAddWords(): NotificationPayload =
@@ -105,21 +122,31 @@ class NotificationContentBuilder(
 
     private fun buildDueCards(user: User): NotificationPayload {
         val stats = userProgressService.calculateProgressStats(user.requireId())
-        val estimatedMinutes = maxOf(1, (stats.dueCards * 8) / 60)
         val primaryLang = bestEffort("Primary language for user=${user.id}") {
             learnerSignals.primaryTargetLanguage(user.requireId())
-        } ?: "vocabulary"
+        }?.let(::languageName) ?: "vocabulary"
+        val bite = dueBite(user)
         return NotificationPayload(
-            title = "📚 ${stats.dueCards} words are waiting",
-            body = "Your $primaryLang review takes ~$estimatedMinutes min.",
+            title = bite?.let { "📚 ${it.wordIds.size} $primaryLang words, about ${it.minutes} min" }
+                ?: "📚 Your $primaryLang words are ready",
+            body = biteBody(bite),
             data = mapOf(
                 "type" to "due_cards",
                 "due_count" to stats.dueCards.toString(),
-                "deep_link" to "vokab://review/due"
+                "deep_link" to biteLink(bite, fallback = "vokab://review/due")
             ),
             type = DUE_CARDS
         )
     }
+
+    /**
+     * The few words a due push offers instead of the whole backlog; null when none are due or
+     * the lookup fails, and the push then opens the due review without promising a size.
+     */
+    private fun dueBite(user: User): DueBite? =
+        bestEffort("Due words for user=${user.id}") {
+            DueBite.pick(dueWordQueries.dueWords(user.requireId(), clock.millis()))
+        }
 
     private fun buildComebackAlert(user: User): NotificationPayload {
         val word = learnerSignals.topDifficultWord(user.requireId()) ?: return buildFallbackInsight()
@@ -189,11 +216,9 @@ class NotificationContentBuilder(
     }
 
     private fun buildReviewReminder(user: User): NotificationPayload {
-        val stats = userProgressService.calculateProgressStats(user.requireId())
-        val dueCards = stats.dueCards
-        val body = if (dueCards > 0) {
-            val estimatedMinutes = maxOf(1, (dueCards * 8) / 60)
-            "You have $dueCards words due for review — takes ~$estimatedMinutes min."
+        val bite = dueBite(user)
+        val body = if (bite != null) {
+            "${bite.wordIds.size} words, about ${bite.minutes} min. ${biteBody(bite)}"
         } else {
             "Time for your daily vocabulary review. Keep the streak going!"
         }
@@ -202,7 +227,7 @@ class NotificationContentBuilder(
             body = body,
             data = mapOf(
                 "type" to "review_reminder",
-                "deep_link" to "vokab://review"
+                "deep_link" to biteLink(bite, fallback = "vokab://review")
             ),
             type = REVIEW_REMINDER
         )

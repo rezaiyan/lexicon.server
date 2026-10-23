@@ -51,7 +51,10 @@ enum class CreditTransactionType {
     /** A new period started: allowance replaced by the tier's monthly amount. */
     ALLOWANCE_RESET,
 
-    /** Allowance clamped after a downgrade (premium ended mid-period). */
+    /**
+     * Allowance clamped after a downgrade (premium ended mid-period), or topped up after a
+     * mid-period upgrade (never beyond the new tier's allowance less this period's use).
+     */
     ALLOWANCE_ADJUSTED,
     SIGNUP_BONUS,
     ADMIN_GRANT,

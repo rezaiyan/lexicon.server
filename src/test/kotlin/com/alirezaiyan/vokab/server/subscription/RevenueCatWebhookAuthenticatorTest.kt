@@ -23,6 +23,7 @@ class RevenueCatWebhookAuthenticatorTest {
         signing: String = "",
         now: Long = timestamp,
         tolerance: Long = 300,
+        requireSignature: Boolean = false,
     ) = RevenueCatWebhookAuthenticator(
         AppProperties(
             revenuecat = RevenueCatConfig(
@@ -32,7 +33,23 @@ class RevenueCatWebhookAuthenticatorTest {
             )
         ),
         Clock.fixed(Instant.ofEpochSecond(now), ZoneOffset.UTC),
+        RevenueCatPolicyProperties(requireWebhookSignature = requireSignature),
     )
+
+    @Test
+    fun `rejects every delivery when a signature is required but no signing secret is configured`() {
+        rejected(
+            authenticator(requireSignature = true).authenticate("Bearer shared", null, body),
+            "signing secret required but not configured",
+        )
+    }
+
+    @Test
+    fun `accepts a valid signature when signatures are required`() {
+        val result = authenticator(signing = signingSecret, requireSignature = true)
+            .authenticate("Bearer shared", validSignature, body)
+        assertEquals(WebhookAuthResult.Authorized, result)
+    }
 
     private fun rejected(result: WebhookAuthResult, reason: String) {
         assertTrue(result is WebhookAuthResult.Rejected, "expected rejection, got $result")

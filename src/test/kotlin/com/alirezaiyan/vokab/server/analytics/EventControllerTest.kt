@@ -80,6 +80,34 @@ class EventControllerTest {
     }
 
     @Test
+    fun `POST events should return 400 when there are too many properties`() {
+        val properties = (1..MAX_EVENT_PROPERTIES + 1).associate { "k$it" to "v" }
+        val request = createTrackEventRequest().copy(properties = properties)
+
+        mockMvc.perform(
+            post("/api/v1/events")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST events should return 400 when a property value is too long`() {
+        val properties = mapOf("k" to "v".repeat(MAX_EVENT_PROPERTY_VALUE_LENGTH + 1))
+        val request = createTrackEventRequest().copy(properties = properties)
+
+        mockMvc.perform(
+            post("/api/v1/events")
+                .with(authentication(auth))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
     fun `POST events should return 400 when event name is blank`() {
         val request = createTrackEventRequest(eventName = "")
 

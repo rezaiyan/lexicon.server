@@ -8,10 +8,11 @@ import com.alirezaiyan.vokab.server.words.WordService
 private val logger = KotlinLogging.logger {}
 
 /**
- * AI vocabulary suggestions, trimmed to the configured count.
+ * AI vocabulary suggestions: as many as the learner asked for, otherwise
+ * `app.vocabulary.suggestion-count`, which is also the most a request can get.
  *
  * The model returns extra items (see [AiService.generateVocabularyFromPreferences]) so
- * that duplicates can be dropped and the list still reaches `app.vocabulary.suggestion-count`.
+ * that duplicates can be dropped and the list still reaches the count.
  */
 @Service
 class VocabularySuggestionService(
@@ -27,10 +28,10 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String>,
     ): SuggestVocabularyResponse = suggest(
-        targetLanguage = targetLanguage.trim(),
-        currentLevel = currentLevel.trim(),
-        nativeLanguage = nativeLanguage.trim(),
-        interests = interests.map { it.trim() }.filter { it.isNotBlank() },
+        targetLanguage = targetLanguage.asPromptLabel(),
+        currentLevel = currentLevel.asPromptLabel(),
+        nativeLanguage = nativeLanguage.asPromptLabel(),
+        interests = interests.toPromptLabels(),
         existingKeys = emptySet(),
     )
 
@@ -45,14 +46,16 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String> = emptyList(),
         targetLanguageCode: String? = null,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
-        val target = targetLanguage.trim()
+        val target = targetLanguage.asPromptLabel()
         return suggest(
             targetLanguage = target,
-            currentLevel = currentLevel.trim(),
-            nativeLanguage = nativeLanguage.trim(),
-            interests = interests.map { it.trim() }.filter { it.isNotBlank() },
+            currentLevel = currentLevel.asPromptLabel(),
+            nativeLanguage = nativeLanguage.asPromptLabel(),
+            interests = interests.toPromptLabels(),
             existingKeys = wordService.getExistingTermKeys(userId, targetLanguageCode?.trim() ?: target),
+            preferences = preferences,
         )
     }
 
@@ -62,15 +65,20 @@ class VocabularySuggestionService(
         nativeLanguage: String,
         interests: List<String>,
         existingKeys: Set<String>,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): SuggestVocabularyResponse {
+        // The learner's own number wins over the default, up to the configured maximum
+        val maxCount = appProperties.vocabulary.suggestionCount
+        val targetCount = preferences.requestedItemCount?.coerceAtMost(maxCount) ?: maxCount
         val rawItems = aiService.generateVocabularyFromPreferences(
             targetLanguage = targetLanguage,
             currentLevel = currentLevel,
             nativeLanguage = nativeLanguage,
             interests = interests,
+            preferences = preferences,
+            count = targetCount,
         )
 
-        val targetCount = appProperties.vocabulary.suggestionCount
         val items = uniqueNewItems(rawItems, existingKeys).take(targetCount)
         logger.info {
             "Vocabulary suggestions: raw=${rawItems.size}, existing=${existingKeys.size}, " +
@@ -84,6 +92,10 @@ class VocabularySuggestionService(
             items = items,
         )
     }
+
+    /** Client-supplied topics end up in the prompt, so they get the same treatment as language names. */
+    private fun List<String>.toPromptLabels(): List<String> =
+        take(MAX_INTERESTS).map { it.asPromptLabel() }.filter { it.isNotBlank() }
 
     /** Items with a non-blank word not in [existingKeys], first occurrence only (case-insensitive). */
     private fun uniqueNewItems(

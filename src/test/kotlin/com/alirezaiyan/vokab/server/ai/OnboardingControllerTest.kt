@@ -4,8 +4,12 @@ import com.alirezaiyan.vokab.server.words.WordService
 import com.alirezaiyan.vokab.server.shared.ControllerTestSecurityConfig
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
 import com.fasterxml.jackson.databind.ObjectMapper
+import io.github.bucket4j.Bandwidth
 import io.github.bucket4j.Bucket
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
@@ -15,6 +19,7 @@ import org.springframework.http.MediaType
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import java.time.Duration
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -45,6 +50,12 @@ class OnboardingControllerTest {
     // Mocking AppProperties causes RS256JwtTokenProvider to NPE on appProperties.jwt.privateKey
     // during Spring context startup before any @BeforeEach stubs can run.
 
+    @BeforeEach
+    fun allowGlobalBudget() {
+        val budget = globalBucket(capacity = 100)
+        `when`(rateLimitConfig.getOnboardingGlobalBucket()).thenReturn(budget)
+    }
+
     // ── POST /api/v1/onboarding/preferences ──────────────────────────────────
 
     @Test
@@ -60,7 +71,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(items)
 
 
@@ -118,7 +130,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenThrow(RuntimeException("AI service unavailable"))
 
 
@@ -147,7 +160,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(itemsWithDuplicates)
 
 
@@ -176,7 +190,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = interests
+            interests = interests,
+            count = 50,
         )).thenReturn(items)
 
 
@@ -193,10 +208,10 @@ class OnboardingControllerTest {
     }
 
     @Test
-    fun `POST preferences should respect X-Forwarded-For header for rate limiting`() {
+    fun `POST preferences should rate limit by the resolved client address, ignoring X-Forwarded-For`() {
         val bucket = createAllowedBucket()
-        // The bucket is fetched with the forwarded IP
-        `when`(rateLimitConfig.getOnboardingBucket("203.0.113.10")).thenReturn(bucket)
+        // The bucket is fetched with remoteAddr (the proxy-resolved client), never a client-sent header
+        `when`(rateLimitConfig.getOnboardingBucket("198.51.100.7")).thenReturn(bucket)
 
         val items = listOf(
             SuggestVocabularyItemResponse(originalWord = "Hallo", translation = "hello"),
@@ -205,7 +220,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(items)
 
 
@@ -215,6 +231,7 @@ class OnboardingControllerTest {
             post("/api/v1/onboarding/preferences")
                 .contentType(MediaType.APPLICATION_JSON)
                 .header("X-Forwarded-For", "203.0.113.10, 10.0.0.1")
+                .with { it.apply { remoteAddr = "198.51.100.7" } }
                 .content(objectMapper.writeValueAsString(request))
         )
             .andExpect(status().isOk)
@@ -234,7 +251,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(manyItems)
 
         val request = createPreferencesRequest()
@@ -258,7 +276,8 @@ class OnboardingControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(emptyList())
 
 
@@ -274,7 +293,74 @@ class OnboardingControllerTest {
             .andExpect(jsonPath("$.data.items.length()").value(0))
     }
 
+    @Test
+    fun `POST preferences should return 429 without calling the AI when the global budget is spent`() {
+        val perIp = createAllowedBucket()
+        `when`(rateLimitConfig.getOnboardingBucket(org.mockito.ArgumentMatchers.anyString())).thenReturn(perIp)
+        val spent = globalBucket(capacity = 1).apply { tryConsume(1) }
+        `when`(rateLimitConfig.getOnboardingGlobalBucket()).thenReturn(spent)
+
+        mockMvc.perform(
+            post("/api/v1/onboarding/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(createPreferencesRequest()))
+        )
+            .andExpect(status().isTooManyRequests)
+            .andExpect(jsonPath("$.code").value("RATE_LIMITED"))
+
+        verify(aiService, never()).generateVocabularyFromPreferences(
+            targetLanguage = "German",
+            currentLevel = "beginner",
+            nativeLanguage = "English",
+            interests = emptyList(),
+            count = 50,
+        )
+    }
+
+    @Test
+    fun `POST preferences should return 400 for more than 10 interests`() {
+        val request = createPreferencesRequest(interests = (1..11).map { "topic$it" })
+
+        mockMvc.perform(
+            post("/api/v1/onboarding/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+    }
+
+    @Test
+    fun `POST preferences should return 400 for an interest longer than 40 characters`() {
+        val request = createPreferencesRequest(interests = listOf("x".repeat(41)))
+
+        mockMvc.perform(
+            post("/api/v1/onboarding/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+    }
+
+    @Test
+    fun `POST preferences should return 400 for a language name longer than 40 characters`() {
+        val request = createPreferencesRequest(targetLanguage = "G".repeat(41))
+
+        mockMvc.perform(
+            post("/api/v1/onboarding/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request))
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+    }
+
     // ── factory functions ─────────────────────────────────────────────────────
+
+    private fun globalBucket(capacity: Long): Bucket = Bucket.builder()
+        .addLimit(Bandwidth.builder().capacity(capacity).refillIntervally(capacity, Duration.ofHours(1)).build())
+        .build()
 
     private fun createPreferencesRequest(
         targetLanguage: String = "German",

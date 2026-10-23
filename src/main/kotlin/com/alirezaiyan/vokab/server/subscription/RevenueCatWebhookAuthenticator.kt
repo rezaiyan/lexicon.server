@@ -26,6 +26,9 @@ sealed interface WebhookAuthResult {
  *    `X-RevenueCat-Webhook-Signature: t=<unix>,v1=<hex>` — HMAC-SHA256 over `"<t>.<raw body>"` —
  *    with `t` within the configured tolerance (replay protection). RevenueCat re-signs every
  *    retry, so the tolerance only has to cover clock skew and request latency.
+ * 3. Without a signing secret only the static header protects the endpoint; that is logged loudly at
+ *    startup, and with `app.revenuecat.require-webhook-signature=true` every delivery is rejected
+ *    until the signing secret is configured.
  *
  * https://www.revenuecat.com/docs/integrations/webhooks#webhook-signature-verification-hmac
  */
@@ -33,10 +36,25 @@ sealed interface WebhookAuthResult {
 class RevenueCatWebhookAuthenticator(
     private val appProperties: AppProperties,
     private val clock: Clock,
+    private val policy: RevenueCatPolicyProperties = RevenueCatPolicyProperties(),
 ) {
     init {
         if (appProperties.revenuecat.webhookSecret.isBlank()) {
             logger.error { "app.revenuecat.webhook-secret is not set — all RevenueCat webhooks will be rejected" }
+        }
+        if (appProperties.revenuecat.webhookSigningSecret.isBlank()) {
+            if (policy.requireWebhookSignature) {
+                logger.error {
+                    "app.revenuecat.webhook-signing-secret is not set and require-webhook-signature is on — " +
+                        "all RevenueCat webhooks will be rejected"
+                }
+            } else {
+                logger.warn {
+                    "SECURITY: app.revenuecat.webhook-signing-secret (REVENUECAT_WEBHOOK_SIGNING_SECRET) " +
+                        "is not set — RevenueCat webhooks are protected by the static Authorization header only. " +
+                        "Configure HMAC signing, then set app.revenuecat.require-webhook-signature=true"
+                }
+            }
         }
     }
 
@@ -49,11 +67,13 @@ class RevenueCatWebhookAuthenticator(
         if (!authorizationMatches(authorization, config.webhookSecret)) {
             return WebhookAuthResult.Rejected("missing or invalid Authorization header")
         }
-        if (config.webhookSigningSecret.isNotBlank()) {
-            verifySignature(signature, body, config.webhookSigningSecret, config.webhookSignatureToleranceSeconds)
-                ?.let { return WebhookAuthResult.Rejected(it) }
+        val signatureProblem = when {
+            config.webhookSigningSecret.isNotBlank() ->
+                verifySignature(signature, body, config.webhookSigningSecret, config.webhookSignatureToleranceSeconds)
+            policy.requireWebhookSignature -> "signing secret required but not configured"
+            else -> null
         }
-        return WebhookAuthResult.Authorized
+        return signatureProblem?.let(WebhookAuthResult::Rejected) ?: WebhookAuthResult.Authorized
     }
 
     private fun authorizationMatches(header: String?, secret: String): Boolean {

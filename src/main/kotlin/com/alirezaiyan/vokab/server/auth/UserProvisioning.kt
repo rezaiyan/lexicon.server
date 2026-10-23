@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.auth
 
+import com.alirezaiyan.vokab.server.shared.AuthRejectedException
 import com.alirezaiyan.vokab.server.user.Platform
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserPlatformRepository
@@ -27,11 +28,22 @@ class UserProvisioning(
     private val clock: Clock,
 ) {
 
-    /** By Google id, else links the account with the same email, else creates one. */
+    /**
+     * By Google id, else links the account with the same email, else creates one. Linking or creating
+     * by email requires a verified address: an unverified one could take over (or pre-claim) the
+     * account of whoever really owns it.
+     *
+     * @throws AuthRejectedException if the account would be linked or created from an unverified email
+     */
     fun googleUser(claims: FirebaseIdClaims, email: String): ProvisionedUser {
         val now = Instant.now(clock)
         val name = claims.name ?: email
-        val user = userRepository.findByGoogleId(claims.uid).orElse(null)
+        val byGoogleId = userRepository.findByGoogleId(claims.uid).orElse(null)
+        if (byGoogleId == null && !claims.emailVerified) {
+            logger.warn { "Google sign-in rejected: unverified email for an unknown Google account" }
+            throw AuthRejectedException("Email not verified")
+        }
+        val user = byGoogleId
             ?.also { it.recordLogin(now) }
             ?: userRepository.findByEmail(email).orElse(null)?.let { existing ->
                 logger.info { "Linking Google account to existing userId=${existing.id}" }
@@ -68,14 +80,24 @@ class UserProvisioning(
         return save(testAccessPolicy.applyTo(user))
     }
 
-    /** The dedicated CI account, with premium granted or explicitly stripped. */
+    /**
+     * The dedicated CI account, with premium granted or explicitly stripped.
+     *
+     * @throws AuthRejectedException if the CI email belongs to a real (Google/Apple) account, so a
+     *   misconfigured CI_TEST_EMAIL can never hand out tokens for a real user
+     */
     fun ciUser(email: String, premium: Boolean): ProvisionedUser {
         val now = Instant.now(clock)
-        val user = userRepository.findByEmail(email).orElse(null)
+        val existing = userRepository.findByEmail(email).orElse(null)
+        if (existing != null && (existing.googleId != null || existing.appleId != null)) {
+            logger.error { "CI token refused: CI test email belongs to a real account userId=${existing.id}" }
+            throw AuthRejectedException("CI test email belongs to a real account")
+        }
+        val user = existing
             ?.also { it.recordLogin(now) }
             ?: User(email = email, name = "CI Test User", lastLoginAt = now)
                 .also { logger.info { "Creating new CI test user" } }
-        return save(if (premium) testAccessPolicy.applyTo(user) else testAccessPolicy.stripPremium(user))
+        return save(if (premium) testAccessPolicy.grantForCi(user) else testAccessPolicy.stripPremium(user))
     }
 
     /** Best effort: an unknown platform or a failed write never blocks sign-in. */

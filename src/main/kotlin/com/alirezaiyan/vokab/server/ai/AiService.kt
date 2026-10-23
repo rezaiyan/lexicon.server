@@ -1,6 +1,5 @@
 package com.alirezaiyan.vokab.server.ai
 
-import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.shared.UserFacingException
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
@@ -20,7 +19,6 @@ private const val MAX_IMAGE_BYTES = 5 * 1024 * 1024
 class AiService(
     private val aiClient: AiClient,
     private val promptTemplates: PromptTemplates,
-    private val appProperties: AppProperties,
 ) {
 
     data class DailyInsightContext(
@@ -43,6 +41,7 @@ class AiService(
         // Base64 inflates by ~4/3.
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
         require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
+        val targetLanguage = targetLanguage.asPromptLabel()
         logger.info { "[AI] Image extraction: size=~${estimatedSizeBytes / 1024}KB, language=$targetLanguage" }
 
         val (extractionType, extractionRule) = when {
@@ -74,15 +73,19 @@ class AiService(
     /**
      * v2 photo extraction: the model answers JSON, which is validated here so clients receive clean,
      * de-duplicated items and never parse text. An image without vocabulary yields an empty list.
+     * [preferences] narrow which items are read.
      */
     fun extractWordsFromImage(
         imageBase64: String,
         learningLanguage: String,
         nativeLanguage: String,
         includePhrases: Boolean = false,
+        preferences: LearnerPreferences = LearnerPreferences(),
     ): List<ExtractedWordItem> {
         val estimatedSizeBytes = (imageBase64.length * 0.75).toInt()
         require(estimatedSizeBytes <= MAX_IMAGE_BYTES) { "Image too large. Maximum size is 5MB." }
+        val learningLanguage = learningLanguage.asPromptLabel()
+        val nativeLanguage = nativeLanguage.asPromptLabel()
         logger.info {
             "[AI] Word extraction v2: size=~${estimatedSizeBytes / 1024}KB, " +
                 "learning=$learningLanguage, native=$nativeLanguage"
@@ -98,12 +101,21 @@ class AiService(
                 } else {
                     "Extract individual words or short phrases of at most 3 words. Skip full sentences."
                 },
+                "focus" to preferences.focus.toPromptBlock(noteField = "\"note\""),
+                "preferences" to photoPreferencesBlock(preferences),
             ),
         )
         val raw = aiClient.completeWithImage(imageBase64, prompt, AiOperation.IMAGE_EXTRACTION)
             ?: throw UserFacingException("No response from AI. Please try again.")
-        return ExtractedWordsParser.parse(raw)
+        val items = ExtractedWordsParser.parse(raw)
+        return preferences.requestedItemCount?.let(items::take) ?: items
     }
+
+    /** The learner request, and the item limit they named; the limit is also enforced on the answer. */
+    private fun photoPreferencesBlock(preferences: LearnerPreferences): String = listOfNotNull(
+        preferences.toPromptBlock().ifEmpty { null },
+        preferences.requestedItemCount?.let { "Return at most $it items: the ones that best fit the learner request." },
+    ).joinToString("\n\n")
 
     /** Why an extraction answer can't be imported, as a user-facing message; null when it can. */
     private fun unusableExtraction(text: String): String? = when {
@@ -187,28 +199,38 @@ class AiService(
     }
 
     fun translateText(text: String, targetLanguage: String): String {
-        val prompt = promptTemplates.render(Prompt.TRANSLATE, mapOf("targetLanguage" to targetLanguage, "text" to text))
+        val prompt = promptTemplates.render(
+            Prompt.TRANSLATE,
+            mapOf("targetLanguage" to targetLanguage.asPromptLabel(), "text" to text),
+        )
         return aiClient.complete(prompt, AiOperation.TRANSLATION)
             ?: throw UserFacingException("Translation failed. Please try again.")
     }
 
     /**
-     * Generates `app.vocabulary.suggestionCount` (+10 headroom for dedup) vocabulary items in
-     * [targetLanguage] with [nativeLanguage] translations, pitched at [currentLevel].
+     * Generates [count] vocabulary items in [targetLanguage] with [nativeLanguage] translations,
+     * pitched at [currentLevel], plus some headroom so the caller can drop duplicates and still
+     * reach [count].
      */
     fun generateVocabularyFromPreferences(
         targetLanguage: String,
         currentLevel: String,
         nativeLanguage: String,
-        interests: List<String> = emptyList()
+        interests: List<String> = emptyList(),
+        preferences: LearnerPreferences = LearnerPreferences(),
+        count: Int,
     ): List<SuggestVocabularyItemResponse> {
-        val requestedCount = appProperties.vocabulary.suggestionCount + 10
+        val requestedCount = count + maxOf(MIN_DEDUP_HEADROOM, count / DEDUP_HEADROOM_DIVISOR)
         logger.info {
             "Generating vocabulary: target=$targetLanguage, level=$currentLevel, native=$nativeLanguage, " +
-                "itemsRequested=$requestedCount, interests=${interests.joinToString(limit = 5).ifEmpty { "none" }}"
+                "itemsRequested=$requestedCount, interests=${interests.joinToString(limit = 5).ifEmpty { "none" }}, " +
+                "focus=${preferences.focus}, guided=${preferences.isGuided}"
         }
 
-        val focusRequirements = if (interests.isNotEmpty()) {
+        val focusRequirements = if (preferences.isGuided) {
+            "4. The learner request below comes first: choose vocabulary that fits it closely, even if " +
+                "that means skipping the balanced mix in rule 3."
+        } else if (interests.isNotEmpty()) {
             "4. Prioritize vocabulary that is especially relevant to these interests: ${interests.joinToString()}.\n" +
                 "5. Still include some general everyday vocabulary so the set feels balanced for an " +
                 "onboarding experience."
@@ -226,14 +248,16 @@ class AiService(
                 "interestsLine" to
                     if (interests.isEmpty()) "" else "- Their interests / focus areas: ${interests.joinToString()}",
                 "focusRequirements" to focusRequirements,
+                "focus" to preferences.focus.toPromptBlock(noteField = "optionalShortDescription"),
+                "preferences" to preferences.toPromptBlock(),
             ),
         )
 
         val raw = aiClient.complete(prompt, AiOperation.SUGGEST_VOCABULARY)
             ?: throw UserFacingException("No vocabulary generated. Please try again.")
         val items = parseSuggestVocabularyResponse(raw)
-        if (items.size < maxOf(20, requestedCount / 2)) {
-            logger.warn { "AI returned only ${items.size} items; expected around $requestedCount" }
+        if (items.size < count) {
+            logger.warn { "AI returned only ${items.size} items; wanted $count (asked for $requestedCount)" }
         }
         logger.info { "Generated ${items.size} vocabulary items for $targetLanguage ($currentLevel)" }
         return items.take(requestedCount)
@@ -268,6 +292,9 @@ class AiService(
     }
 
     private companion object {
+        /** Extra items asked of the model so dropping duplicates still leaves enough: 20%, at least 3. */
+        const val MIN_DEDUP_HEADROOM = 3
+        const val DEDUP_HEADROOM_DIVISOR = 5
         val VOCAB_ENTRY = Regex("^[^,]+,[^,]+(?:,[^,]*)?$")
     }
 }

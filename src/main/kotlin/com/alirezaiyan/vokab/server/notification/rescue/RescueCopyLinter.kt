@@ -1,0 +1,104 @@
+package com.alirezaiyan.vokab.server.notification.rescue
+
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.containsWord
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.numbers
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.startsWord
+import com.alirezaiyan.vokab.server.notification.rescue.RescueText.withoutWords
+import java.text.BreakIterator
+
+data class RescueCopyContext(
+    val factSheet: RescueFactSheet,
+    /** Target-language text of the words in this session. */
+    val sessionWords: Set<String>,
+    val lastAngle: String?,
+    /** "title body" of the learner's recent rescues. */
+    val recentCopies: List<String>,
+)
+
+data class LintedCandidate(val candidate: RescueCopyCandidate, val violations: List<String>) {
+    val ok: Boolean get() = violations.isEmpty()
+}
+
+/**
+ * Hard rules every rescue copy must pass: grounded in the fact sheet, names a session word, short,
+ * and free of the hype, guilt and tics that make a push read as machine-written.
+ */
+object RescueCopyLinter {
+    const val TITLE_MAX = 40
+    const val BODY_MAX = 110
+    const val OUTRO_MAX = 90
+
+    val ANGLES = setOf("rematch", "almost_there", "callback", "progress_fact", "curiosity")
+
+    val BANNED_PHRASES = listOf(
+        "journey", "unlock", "crush", "level up", "boost", "supercharge",
+        "don't lose", "don't break", "we miss you", "ready to", "let's go", "hey there", "oops",
+    )
+
+    private val QUOTED = Regex("""["“”«»]([^"“”«»]{1,40})["“”«»]""")
+
+    fun lintAll(candidates: List<RescueCopyCandidate>, ctx: RescueCopyContext): List<LintedCandidate> =
+        candidates.map { LintedCandidate(it, lint(it, ctx)) }
+
+    fun lint(c: RescueCopyCandidate, ctx: RescueCopyContext): List<String> {
+        val v = mutableListOf<String>()
+        val text = "${c.title} ${c.body}"
+
+        if (c.angle !in ANGLES) v += "unknown angle ${c.angle}"
+        if (c.angle == ctx.lastAngle) v += "repeats last angle"
+        if (c.title.isBlank() || graphemes(c.title) > TITLE_MAX) v += "title length"
+        if (c.body.isBlank() || graphemes(c.body) > BODY_MAX) v += "body length"
+        if (ctx.sessionWords.none { containsWord(text, it) }) v += "names no session word"
+
+        val unknownFacts = c.factIds.filter { id -> ctx.factSheet.facts.none { it.id == id } }
+        unknownFacts.forEach { v += "cites unknown fact $it" }
+        val citedNumbers = numbersIn(ctx.factSheet.byIds(c.factIds))
+        numbers(withoutWords(text, ctx.factSheet.allWords + ctx.sessionWords)).distinct()
+            .filter { it !in citedNumbers }.forEach { v += "ungrounded number $it" }
+        val knownWords = (ctx.factSheet.allWords + ctx.sessionWords).map { it.lowercase() }.toSet()
+        QUOTED.findAll(text).map { it.groupValues[1] }
+            .filter { it.lowercase() !in knownWords }.forEach { v += "ungrounded word $it" }
+
+        v += toneViolations(text)
+
+        val normalized = normalize(text)
+        if (ctx.recentCopies.any { normalize(it) == normalized }) v += "repeats a recent copy"
+
+        return v
+    }
+
+    /** An outro may be shown only if it is short, calm and invents no numbers. */
+    fun outroOk(outro: String?, sheet: RescueFactSheet): Boolean {
+        if (outro.isNullOrBlank() || graphemes(outro) > OUTRO_MAX) return false
+        val knownNumbers = numbersIn(sheet.facts)
+        if (numbers(withoutWords(outro, sheet.allWords)).any { it !in knownNumbers }) return false
+        return toneViolations(outro).isEmpty()
+    }
+
+    private fun numbersIn(facts: List<RescueFact>): Set<String> = facts.flatMap { numbers(it.text).toList() }.toSet()
+
+    fun graphemes(s: String): Int {
+        val it = BreakIterator.getCharacterInstance().apply { setText(s) }
+        var count = 0
+        while (it.next() != BreakIterator.DONE) count++
+        return count
+    }
+
+    private fun toneViolations(text: String): List<String> {
+        val v = mutableListOf<String>()
+        BANNED_PHRASES.filter { startsWord(text, it) }.forEach { v += "banned phrase $it" }
+        if ('—' in text) v += "em dash"
+        if (text.count { it == '!' } > 1) v += "too many exclamation marks"
+        if (text.codePoints().anyMatch(::isEmoji)) v += "emoji"
+        return v
+    }
+
+    /** Pictographs plus the flag letters (🇩🇪) and keycap mark (8️⃣), which are not Extended_Pictographic. */
+    private fun isEmoji(cp: Int): Boolean =
+        Character.isExtendedPictographic(cp) || cp in REGIONAL_INDICATORS || cp == COMBINING_KEYCAP
+
+    private val REGIONAL_INDICATORS = 0x1F1E6..0x1F1FF
+    private const val COMBINING_KEYCAP = 0x20E3
+
+    private fun normalize(s: String): String = s.lowercase().filter { it.isLetterOrDigit() }
+}

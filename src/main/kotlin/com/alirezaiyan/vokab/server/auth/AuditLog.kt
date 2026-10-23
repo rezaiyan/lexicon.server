@@ -47,4 +47,6 @@ enum class AuditEventType {
     TOKEN_REVOCATION,
     TOKEN_REUSE,
     ACCOUNT_DELETION,
+    /** An AI app connected over MCP changed the learner's words (ids only, so it can be undone). */
+    MCP_WRITE,
 }

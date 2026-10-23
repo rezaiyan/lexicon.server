@@ -1,5 +1,12 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionGuard
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionJudge
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionScope
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionVerdict
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedInstruction
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
+import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.credits.CreditAction
 import com.alirezaiyan.vokab.server.credits.CreditCharger
 import com.alirezaiyan.vokab.server.credits.CreditService
@@ -17,9 +24,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.bucket4j.Bucket
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentMatchers.anyBoolean
-import org.mockito.ArgumentMatchers.anyList
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.Mockito.never
+import org.mockito.Mockito.verifyNoInteractions
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -41,7 +48,7 @@ import java.time.Instant
 
 @WebMvcTest(AiController::class)
 @ActiveProfiles("test")
-@Import(ControllerTestSecurityConfig::class, VocabularySuggestionService::class, CreditCharger::class)
+@Import(ControllerTestSecurityConfig::class, VocabularySuggestionService::class, CreditCharger::class, InstructionGuard::class)
 class AiControllerTest {
 
     @Autowired
@@ -66,6 +73,10 @@ class AiControllerTest {
 
     @MockitoBean
     private lateinit var wordService: WordService
+
+    /** The real [InstructionGuard] runs; only the judge model call is faked. */
+    @MockitoBean
+    private lateinit var instructionJudge: InstructionJudge
 
     private val mockUser = createUser()
     private val auth = UsernamePasswordAuthenticationToken(AuthUser(mockUser.requireId()), null, emptyList())
@@ -374,7 +385,7 @@ class AiControllerTest {
         )
             .andExpect(status().isPaymentRequired)
             .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
-        verify(aiService, never()).generateVocabularyFromPreferences(anyString(), anyString(), anyString(), anyList())
+        verifyNoInteractions(aiService)
     }
 
     @Test
@@ -412,7 +423,8 @@ class AiControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenReturn(rawItems)
 
         val request = createSuggestVocabularyRequest()
@@ -440,7 +452,8 @@ class AiControllerTest {
             targetLanguage = "German",
             currentLevel = "beginner",
             nativeLanguage = "English",
-            interests = emptyList()
+            interests = emptyList(),
+            count = 50,
         )).thenThrow(RuntimeException("AI service down"))
 
         val request = createSuggestVocabularyRequest()
@@ -488,73 +501,74 @@ class AiControllerTest {
         updatedAt = Instant.now(),
     )
 
-    // ── POST /api/v1/ai/extract-words (v2) ────────────────────────────────────
-
     @Test
-    fun `POST extract-words returns 402 INSUFFICIENT_CREDITS when credits run out, whatever the plan`() {
-        val bucket = createAllowedBucket()
-        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION))
-            .thenThrow(InsufficientCreditsException("PHOTO_EXTRACTION", required = 3, available = 0))
+    fun `POST suggest-vocabulary with instructions charges guided suggestions with the screened intent`() {
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(createAllowedBucket())
+        `when`(rateLimitConfig.getInstructionRejectionBucket(mockUser.requireId())).thenReturn(createAllowedBucket())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        val interview = requireNotNull(UserInstruction.of("job interview at a hospital"))
+        `when`(instructionJudge.judge(interview, InstructionScope.VOCABULARY_SUGGESTION, "German", "English"))
+            .thenReturn(InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Hospital job interview"))))
+        val focus = VocabularyFocus(register = Register.FORMAL)
+        `when`(aiService.generateVocabularyFromPreferences(
+            "German", "beginner", "English", emptyList(),
+            LearnerPreferences(focus, ScreenedInstruction(ScreenedIntent("Hospital job interview"))),
+            50,
+        )).thenReturn(listOf(SuggestVocabularyItemResponse(originalWord = "Bewerbung", translation = "application")))
 
         mockMvc.perform(
-            post("/api/v1/ai/extract-words")
+            post("/api/v1/ai/suggest-vocabulary")
                 .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+                .content(objectMapper.writeValueAsString(
+                    createSuggestVocabularyRequest().copy(focus = focus, instructions = "job interview at a hospital"),
+                ))
         )
-            .andExpect(status().isPaymentRequired)
-            .andExpect(jsonPath("$.code").value("INSUFFICIENT_CREDITS"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.items[0].originalWord").value("Bewerbung"))
+        verify(creditService).spend(mockUser.requireId(), CreditAction.AI_SUGGESTION_GUIDED)
     }
 
     @Test
-    fun `POST extract-words refunds when nothing is recognised`() {
-        val spend = CreditSpend(transactionId = 8, userId = mockUser.requireId(), cost = 3)
-        `when`(creditService.spend(mockUser.requireId(), CreditAction.PHOTO_EXTRACTION)).thenReturn(spend)
-        val bucket = createAllowedBucket()
-        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false)).thenReturn(emptyList())
+    fun `POST suggest-vocabulary refunds and returns 502 when the AI fails`() {
+        val spend = CreditSpend(transactionId = 9, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.AI_SUGGESTION)).thenReturn(spend)
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(createAllowedBucket())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        `when`(aiService.generateVocabularyFromPreferences(
+            "German", "beginner", "English", emptyList(), LearnerPreferences(), 50,
+        )).thenThrow(UpstreamServiceException("OpenRouter suggestion failed: status=503"))
 
         mockMvc.perform(
-            post("/api/v1/ai/extract-words")
+            post("/api/v1/ai/suggest-vocabulary")
                 .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+                .content(objectMapper.writeValueAsString(createSuggestVocabularyRequest()))
         )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.items.length()").value(0))
+            .andExpect(status().isBadGateway)
+            .andExpect(jsonPath("$.code").value("UPSTREAM_UNAVAILABLE"))
         verify(creditService).refund(spend)
     }
 
     @Test
-    fun `POST extract-words returns structured items`() {
-        val bucket = createAllowedBucket()
-        `when`(rateLimitConfig.getImageProcessingBucket(mockUser.id.toString())).thenReturn(bucket)
-        `when`(aiService.extractWordsFromImage("dGVzdA==", "German", "English", false))
-            .thenReturn(listOf(ExtractedWordItem("gehen", "to go, to walk", "verb")))
+    fun `POST suggest-vocabulary refunds when no words come back`() {
+        val spend = CreditSpend(transactionId = 10, userId = mockUser.requireId(), cost = 3)
+        `when`(creditService.spend(mockUser.requireId(), CreditAction.AI_SUGGESTION)).thenReturn(spend)
+        `when`(rateLimitConfig.getAiBucket(mockUser.id.toString())).thenReturn(createAllowedBucket())
+        `when`(wordService.getExistingTermKeys(mockUser.requireId(), "German")).thenReturn(emptySet())
+        `when`(aiService.generateVocabularyFromPreferences(
+            "German", "beginner", "English", emptyList(), LearnerPreferences(), 50,
+        )).thenReturn(emptyList())
 
         mockMvc.perform(
-            post("/api/v1/ai/extract-words")
+            post("/api/v1/ai/suggest-vocabulary")
                 .with(authentication(auth))
                 .contentType(MediaType.APPLICATION_JSON)
-                .content(objectMapper.writeValueAsString(ExtractWordsRequest("dGVzdA==", "German", "English")))
+                .content(objectMapper.writeValueAsString(createSuggestVocabularyRequest()))
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.data.items[0].term").value("gehen"))
-            .andExpect(jsonPath("$.data.items[0].translation").value("to go, to walk"))
-            .andExpect(jsonPath("$.data.items[0].note").value("verb"))
-    }
-
-    @Test
-    fun `POST extract-words returns 400 when languages are missing`() {
-        mockMvc.perform(
-            post("/api/v1/ai/extract-words")
-                .with(authentication(auth))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"imageBase64":"dGVzdA==","learningLanguage":"","nativeLanguage":"English"}""")
-        )
-            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.data.items.length()").value(0))
+        verify(creditService).refund(spend)
     }
 
     private fun createExtractVocabularyRequest(

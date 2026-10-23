@@ -34,21 +34,31 @@ class AdminSessionTokens(
         if (key.isNotEmpty() && key.length < MIN_DASHBOARD_KEY_LENGTH) {
             logger.warn {
                 "app.security.admin-api-key is shorter than $MIN_DASHBOARD_KEY_LENGTH characters: " +
-                    "admin dashboard sign-in is disabled until it is rotated to a longer random key"
+                    "admin key auth ($ADMIN_KEY_HEADER and dashboard sign-in) is disabled until it is " +
+                    "rotated to a longer random key (openssl rand -base64 36)"
             }
         }
     }
 
-    /** Constant-time: digests first, so neither content nor length leaks through timing. */
+    /**
+     * Constant-time: digests first, so neither content nor length leaks through timing. Never
+     * matches while [keyAuthEnabled] is false.
+     */
     fun keyMatches(candidate: String?): Boolean {
         val configured = appProperties.security.adminApiKey
-        if (candidate.isNullOrEmpty() || configured.isEmpty()) return false
+        if (candidate.isNullOrEmpty() || !keyAuthEnabled()) return false
         return MessageDigest.isEqual(sha256(candidate), sha256(configured))
     }
 
-    /** Browser sign-in is exposed to the internet, so it needs a key too long to guess. */
-    fun dashboardSignInEnabled(): Boolean =
+    /**
+     * Admin key auth (the `X-Admin-Key` header and dashboard sign-in) is exposed to the internet,
+     * so it needs a key too long to guess; a shorter (or empty) key turns it off.
+     */
+    fun keyAuthEnabled(): Boolean =
         appProperties.security.adminApiKey.length >= MIN_DASHBOARD_KEY_LENGTH
+
+    /** Browser sign-in: same rule as [keyAuthEnabled]. */
+    fun dashboardSignInEnabled(): Boolean = keyAuthEnabled()
 
     fun issue(): AdminSession {
         val expiresAt = Instant.now(clock).plus(SESSION_TTL)

@@ -242,6 +242,7 @@ class TagServiceTest {
         val user = createUser()
         val tag = createTag(id = 3L, name = "Sports")
         every { tagRepository.findByIdAndUser(3L, user) } returns tag
+        every { tagRepository.touchWordsByTagIdAndUserId(3L, user.requireId(), any()) } returns 0
         justRun { tagRepository.delete(tag) }
 
         // Act

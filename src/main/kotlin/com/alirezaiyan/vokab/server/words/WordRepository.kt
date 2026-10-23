@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.words
 
 import com.alirezaiyan.vokab.server.user.User
+import org.springframework.data.domain.Pageable
 import org.springframework.data.jpa.repository.JpaRepository
 import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
@@ -16,6 +17,49 @@ interface WordRepository : JpaRepository<Word, Long> {
     fun findAllByUser(user: User): List<Word>
 
     fun findAllByUserAndIdIn(user: User, ids: List<Long>): List<Word>
+
+    /**
+     * Ids of a user's words matching an optional text pattern (word or translation, lower-cased LIKE),
+     * learning language and tag. Empty [language] and 0 [tagId] mean "any".
+     */
+    @Query(
+        """
+        SELECT w.id FROM Word w
+        WHERE w.user.id = :userId
+          AND w.id > :afterId
+          AND $SEARCH_FILTER
+        ORDER BY w.id
+        """
+    )
+    fun searchIds(
+        userId: Long, pattern: String, language: String, tagId: Long, afterId: Long, page: Pageable,
+    ): List<Long>
+
+    /** [searchIds], newest first; [beforeId] 0 starts from the newest. */
+    @Query(
+        """
+        SELECT w.id FROM Word w
+        WHERE w.user.id = :userId
+          AND (:beforeId = 0 OR w.id < :beforeId)
+          AND $SEARCH_FILTER
+        ORDER BY w.id DESC
+        """
+    )
+    fun searchIdsNewestFirst(
+        userId: Long, pattern: String, language: String, tagId: Long, beforeId: Long, page: Pageable,
+    ): List<Long>
+
+    @Query(
+        "SELECT w.id FROM Word w WHERE w.user.id = :userId AND w.nextReviewDate <= :nowMs " +
+            "ORDER BY w.nextReviewDate, w.id"
+    )
+    fun findDueIds(userId: Long, nowMs: Long, page: Pageable): List<Long>
+
+    @Query("SELECT COUNT(w) FROM Word w WHERE w.user.id = :userId AND w.nextReviewDate <= :nowMs")
+    fun countDue(userId: Long, nowMs: Long): Long
+
+    @Query("SELECT DISTINCT w FROM Word w LEFT JOIN FETCH w.tags WHERE w.id IN :ids")
+    fun findAllByIdInWithTags(ids: List<Long>): List<Word>
 
     @Query("SELECT DISTINCT w FROM Word w LEFT JOIN FETCH w.tags WHERE w.user = :user")
     fun findAllByUserWithTags(user: User): List<Word>
@@ -68,6 +112,14 @@ interface WordRepository : JpaRepository<Word, Long> {
     @Modifying
     @Query("DELETE FROM Word w WHERE w.id IN :ids AND w.user.id = :userId")
     fun deleteAllByIdInAndUserId(ids: List<Long>, userId: Long): Int
+
+    @Query("SELECT w.id FROM Word w WHERE w.id IN :ids AND w.user.id = :userId")
+    fun findOwnedIds(ids: Collection<Long>, userId: Long): List<Long>
+
+    /** Marks the words changed for incremental pulls when an edit (e.g. tags) doesn't touch the row itself. */
+    @Modifying
+    @Query("UPDATE Word w SET w.updatedAt = :now WHERE w.id IN :ids AND w.user.id = :userId")
+    fun touchByIdInAndUserId(ids: List<Long>, userId: Long, now: Instant): Int
 
     @Modifying
     @Query(
@@ -124,9 +176,17 @@ interface WordRepository : JpaRepository<Word, Long> {
         WHERE w.id IN :wordIds
           AND w.user_id = :userId
           AND t.id IN :tagIds
+          AND t.user_id = :userId
         ON CONFLICT DO NOTHING
         """,
         nativeQuery = true
     )
     fun insertWordTagsBulkByWordIdsAndUserId(wordIds: List<Long>, tagIds: List<Long>, userId: Long)
 }
+
+/** Shared WHERE clause of the word searches (JPQL); empty pattern/language and tag 0 mean "any". */
+private const val SEARCH_FILTER = """(:pattern = '%'
+               OR LOWER(w.originalWord) LIKE :pattern ESCAPE '#'
+               OR LOWER(w.translation) LIKE :pattern ESCAPE '#')
+          AND (:language = '' OR LOWER(w.targetLanguage) = :language)
+          AND (:tagId = 0 OR EXISTS (SELECT 1 FROM w.tags t WHERE t.id = :tagId))"""

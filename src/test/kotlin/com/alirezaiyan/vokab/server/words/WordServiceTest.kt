@@ -24,6 +24,7 @@ class WordServiceTest {
     private lateinit var tagRepository: TagRepository
     private lateinit var wordUpsertPreparer: WordUpsertPreparer
     private lateinit var userRepository: UserRepository
+    private lateinit var deletedWords: DeletedWords
     private val knownUsers = mutableListOf<User>()
     private lateinit var wordService: WordService
 
@@ -33,7 +34,10 @@ class WordServiceTest {
         tagRepository = mockk()
         wordUpsertPreparer = mockk()
         userRepository = mockk<UserRepository>().answerReferences(knownUsers)
-        wordService = WordService(wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock = fixedClock())
+        deletedWords = mockk(relaxed = true)
+        wordService = WordService(
+            wordRepository, tagRepository, wordUpsertPreparer, userRepository, clock = fixedClock(), deletedWords = deletedWords,
+        )
     }
 
     // ── list ──────────────────────────────────────────────────────────────────
@@ -239,6 +243,7 @@ class WordServiceTest {
         wordService.delete(user.requireId(), 10L)
 
         verify(exactly = 1) { wordRepository.deleteByIdAndUserId(10L, 1L) }
+        verify(exactly = 1) { deletedWords.record(1L, listOf(10L)) }
     }
 
     // ── batchDelete ───────────────────────────────────────────────────────────
@@ -254,15 +259,16 @@ class WordServiceTest {
     }
 
     @Test
-    fun `batchDelete should call repository and return count`() {
+    fun `batchDelete deletes only the caller's words and records tombstones for them`() {
         val user = createUser(id = 1L)
         val ids = listOf(10L, 11L, 12L)
-        every { wordRepository.deleteAllByIdInAndUserId(ids, 1L) } returns 3
+        every { wordRepository.findOwnedIds(ids, 1L) } returns listOf(10L, 12L)
+        every { wordRepository.deleteAllByIdInAndUserId(listOf(10L, 12L), 1L) } returns 2
 
         val result = wordService.batchDelete(user.requireId(), ids)
 
-        assertEquals(3, result)
-        verify(exactly = 1) { wordRepository.deleteAllByIdInAndUserId(ids, 1L) }
+        assertEquals(2, result)
+        verify(exactly = 1) { deletedWords.record(1L, listOf(10L, 12L)) }
     }
 
     // ── batchUpdateLanguages ──────────────────────────────────────────────────
@@ -353,6 +359,7 @@ class WordServiceTest {
         val tagIds = listOf(5L, 6L)
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
         justRun { wordRepository.insertWordTagsBulkByWordIdsAndUserId(wordIds, tagIds, 1L) }
+        every { wordRepository.touchByIdInAndUserId(wordIds, 1L, any()) } returns 2
 
         val result = wordService.batchAssignTags(user.requireId(), wordIds, tagIds)
 
@@ -366,6 +373,7 @@ class WordServiceTest {
         val user = createUser(id = 1L)
         val wordIds = listOf(10L, 11L)
         justRun { wordRepository.deleteWordTagsByWordIdsAndUserId(wordIds, 1L) }
+        every { wordRepository.touchByIdInAndUserId(wordIds, 1L, any()) } returns 2
 
         val result = wordService.batchAssignTags(user.requireId(), wordIds, emptyList())
 

@@ -33,6 +33,7 @@ class NotificationTypeSelector(
         ADD_WORDS,   // Activation: the user has no words yet, so there is nothing to review
         WORD_RUSH,   // Practice nudges when nothing is due; see PracticeNudgePolicy
         LISTENING,
+        COMEBACK_RESCUE, // Early-lapse quick-win session planned nightly; see notification.rescue
         NONE
     }
 

@@ -10,6 +10,9 @@ import java.time.LocalTime
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.study.MilestoneDetector
 import com.alirezaiyan.vokab.server.ai.DailyInsightService
+import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescue
+import com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueService
+import com.alirezaiyan.vokab.server.notification.rescue.RescuePushBuilder
 
 private val logger = KotlinLogging.logger {}
 
@@ -17,6 +20,7 @@ private val logger = KotlinLogging.logger {}
 const val NOTIFICATION_LOG_ID_KEY = "notification_log_id"
 
 @Service
+@Suppress("LongParameterList") // Spring-injected collaborators, one per notification concern
 class SmartNotificationDispatcher(
     private val notificationScheduleRepository: NotificationScheduleRepository,
     private val notificationTypeSelector: NotificationTypeSelector,
@@ -25,6 +29,7 @@ class SmartNotificationDispatcher(
     private val milestoneDetector: MilestoneDetector,
     private val notificationEngagementService: NotificationEngagementService,
     private val dailyInsightService: DailyInsightService,
+    private val comebackRescueService: ComebackRescueService,
     private val clock: Clock,
     private val meterRegistry: MeterRegistry,
 ) {
@@ -72,6 +77,15 @@ class SmartNotificationDispatcher(
         val isColdOrDormant = segment == "COLD" || segment == "DORMANT"
         val studiedToday   = notificationTypeSelector.studiedToday(user)
 
+        // A learner in an early lapse gets the rescue planned for them tonight. It outranks every
+        // other push, the COLD/DORMANT AI decision included: it exists for exactly this day.
+        if (!studiedToday) {
+            comebackRescueService.sendablePlan(userId)?.let { rescue ->
+                sendRescue(schedule, rescue)
+                return
+            }
+        }
+
         // COLD/DORMANT users: honour AI decision first — unless they came back today on their
         // own, when a "come back" push would be wrong (the selector handles them instead)
         if (isColdOrDormant && !studiedToday) {
@@ -110,9 +124,31 @@ class SmartNotificationDispatcher(
         type: NotificationType,
         contentHint: String?
     ) {
-        val user    = schedule.user
-        val userId  = user.requireId()
-        val payload = notificationContentBuilder.build(user, type, contentHint)
+        val payload = notificationContentBuilder.build(schedule.user, type, contentHint)
+        // Only a real milestone push moves the snapshot; the builder may have sent its fallback insight
+        if (deliver(schedule, type, payload) != null && payload.type == NotificationType.PROGRESS_MILESTONE) {
+            milestoneDetector.recordMilestoneSnapshot(schedule.user)
+        }
+    }
+
+    private fun sendRescue(schedule: NotificationSchedule, rescue: ComebackRescue) {
+        val delivery = deliver(schedule, NotificationType.COMEBACK_RESCUE, RescuePushBuilder.build(rescue)) ?: return
+        comebackRescueService.markSent(requireNotNull(rescue.id), delivery.logId)
+    }
+
+    private data class Delivery(val logId: Long?)
+
+    /**
+     * Logs, pushes and records [payload] under the requested [type] (what rotation and analytics
+     * track, even when the builder fell back to other content); the delivery when a device got it.
+     */
+    private fun deliver(
+        schedule: NotificationSchedule,
+        type: NotificationType,
+        payload: NotificationPayload,
+    ): Delivery? {
+        val user   = schedule.user
+        val userId = user.requireId()
 
         // The log is created before the push so its id can ride in the payload and come back
         // with the tap (POST /notifications/{id}/opened). Without a log we still send — only
@@ -139,21 +175,17 @@ class SmartNotificationDispatcher(
             )
         }.onFailure { discardLog(logId) }.getOrThrow()
 
-        val sent = results.any { it.success }
-        if (sent) {
-            notificationEngagementService.recordSend(schedule, type.name, currentLogId = logId)
-            meterRegistry.counter("notifications.sent", "type", type.name).increment()
-
-            if (type == NotificationType.PROGRESS_MILESTONE) {
-                milestoneDetector.recordMilestoneSnapshot(user)
-            }
-
-            logger.info { "Sent $type (segment=${ schedule.engagementSegment}) to user=$userId" }
-        } else {
+        if (results.none { it.success }) {
             discardLog(logId)
             meterRegistry.counter("notifications.failed", "type", type.name).increment()
             logger.warn { "Push delivery failed for user=$userId, type=$type" }
+            return null
         }
+
+        notificationEngagementService.recordSend(schedule, type.name, currentLogId = logId)
+        meterRegistry.counter("notifications.sent", "type", type.name).increment()
+        logger.info { "Sent $type (segment=${schedule.engagementSegment}) to user=$userId" }
+        return Delivery(logId)
     }
 
     /** A log for an undelivered push would later count as an ignored notification. */

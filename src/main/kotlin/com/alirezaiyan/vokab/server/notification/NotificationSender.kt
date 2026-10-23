@@ -102,7 +102,7 @@ class FirebaseTokenInvalidationHandler(
     
     override fun handleInvalidToken(exception: Exception, token: String) {
         if (isInvalidTokenError(exception)) {
-            pushTokenService.deactivateToken(token)
+            pushTokenService.deactivateInvalidToken(token)
         }
     }
     

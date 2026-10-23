@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Comeback Rescue</title>
+<link rel="stylesheet" href="/admin-ui/notifications.css">
+</head>
+<body>
+<header>
+  <h1>Comeback Rescue</h1>
+  <div id="sessionBar" class="session hidden">
+    <a href="/admin-ui/notifications" class="small">Push notifications →</a>
+    <a href="/admin-ui/support" class="small">Support inbox →</a>
+    <span class="muted" id="sessionInfo"></span>
+    <button type="button" id="signOut">Sign out</button>
+  </div>
+</header>
+
+<main>
+  <div id="globalMsg" class="banner hidden" role="status"></div>
+
+  <section id="signIn" class="card signin hidden">
+    <h2>Sign in</h2>
+    <form id="signInForm" autocomplete="off">
+      <label for="adminKey">Password</label>
+      <input id="adminKey" type="password" required autocomplete="current-password">
+      <button type="submit" class="primary mt12">Sign in</button>
+    </form>
+  </section>
+
+  <div id="app" class="hidden">
+    <section class="card">
+      <div class="row between mb12">
+        <h2 class="m0 grow">Autopilot</h2>
+        <span id="autopilotStatus" class="pill fixed"></span>
+      </div>
+      <p class="muted small">Rescues send on their own. An AI judge must pass the copy for each push, otherwise the
+        template goes out. If two rescued learners opt out, sends pause for 14 days and resume by themselves; Telegram
+        gets an alert each time and a digest every Monday.</p>
+      <p class="small" id="autopilotDetail"></p>
+    </section>
+
+    <section class="card">
+      <h2>Your ratings (optional)</h2>
+      <p class="muted small">Ratings don't gate anything. They build an eval set for tuning the prompt and the judge.</p>
+      <div class="grid">
+        <div class="stat"><div class="label">Chosen copy 👍</div><div class="value" id="tasteRate">–</div>
+          <div class="bar mt12"><span id="tasteBar"></span></div></div>
+        <div class="stat"><div class="label">Chosen copy rated</div><div class="value" id="tasteRated">0</div></div>
+        <div class="stat"><div class="label">All candidates 👍</div><div class="value" id="tasteAllRate">–</div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Generate previews</h2>
+      <p class="muted small">Drafts copy for random learners exactly like the nightly planner, as if their last study day
+        was 3 days ago (the earliest rescue). About one AI call per preview, up to 10 per run; template-only drafts are
+        skipped. Nothing is sent or planned.</p>
+      <form id="generateForm" class="row">
+        <div class="fixed"><label for="previewCount">Learners</label>
+          <input id="previewCount" type="number" min="1" max="10" value="5" required></div>
+        <div class="fixed"><button type="submit" class="primary">Generate</button></div>
+        <div class="fixed"><button type="button" id="exportEval">Download eval set (.jsonl)</button></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="row between mb12">
+        <h2 class="m0 grow">Previews</h2>
+        <div class="seg fixed" role="group" aria-label="Show">
+          <button type="button" data-show="ALL" aria-pressed="true">All</button>
+          <button type="button" data-show="UNRATED" aria-pressed="false">Chosen unrated</button>
+        </div>
+      </div>
+      <div id="previews"></div>
+      <p id="noPreviews" class="muted hidden">No previews yet. Generate a few above.</p>
+    </section>
+
+    <section class="card">
+      <h2>Nightly plans</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Day</th><th>User</th><th>Status</th><th>Source</th><th>Angle</th><th>Push</th>
+            <th class="num">Words</th></tr></thead>
+          <tbody id="plans"></tbody>
+        </table>
+      </div>
+      <p id="noPlans" class="muted hidden">No plans yet. They are made nightly at 00:45 UTC.</p>
+    </section>
+
+    <section class="card">
+      <div class="row between mb12">
+        <h2 class="m0 grow">Funnel</h2>
+        <div class="fixed"><label for="funnelDays" class="hidden">Days</label>
+          <select id="funnelDays">
+            <option value="7">Last 7 days</option>
+            <option value="14" selected>Last 14 days</option>
+            <option value="30">Last 30 days</option>
+            <option value="90">Last 90 days</option>
+          </select></div>
+      </div>
+      <p class="muted small">Compare <b>returned 24h</b> of <b>treated</b> (every plan meant to be sent, pushed or not)
+        against <b>holdout</b> (10% of learners, planned and never sent). In shadow mode both arms are unsent: an A/A check.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Arm</th><th>Source</th><th>Angle</th><th class="num">Planned</th><th class="num">Sent</th>
+            <th class="num">Opened</th><th class="num">Completed</th><th class="num">Returned 24h</th></tr></thead>
+          <tbody id="funnel"></tbody>
+        </table>
+      </div>
+      <p id="noFunnel" class="muted hidden">Nothing planned in this window.</p>
+    </section>
+  </div>
+</main>
+<script src="/admin-ui/rescue.js"></script>
+</body>
+</html>

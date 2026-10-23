@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.user.Platform
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserSettings
 import jakarta.persistence.EntityManagerFactory
@@ -29,6 +30,7 @@ class NotificationScheduleRepositoryFetchTest {
     @Autowired lateinit var settingsRepository: UserSettingsRepository
     @Autowired lateinit var userRepository: UserRepository
     @Autowired lateinit var entityManagerFactory: EntityManagerFactory
+    @Autowired lateinit var pushTokenRepository: PushTokenRepository
 
     private val hour = 7
     private lateinit var user: User
@@ -43,6 +45,7 @@ class NotificationScheduleRepositoryFetchTest {
 
     @AfterEach
     fun cleanUp() {
+        pushTokenRepository.deleteAll(pushTokenRepository.findAll().filter { it.user.id == user.id })
         scheduleRepository.findByUserId(requireNotNull(user.id))?.let(scheduleRepository::delete)
         settingsRepository.findByUserId(requireNotNull(user.id))?.let(settingsRepository::delete)
         userRepository.delete(user)
@@ -89,5 +92,24 @@ class NotificationScheduleRepositoryFetchTest {
         assertTrue(Hibernate.isInitialized(schedule.user))
         assertTrue(scheduleRepository.findStreakSaverCandidates(listOf(7), minStreak = 2).none { it.user.id == user.id })
         assertTrue(scheduleRepository.findStreakSaverCandidates(listOf(8), minStreak = 5).none { it.user.id == user.id })
+    }
+
+    @Test
+    fun `rescue planning candidates are reachable learners from the given send hour, with their user loaded`() {
+        seed { notificationsEnabled = true; notificationFrequency = "DAILY" }
+        pushTokenRepository.save(PushToken(user = user, token = "fetch-${System.nanoTime()}", platform = Platform.ANDROID))
+
+        val schedule = scheduleRepository.findRescuePlanningCandidates(minSendHour = hour)
+            .single { it.user.id == user.id }
+
+        assertTrue(Hibernate.isInitialized(schedule.user))
+        assertTrue(scheduleRepository.findRescuePlanningCandidates(minSendHour = hour + 1).none { it.user.id == user.id })
+    }
+
+    @Test
+    fun `rescue planning skips learners without a push token or with notifications off`() {
+        seed { notificationsEnabled = false; notificationFrequency = "DAILY" }
+
+        assertTrue(scheduleRepository.findRescuePlanningCandidates(minSendHour = 0).none { it.user.id == user.id })
     }
 }

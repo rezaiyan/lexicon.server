@@ -37,7 +37,12 @@ class JwtAuthenticationFilter(
         // Admin auth (key or dashboard session) is AdminAuthenticationFilter's job
         ADMIN_PATH_PREFIX,
         "/actuator/",
-        "/error"
+        "/error",
+        // MCP and its OAuth server have their own filter chains and token types (McpAuthorizationServerConfig)
+        "/mcp",
+        "/oauth/",
+        "/oauth2/",
+        "/.well-known/",
     )
     
     override fun shouldNotFilter(request: HttpServletRequest): Boolean {
@@ -65,40 +70,41 @@ class JwtAuthenticationFilter(
             } else {
                 log.debug { "🔑 JWT Filter [TOKEN_FOUND]: Token length ${jwt.length} for $path" }
                 
-                val isValid = jwtTokenProvider.validateToken(jwt)
-                log.debug { "🔍 JWT Filter [VALIDATE]: Token valid=$isValid for $path" }
-                
-                if (isValid) {
-                    val userId = jwtTokenProvider.getUserIdFromToken(jwt)
-                    log.debug { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
-                    
-                    if (userId != null) {
-                        if (userAccessCache.isAllowed(userId)) {
-                            val authentication = UsernamePasswordAuthenticationToken(
-                                AuthUser(userId),
-                                null,
-                                emptyList()
-                            )
-                            authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
+                val verified = jwtTokenProvider.verifyAccessToken(jwt)
+                log.debug { "🔍 JWT Filter [VALIDATE]: Token valid=${verified != null} for $path" }
 
-                            SecurityContextHolder.getContext().authentication = authentication
-                            request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, userId)
-                            log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId for $path" }
-                            log.debug { "🔄 JWT Filter [FILTER_CHAIN]: Proceeding to next filter for $path" }
-                        } else {
-                            log.warn { "❌ JWT Filter [AUTH_FAILED]: unknown or inactive userId=$userId - 403 for $path" }
-                            response.status = HttpServletResponse.SC_FORBIDDEN
-                            response.writer.write("""{"success":false,"message":"User account has been deleted or deactivated"}""")
-                            response.contentType = "application/json"
-                            return
-                        }
-                    } else {
-                        log.warn { "❌ JWT Filter [NO_USER_ID]: Unable to extract user ID from token - returning 401 for $path" }
-                        response.status = HttpServletResponse.SC_UNAUTHORIZED
-                        response.writer.write("""{"success":false,"message":"Invalid token"}""")
+                if (verified != null) {
+                    val userId = verified.userId
+                    log.debug { "👤 JWT Filter [USER_ID]: Extracted user ID=$userId for $path" }
+
+                    if (!userAccessCache.isAllowed(userId)) {
+                        log.warn { "❌ JWT Filter [AUTH_FAILED]: unknown or inactive userId=$userId - 403 for $path" }
+                        response.status = HttpServletResponse.SC_FORBIDDEN
+                        response.writer.write("""{"success":false,"message":"User account has been deleted or deactivated"}""")
                         response.contentType = "application/json"
                         return
                     }
+                    if (!userAccessCache.isTokenAllowed(userId, verified.issuedAt)) {
+                        log.warn {
+                            "❌ JWT Filter [REVOKED]: token issued before revocation cutoff " +
+                                "for userId=$userId - 401 for $path"
+                        }
+                        response.status = HttpServletResponse.SC_UNAUTHORIZED
+                        response.writer.write("""{"success":false,"message":"Token has been revoked"}""")
+                        response.contentType = "application/json"
+                        return
+                    }
+
+                    val authentication = UsernamePasswordAuthenticationToken(
+                        AuthUser(userId),
+                        null,
+                        emptyList()
+                    )
+                    authentication.details = WebAuthenticationDetailsSource().buildDetails(request)
+
+                    SecurityContextHolder.getContext().authentication = authentication
+                    request.setAttribute(AccessLogFilter.USER_ID_ATTRIBUTE, userId)
+                    log.debug { "✅ JWT Filter [AUTH_SUCCESS]: Set authentication for user=$userId for $path" }
                 } else {
                     log.warn { "❌ JWT Filter [INVALID_TOKEN]: Token validation failed - returning 401 for $path" }
                     response.status = HttpServletResponse.SC_UNAUTHORIZED

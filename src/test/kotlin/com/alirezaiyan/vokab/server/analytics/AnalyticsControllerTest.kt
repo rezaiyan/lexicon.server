@@ -7,6 +7,7 @@ import com.alirezaiyan.vokab.server.user.User
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -227,6 +228,34 @@ class AnalyticsControllerTest {
             .andExpect(jsonPath("$.data").isArray)
             .andExpect(jsonPath("$.data[0].wordId").value(10))
             .andExpect(jsonPath("$.data[0].errorRate").value(0.8))
+    }
+
+    @Test
+    fun `GET difficult-words should clamp an oversized limit to 100`() {
+        `when`(wordProgressQueries.getDifficultWords(mockUser.requireId(), 3, 100)).thenReturn(emptyList())
+
+        mockMvc.perform(
+            get("/api/v1/analytics/difficult-words")
+                .param("limit", "1000000")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isOk)
+
+        verify(wordProgressQueries).getDifficultWords(mockUser.requireId(), 3, 100)
+    }
+
+    @Test
+    fun `GET sessions should clamp a non-positive limit to 1`() {
+        `when`(studyActivityQueries.getRecentSessions(mockUser.requireId(), 1)).thenReturn(emptyList())
+
+        mockMvc.perform(
+            get("/api/v1/analytics/sessions")
+                .param("limit", "-5")
+                .with(authentication(auth))
+        )
+            .andExpect(status().isOk)
+
+        verify(studyActivityQueries).getRecentSessions(mockUser.requireId(), 1)
     }
 
     @Test

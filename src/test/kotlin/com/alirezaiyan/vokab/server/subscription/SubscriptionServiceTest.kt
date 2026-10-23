@@ -186,6 +186,33 @@ class SubscriptionServiceTest {
     }
 
     @Test
+    fun `should acknowledge but ignore a SANDBOX purchase when sandbox is not allowed`() {
+        linkedUser()
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "INITIAL_PURCHASE").withEvent { copy(environment = "SANDBOX") }
+        )
+
+        assertTrue(statusUpdates.isEmpty())
+        assertTrue(savedSubscriptions.isEmpty())
+    }
+
+    @Test
+    fun `should apply a SANDBOX purchase when sandbox is allowed`() {
+        linkedUser()
+        subscriptionService = SubscriptionService(
+            subscriptionRepository, userRepository, publisher, processedEvents, revenueCatClient,
+            clock = fixedClock(), revenueCatPolicy = RevenueCatPolicyProperties(allowSandbox = true),
+        )
+
+        subscriptionService.handleRevenueCatWebhook(
+            webhook(type = "INITIAL_PURCHASE").withEvent { copy(environment = "SANDBOX") }
+        )
+
+        assertEquals(SubscriptionStatus.ACTIVE, lastUpdate().status)
+    }
+
+    @Test
     fun `should never write subscription fields through a whole-user save`() {
         linkedUser()
 

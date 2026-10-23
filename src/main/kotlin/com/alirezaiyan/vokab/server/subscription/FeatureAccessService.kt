@@ -21,6 +21,7 @@ private val logger = KotlinLogging.logger {}
 class FeatureAccessService(
     private val appProperties: AppProperties,
     private val userRepository: UserRepository,
+    private val subscriptionRepository: SubscriptionRepository,
     private val clock: Clock
 ) {
 
@@ -56,6 +57,10 @@ class FeatureAccessService(
     /**
      * Coarse access level for usage quotas (AI credits). A grant counts as full premium even during
      * a store trial: grants are comps and test users. An unknown user is FREE.
+     *
+     * A cancelled trial is still a trial: turning auto-renew off moves the status to CANCELLED, but
+     * nothing was paid, so it must not unlock the premium allowance (toggling auto-renew would
+     * otherwise farm credits).
      */
     fun accessLevel(userId: Long): AccessLevel {
         val user = userRepository.findById(userId).orElse(null) ?: return AccessLevel.FREE
@@ -64,8 +69,23 @@ class FeatureAccessService(
             hasActiveGrant(user, now) -> AccessLevel.PREMIUM
             !hasActiveStoreSubscription(user, now) -> AccessLevel.FREE
             user.subscriptionStatus == SubscriptionStatus.TRIAL -> AccessLevel.TRIAL
+            user.subscriptionStatus == SubscriptionStatus.CANCELLED && isCancelledTrial(user) -> AccessLevel.TRIAL
             else -> AccessLevel.PREMIUM
         }
+    }
+
+    /**
+     * The cancelled period is a free trial when the user's latest store subscription (as recorded
+     * by the webhooks) is a trial whose expiry covers the user's current access. A later paid
+     * period (e.g. reported by a store sync before its RENEWAL webhook) extends the user's expiry
+     * past the trial row, so a paying user isn't mistaken for a trial. Without any subscription
+     * row (webhooks never arrived) the user keeps the paid allowance.
+     */
+    private fun isCancelledTrial(user: User): Boolean {
+        val latest = subscriptionRepository.findByUser(user).maxByOrNull { it.expiresAt ?: Instant.MIN }
+        val trialEnd = latest?.expiresAt?.takeIf { latest.isTrial } ?: return false
+        val userExpiry = user.subscriptionExpiresAt ?: return false
+        return !trialEnd.isBefore(userExpiry)
     }
 
     /**

@@ -1,5 +1,8 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionGuard
+import com.alirezaiyan.vokab.server.ai.instructions.InstructionScope
+import com.alirezaiyan.vokab.server.ai.instructions.UserInstruction
 import com.alirezaiyan.vokab.server.credits.CreditAction
 import com.alirezaiyan.vokab.server.credits.CreditCharger
 import com.alirezaiyan.vokab.server.shared.AuthUser
@@ -30,6 +33,7 @@ class AiController(
     private val dailyInsightService: DailyInsightService,
     private val vocabularySuggestionService: VocabularySuggestionService,
     private val creditCharger: CreditCharger,
+    private val instructionGuard: InstructionGuard,
 ) {
     
     @PostMapping("/extract-vocabulary")
@@ -69,13 +73,18 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getImageProcessingBucket(user.id.toString()), "image processing")
 
+        val scope = InstructionScope.PHOTO_EXTRACTION
+        val preferences = learnerPreferences(user, request, scope, request.learningLanguage, request.nativeLanguage)
+
+        val action = scope.creditAction(preferences.isGuided)
         // Nothing recognised is refunded: the user got nothing for the credits
-        val items = creditCharger.charge(user.id, CreditAction.PHOTO_EXTRACTION, refundIf = { it.isEmpty() }) {
+        val items = creditCharger.charge(user.id, action, refundIf = { it.isEmpty() }) {
             aiService.extractWordsFromImage(
                 imageBase64 = request.imageBase64,
                 learningLanguage = request.learningLanguage,
                 nativeLanguage = request.nativeLanguage,
                 includePhrases = request.includePhrases,
+                preferences = preferences,
             )
         }
         logger.info { "Word extraction (v2) for userId=${user.id}: ${items.size} items" }
@@ -146,7 +155,11 @@ class AiController(
 
         consumeRateLimit(user, rateLimitConfig.getAiBucket(user.id.toString()), "suggest-vocabulary")
 
-        val response = creditCharger.charge(user.id, CreditAction.AI_SUGGESTION, refundIf = { it.items.isEmpty() }) {
+        val scope = InstructionScope.VOCABULARY_SUGGESTION
+        val preferences = learnerPreferences(user, request, scope, request.targetLanguage, request.nativeLanguage)
+
+        val action = scope.creditAction(preferences.isGuided)
+        val response = creditCharger.charge(user.id, action, refundIf = { it.items.isEmpty() }) {
             vocabularySuggestionService.suggestForUser(
                 userId = user.id,
                 targetLanguage = request.targetLanguage,
@@ -154,6 +167,7 @@ class AiController(
                 nativeLanguage = request.nativeLanguage,
                 interests = request.interests,
                 targetLanguageCode = request.targetLanguageCode,
+                preferences = preferences,
             )
         }
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
@@ -171,6 +185,25 @@ class AiController(
                 )
             )
         )
+    }
+
+    /**
+     * What the learner asked for. Their own words are screened before anything is charged, and only
+     * for a user who can afford the guided price: refusals cost nothing, and a user who can't pay
+     * never triggers a judge call.
+     */
+    private fun learnerPreferences(
+        user: AuthUser,
+        request: GuidedAiRequest,
+        scope: InstructionScope,
+        learningLanguage: String,
+        nativeLanguage: String,
+    ): LearnerPreferences {
+        val focus = request.focus ?: VocabularyFocus()
+        val instruction = UserInstruction.of(request.instructions) ?: return LearnerPreferences(focus)
+        creditCharger.requireAffordable(user.id, scope.creditAction(guided = true))
+        val screened = instructionGuard.screen(user.id, instruction, scope, learningLanguage, nativeLanguage)
+        return LearnerPreferences(focus, screened)
     }
 
     /** Takes one token from [bucket], or rejects the call with a 429 and Retry-After. */

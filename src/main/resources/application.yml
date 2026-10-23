@@ -56,6 +56,19 @@ spring:
         query:
           fail_on_pagination_over_collection_fetch: true
 
+  # MCP server for AI clients at POST /mcp (JWT-protected like the rest of the API).
+  # Off until OAuth for third-party clients exists; MCP_ENABLED=true for local spikes.
+  ai:
+    mcp:
+      server:
+        enabled: ${MCP_ENABLED:false}
+        name: lexicon
+        version: 0.1.0
+        protocol: STATELESS
+        instructions: >-
+          Lexicon is the learner's vocabulary notebook. Use these tools to look up the words and
+          tags they have saved. Word levels run from 0 (new) to 6 (mastered).
+
   h2:
     console:
       enabled: false   # only the h2 profile turns it on
@@ -76,6 +89,10 @@ spring.servlet.multipart:
   max-request-size: 6MB
 
 app:
+  comeback-rescue:
+    # Kill switch. On by default; RescueGuard pauses sends on its own when rescued learners opt out
+    send-enabled: ${COMEBACK_RESCUE_SEND_ENABLED:true}
+
   avatar:
     upload-dir: ${AVATAR_UPLOAD_DIR:/var/www/uploads/avatars}
     base-url: ${AVATAR_BASE_URL:}
@@ -95,7 +112,11 @@ app:
     api-key: ${OPENROUTER_API_KEY:}
     base-url: ${OPENROUTER_BASE_URL:https://openrouter.ai/api/v1}
     model: ${OPENROUTER_MODEL:anthropic/claude-haiku-4.5}
+    judge-model: ${OPENROUTER_JUDGE_MODEL:}
     timeout-seconds: ${OPENROUTER_TIMEOUT_SECONDS:60}
+    # max_tokens for short answers (insights, reminders, translation, judges). Photo extraction and
+    # vocabulary suggestions (8192) and comeback rescue (2048) have their own caps in AiOperation.
+    max-tokens: ${OPENROUTER_MAX_TOKENS:1024}
 
   apple:
     # Accepted `aud` values for Apple ID tokens (iOS bundle id; add a Services ID if web sign-in ships).
@@ -115,8 +136,11 @@ app:
     trial-monthly-allowance: ${CREDITS_TRIAL_MONTHLY:30}
     premium-monthly-allowance: ${CREDITS_PREMIUM_MONTHLY:300}
     costs:
-      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:2}
-      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:2}
+      # One flat price per source, own words or not; the _GUIDED actions only label the ledger
+      PHOTO_EXTRACTION: ${CREDITS_COST_PHOTO:4}
+      PHOTO_EXTRACTION_GUIDED: ${CREDITS_COST_PHOTO:4}
+      AI_SUGGESTION: ${CREDITS_COST_SUGGESTION:3}
+      AI_SUGGESTION_GUIDED: ${CREDITS_COST_SUGGESTION:3}
       TEXT_TRANSLATION: ${CREDITS_COST_TRANSLATION:1}
 
   # Per-user call limits on the AI endpoints; each limit resets in full every window.
@@ -124,6 +148,22 @@ app:
     window-minutes: ${AI_RATE_LIMIT_WINDOW_MINUTES:5}
     photo-calls: ${AI_RATE_LIMIT_PHOTO_CALLS:20}
     ai-calls: ${AI_RATE_LIMIT_AI_CALLS:50}
+    # Per-IP sign-in (/auth/google, /apple, /ci-token) and /auth/refresh limits, per minute
+    auth-per-minute: ${AUTH_RATE_LIMIT_PER_MINUTE:20}
+    refresh-per-minute: ${REFRESH_RATE_LIMIT_PER_MINUTE:60}
+    # Unauthenticated onboarding AI calls from all IPs together (caps the bill under IP rotation);
+    # past either limit onboarding answers 429 until it refills.
+    onboarding-global-per-hour: ${ONBOARDING_AI_GLOBAL_PER_HOUR:200}
+    onboarding-global-per-day: ${ONBOARDING_AI_GLOBAL_PER_DAY:2000}
+    # Failed admin key attempts from all IPs per hour before admin key auth pauses for everyone
+    admin-failures-global-per-hour: ${ADMIN_AUTH_GLOBAL_FAILURES_PER_HOUR:50}
+
+  # Learners' own instructions to the AI (see InstructionGuard): refusals per user before
+  # instructions pause, and how long to wait for the judge before failing closed.
+  ai-instructions:
+    max-rejections: ${AI_INSTRUCTION_REJECTIONS:5}
+    rejection-window-minutes: ${AI_INSTRUCTION_REJECTION_WINDOW_MINUTES:60}
+    judge-timeout-seconds: ${AI_INSTRUCTION_JUDGE_TIMEOUT_SECONDS:8}
 
   revenuecat:
     # Authorization header value set on the RevenueCat webhook. Empty = every webhook is rejected.
@@ -176,9 +216,19 @@ app:
       telegram:
         bot-token: ${TELEGRAM_ADMIN_BOT_TOKEN:}
         chat-id: ${TELEGRAM_ADMIN_CHAT_ID:}
+        webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
 
   geolocation:
     database-path: ${GEOLITE2_COUNTRY_DB_PATH:}
+
+  # OAuth 2.1 for MCP clients (only active with MCP_ENABLED=true)
+  mcp:
+    issuer: ${MCP_ISSUER:http://localhost:8080}
+    signing-key-path: ${MCP_SIGNING_KEY_PATH:./keys/mcp-signing-key.json}
+    allowed-origins: ${MCP_ALLOWED_ORIGINS:}
+    firebase-web-api-key: ${MCP_FIREBASE_WEB_API_KEY:}
+    firebase-auth-domain: ${MCP_FIREBASE_AUTH_DOMAIN:}
+    firebase-project-id: ${MCP_FIREBASE_PROJECT_ID:}
 
 logging:
   level:

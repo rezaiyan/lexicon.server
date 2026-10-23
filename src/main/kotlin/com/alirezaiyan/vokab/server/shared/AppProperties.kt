@@ -19,7 +19,29 @@ data class AppProperties(
     var ciAuth: CiAuthConfig = CiAuthConfig(),
     var notifications: NotificationsConfig = NotificationsConfig(),
     var geolocation: GeoLocationConfig = GeoLocationConfig(),
-    var rateLimit: RateLimitProperties = RateLimitProperties()
+    var rateLimit: RateLimitProperties = RateLimitProperties(),
+    var aiInstructions: AiInstructionsConfig = AiInstructionsConfig(),
+    var mcp: McpConfig = McpConfig(),
+)
+
+/** OAuth for MCP clients; only read while `spring.ai.mcp.server.enabled` is true. */
+data class McpConfig(
+    /** Public origin clients reach us at; the issuer of MCP tokens and base of every OAuth URL. */
+    var issuer: String = "http://localhost:8080",
+    /** RSA JWK (with private part) signing MCP tokens; created on first start. Never the app's JWT key. */
+    var signingKeyPath: String = "./keys/mcp-signing-key.json",
+    /** Short-lived access tokens; every client also gets a rotating refresh token. */
+    var accessTokenMinutes: Long = 60,
+    var refreshTokenDays: Long = 30,
+    /**
+     * Browser origins allowed to call `/mcp` besides our own (DNS-rebinding guard). Requests
+     * without an Origin header (native and server-side clients) are unaffected.
+     */
+    var allowedOrigins: List<String> = emptyList(),
+    /** Firebase web config for the sign-in page (the same public values the web app ships). */
+    var firebaseWebApiKey: String = "",
+    var firebaseAuthDomain: String = "",
+    var firebaseProjectId: String = "",
 )
 
 data class JwtConfig(
@@ -42,7 +64,14 @@ data class OpenRouterConfig(
     var apiKey: String = "",
     var baseUrl: String = "https://openrouter.ai/api/v1",
     var model: String = "anthropic/claude-haiku-4.5",
-    var timeoutSeconds: Long = 60
+    /** Model for second-opinion checks (the rescue copy judge); blank = [model]. */
+    var judgeModel: String = "",
+    var timeoutSeconds: Long = 60,
+    /**
+     * `max_tokens` for calls whose answer is a few sentences or a small JSON object. Long answers
+     * (photo extraction, vocabulary lists, rescue copy) have their own, larger cap in `AiOperation`.
+     */
+    var maxTokens: Int = 1024,
 )
 
 data class AppleConfig(
@@ -72,7 +101,7 @@ data class FeatureFlagsConfig(
 )
 
 data class SecurityConfig(
-    var testEmails: String = "",  // Comma-separated list of test emails that bypass active check
+    var testEmails: String = "",  // Unused: deactivated users are always rejected
     var adminApiKey: String = ""  // Static key for X-Admin-Key header (CLI access to /admin/**)
 )
 
@@ -102,7 +131,25 @@ data class VocabularyConfig(
 data class RateLimitProperties(
     var windowMinutes: Long = 5,
     var photoCalls: Long = 20,
-    var aiCalls: Long = 50
+    var aiCalls: Long = 50,
+    /** Sign-in attempts (Google, Apple, CI token) per IP per minute. */
+    var authPerMinute: Long = 20,
+    /** Token refreshes per IP per minute. */
+    var refreshPerMinute: Long = 60,
+    /** Unauthenticated onboarding AI calls across all IPs: a ceiling on that bill, not a per-user limit. */
+    var onboardingGlobalPerHour: Long = 200,
+    var onboardingGlobalPerDay: Long = 2000,
+    /** Failed admin key attempts across all IPs per hour before admin key auth pauses for everyone. */
+    var adminFailuresGlobalPerHour: Long = 50,
+)
+
+/** The learner-instruction guard (see `InstructionGuard`). */
+data class AiInstructionsConfig(
+    /** Refused instructions a user may have per [rejectionWindowMinutes] before instructions pause. */
+    var maxRejections: Long = 5,
+    var rejectionWindowMinutes: Long = 60,
+    /** How long the guard waits for the judge before refusing as unavailable (fails closed). */
+    var judgeTimeoutSeconds: Long = 8,
 )
 
 data class CiAuthConfig(
@@ -122,7 +169,9 @@ data class NotificationsConfig(
 
 data class TelegramConfig(
     var botToken: String = "",
-    var chatId: String = ""
+    var chatId: String = "",
+    /** Telegram echoes it in `X-Telegram-Bot-Api-Secret-Token`; blank rejects every webhook call. */
+    var webhookSecret: String = ""
 )
 
 data class GeoLocationConfig(

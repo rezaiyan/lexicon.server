@@ -9,6 +9,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.web.bind.annotation.*
 import java.time.LocalDate
 
+/** Largest page any analytics list returns; out-of-range `limit` values are clamped, not rejected. */
+private const val MAX_LIST_LIMIT = 100
+
+private fun clampLimit(limit: Int): Int = limit.coerceIn(1, MAX_LIST_LIMIT)
+
 @RestController
 @RequestMapping("/api/v1/analytics")
 class AnalyticsController(
@@ -52,7 +57,7 @@ class AnalyticsController(
         @RequestParam(defaultValue = "3") minReviews: Int,
         @RequestParam(defaultValue = "20") limit: Int
     ): ResponseEntity<ApiResponse<List<DifficultWordResponse>>> {
-        val words = wordProgressQueries.getDifficultWords(user.id, minReviews, limit)
+        val words = wordProgressQueries.getDifficultWords(user.id, minReviews, clampLimit(limit))
         return ResponseEntity.ok(ApiResponse(success = true, data = words))
     }
 
@@ -61,7 +66,7 @@ class AnalyticsController(
         @AuthenticationPrincipal user: AuthUser,
         @RequestParam(defaultValue = "10") limit: Int
     ): ResponseEntity<ApiResponse<List<MostReviewedWordResponse>>> {
-        val words = wordProgressQueries.getMostReviewedWords(user.id, limit)
+        val words = wordProgressQueries.getMostReviewedWords(user.id, clampLimit(limit))
         return ResponseEntity.ok(ApiResponse(success = true, data = words))
     }
 
@@ -94,7 +99,7 @@ class AnalyticsController(
         @AuthenticationPrincipal user: AuthUser,
         @RequestParam(defaultValue = "10") limit: Int
     ): ResponseEntity<ApiResponse<List<StudySessionResponse>>> {
-        val sessions = studyActivityQueries.getRecentSessions(user.id, limit)
+        val sessions = studyActivityQueries.getRecentSessions(user.id, clampLimit(limit))
         return ResponseEntity.ok(ApiResponse(success = true, data = sessions))
     }
 
@@ -121,7 +126,7 @@ class AnalyticsController(
         @AuthenticationPrincipal user: AuthUser,
         @RequestParam(defaultValue = "20") limit: Int
     ): ResponseEntity<ApiResponse<List<MasteredWordResponse>>> {
-        val data = wordProgressQueries.getWordsMastered(user.id, limit)
+        val data = wordProgressQueries.getWordsMastered(user.id, clampLimit(limit))
         return ResponseEntity.ok(ApiResponse(success = true, data = data))
     }
 

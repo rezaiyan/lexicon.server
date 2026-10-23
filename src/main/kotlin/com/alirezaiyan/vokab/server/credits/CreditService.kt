@@ -19,7 +19,9 @@ private val logger = KotlinLogging.logger {}
  *
  * Periods are settled lazily on access rather than by a scheduled job:
  * - period over → a new one starts with the current tier's allowance (no rollover);
- * - upgrade (bigger allowance) → a fresh period starts now with the new allowance;
+ * - upgrade (bigger allowance) → the period is kept and the allowance is topped up to the new
+ *   tier's amount minus what was already spent from the allowance this period, so a period never
+ *   yields more than the highest tier's allowance however often the tier flips;
  * - downgrade → the remaining allowance is clamped to the new tier's, the period is kept.
  */
 @Service
@@ -33,6 +35,18 @@ class CreditService(
 
     @Transactional
     fun balance(userId: Long): CreditBalance = currentWallet(userId).toBalance()
+
+    /**
+     * Throws [InsufficientCreditsException] when the balance is below [action]'s cost; spends nothing.
+     * For paid preparation (e.g. screening a request) that should not run for a user who can't pay.
+     */
+    @Transactional
+    fun requireAffordable(userId: Long, action: CreditAction) {
+        val cost = properties.costOf(action)
+        if (cost <= 0) return
+        val available = currentWallet(userId).balance
+        if (available < cost) throw InsufficientCreditsException(action.name, required = cost, available = available)
+    }
 
     /**
      * Takes [action]'s cost, allowance first (it expires), then bonus.
@@ -97,9 +111,14 @@ class CreditService(
     /** Support/comp credits; they go to the bonus balance and never expire. */
     @Transactional
     fun grantBonus(userId: Long, amount: Int, note: String?): CreditBalance {
-        require(amount > 0) { "amount must be positive" }
+        require(amount in 1..MAX_GRANT) { "amount must be between 1 and $MAX_GRANT" }
         val wallet = currentWallet(userId)
-        wallet.bonusBalance += amount
+        // Overflow would wrap negative (and trip the column's >= 0 check); refuse instead
+        wallet.bonusBalance = try {
+            Math.addExact(wallet.bonusBalance, amount)
+        } catch (_: ArithmeticException) {
+            throw IllegalArgumentException("bonus balance would overflow")
+        }
         wallet.updatedAt = now()
         record(userId, CreditTransactionType.ADMIN_GRANT, bonusDelta = amount, note = note?.take(NOTE_MAX))
         logger.info { "Granted $amount bonus credits to userId=$userId" }
@@ -141,7 +160,7 @@ class CreditService(
                 while (!now.isBefore(oneMonthAfter(start))) start = oneMonthAfter(start)
                 startPeriod(wallet, level, start, now)
             }
-            allowance > currentAllowance -> startPeriod(wallet, level, now, now)
+            allowance > currentAllowance -> upgrade(wallet, level, allowance, now)
             allowance < currentAllowance -> {
                 val clamped = minOf(wallet.allowanceRemaining, allowance)
                 val delta = clamped - wallet.allowanceRemaining
@@ -159,6 +178,27 @@ class CreditService(
             }
             wallet.tier != level -> wallet.tier = level
         }
+    }
+
+    /**
+     * Raises the allowance for a mid-period upgrade without restarting the period. The allowance
+     * becomes the new tier's monthly amount less what this period's spends already took from it
+     * (refunds counted), so flipping between tiers (e.g. toggling auto-renew) can't refill it:
+     * the most a period ever yields is the highest tier's allowance.
+     */
+    private fun upgrade(wallet: CreditWallet, level: AccessLevel, allowance: Int, now: Instant) {
+        val spentThisPeriod = -transactionRepository.sumAllowanceDeltaSince(
+            wallet.userId, USAGE_TYPES, wallet.periodStart,
+        ).coerceAtMost(0L)
+        val target = (allowance.toLong() - spentThisPeriod).coerceIn(0L, allowance.toLong()).toInt()
+        val delta = (target - wallet.allowanceRemaining).coerceAtLeast(0)
+        wallet.tier = level
+        wallet.allowanceRemaining += delta
+        wallet.updatedAt = now
+        if (delta != 0) {
+            record(wallet.userId, CreditTransactionType.ALLOWANCE_ADJUSTED, allowanceDelta = delta, note = level.name)
+        }
+        logger.info { "Upgraded credit tier for userId=${wallet.userId} to $level: +$delta allowance" }
     }
 
     private fun startPeriod(wallet: CreditWallet, level: AccessLevel, start: Instant, now: Instant) {
@@ -208,6 +248,12 @@ class CreditService(
 
     private companion object {
         const val NOTE_MAX = 128
+
+        /** Largest single admin grant; a typo shouldn't mint millions of credits. */
+        const val MAX_GRANT = 100_000
+
+        /** Ledger rows that reflect actual use of the allowance (spends and their refunds). */
+        val USAGE_TYPES = listOf(CreditTransactionType.SPEND, CreditTransactionType.REFUND)
     }
 }
 

@@ -65,6 +65,12 @@ class AdminSessionTokensTest {
         val weak = AdminSessionTokens(props("short-key"), fixedClock(TEST_NOW))
         assertFalse(weak.dashboardSignInEnabled())
         assertNull(weak.validate(weak.issue().token))
-        assertTrue(weak.keyMatches("short-key")) // the CLI header still works
+    }
+
+    @Test
+    fun `a short admin key disables key auth, so even the right key never matches`() {
+        val weak = AdminSessionTokens(props("short-key"), fixedClock(TEST_NOW))
+        assertFalse(weak.keyAuthEnabled())
+        assertFalse(weak.keyMatches("short-key"))
     }
 }

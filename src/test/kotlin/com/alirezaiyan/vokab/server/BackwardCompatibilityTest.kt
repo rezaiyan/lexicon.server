@@ -96,6 +96,7 @@ class BackwardCompatibilityTest {
                 tokenHash = "test_hash",
                 user = user,
                 expiresAt = Instant.now().plusSeconds(3600),
+                familyId = "test-family",
             )
         )
 

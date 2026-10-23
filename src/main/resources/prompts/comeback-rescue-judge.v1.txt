@@ -1,0 +1,22 @@
+You review push notifications before they are sent to a vocabulary learner who has been away from their flashcard app for a few days. You did not write them. Be strict: an unsent push costs nothing, a bad one makes the learner mute the app.
+
+The learner uses the app in the language with code "{{uiLanguage}}" and is learning "{{targetLanguage}}".
+
+FACTS (everything true about this learner):
+{{facts}}
+
+CANDIDATES:
+{{candidates}}
+
+Pass a candidate only if ALL of these hold:
+- It reads like a friend who knows their deck wrote it, not like marketing or an AI. No filler, no buzzwords, no forced cheerfulness.
+- It is specific to this learner: it names one of their words and uses only what the facts say.
+- It is natural and correct in the "{{uiLanguage}}" language (target-language words may stay as they are).
+- It is kind: no guilt, no pressure, no streak threats, no fake urgency.
+- The learner would be glad to see it on their lock screen, and it is clear what tapping it does (a short review).
+- Title and body work together and the body is not just a restatement of the title.
+
+Fail anything that is merely acceptable. Give a short, concrete reason for every verdict.
+
+Respond with ONLY valid JSON, no markdown:
+{"verdicts":[{"index":0,"pass":true,"reason":"..."}]}

@@ -26,6 +26,7 @@ private val logger = KotlinLogging.logger {}
 class RevenueCatClient(
     restClientBuilder: RestClient.Builder,
     private val appProperties: AppProperties,
+    private val policy: RevenueCatPolicyProperties = RevenueCatPolicyProperties(),
 ) {
     private val restClient = restClientBuilder
         .baseUrl(BASE_URL)
@@ -57,7 +58,10 @@ class RevenueCatClient(
             val hasOneTimePurchases = customer.activeEntitlements.items.isEmpty() && subscriptions.isEmpty() &&
                 get<ListDto<Any>>(project) { pathSegment("customers", appUserId, "purchases").queryParam("limit", 1) }
                     .items.isNotEmpty()
-            toEntitlementState(customer.activeEntitlements.items, subscriptions, hasOneTimePurchases)
+            toEntitlementState(
+                customer.activeEntitlements.items, subscriptions, hasOneTimePurchases,
+                allowSandbox = policy.allowSandbox,
+            )
         } catch (e: RestClientException) {
             logger.warn { "RevenueCat customer lookup failed: ${e.describe()}" }
             null
@@ -166,13 +170,31 @@ data class SubscriptionDto(
     @JsonProperty("gives_access") val givesAccess: Boolean = false,
     @JsonProperty("current_period_ends_at") val currentPeriodEndsAt: Long? = null,
     @JsonProperty("product_id") val productId: String? = null,
-)
+    /** production or sandbox. */
+    val environment: String? = null,
+) {
+    val isSandbox: Boolean get() = environment.equals("sandbox", ignoreCase = true)
+}
 
+/**
+ * Maps the API's view of a customer to ours. With [allowSandbox] off, sandbox subscriptions are
+ * ignored: the customer's active entitlements don't say which purchase backs them, so expiring
+ * entitlements are dropped too when only sandbox subscriptions give access. Lifetime (non-expiring)
+ * entitlements come from one-time purchases and are kept.
+ */
 internal fun toEntitlementState(
     activeEntitlements: List<ActiveEntitlementDto>,
-    subscriptions: List<SubscriptionDto>,
+    allSubscriptions: List<SubscriptionDto>,
     hasOneTimePurchases: Boolean,
+    allowSandbox: Boolean = true,
 ): StoreEntitlementState {
+    val subscriptions = if (allowSandbox) allSubscriptions else allSubscriptions.filterNot { it.isSandbox }
+    val onlySandboxAccess = !allowSandbox &&
+        allSubscriptions.any { it.givesAccess && it.isSandbox } && subscriptions.none { it.givesAccess }
+    if (onlySandboxAccess && activeEntitlements.isNotEmpty() && activeEntitlements.all { it.expiresAt != null }) {
+        logger.warn { "Ignoring RevenueCat entitlement backed only by sandbox subscriptions" }
+        return toEntitlementState(emptyList(), subscriptions, hasOneTimePurchases)
+    }
     // Access lasts until the latest entitlement expiry (grace period included); any null = lifetime.
     val expiresAt = if (activeEntitlements.any { it.expiresAt == null }) {
         null

@@ -1,3 +1,18 @@
+// The Spring Boot Gradle plugin brings Jackson and Apache HttpClient onto the build classpath at
+// older versions; keep them on the same patched releases as the app (the extra[...] overrides below)
+buildscript {
+	configurations.classpath {
+		resolutionStrategy.eachDependency {
+			when {
+				requested.group == "com.fasterxml.jackson.core" && requested.name != "jackson-annotations" ->
+					useVersion("2.21.7")
+				requested.group == "org.apache.httpcomponents.client5" -> useVersion("5.6.4")
+				requested.group == "org.apache.httpcomponents.core5" -> useVersion("5.4.3")
+			}
+		}
+	}
+}
+
 plugins {
 	alias(libs.plugins.kotlin.jvm)
 	alias(libs.plugins.kotlin.spring)
@@ -14,6 +29,15 @@ description = "Lexicon Server Application"
 
 // The Spring Boot BOM pins Kotlin libraries to its own baseline; keep them on the compiler's version
 extra["kotlin.version"] = libs.versions.kotlin.asProvider().get()
+// Security fixes newer than the Spring Boot BOM ships (found by the Trivy image scan in CI). Drop
+// each override once the BOM catches up.
+extra["tomcat.version"] = "10.1.60"
+extra["netty.version"] = "4.1.137.Final"
+extra["jackson-bom.version"] = "2.21.7"
+extra["postgresql.version"] = "42.7.12"
+// firebase-admin asks for httpclient5 5.6.x; the BOM would pin the older, vulnerable 5.5/core 5.3
+extra["httpclient5.version"] = "5.6.4"
+extra["httpcore5.version"] = "5.4.3"
 
 repositories {
 	mavenCentral()
@@ -31,6 +55,18 @@ dependencies {
 	implementation(libs.spring.boot.starter.validation)
 	implementation(libs.spring.boot.starter.actuator)
 	implementation(libs.spring.boot.starter.mail)
+	// MCP server (/mcp): learner tools over the word services, for AI clients
+	implementation(platform(libs.spring.ai.bom))
+	implementation(libs.spring.ai.starter.mcp.server.webmvc)
+	// Spring AI 1.1.8 pins MCP SDK 0.18.3; 0.18.4 bounds HTTP request reads (security backport)
+	constraints {
+		listOf("mcp", "mcp-core", "mcp-json-jackson2", "mcp-spring-webmvc").forEach {
+			implementation("io.modelcontextprotocol.sdk:$it:0.18.4")
+		}
+	}
+	// OAuth 2.1 for MCP clients: we are the authorization server, /mcp is the resource server
+	implementation(libs.spring.security.oauth2.authorization.server)
+	implementation(libs.spring.security.oauth2.resource.server)
 
 	// Metrics, scraped from the internal management port
 	implementation(libs.micrometer.registry.prometheus)
@@ -60,6 +96,10 @@ dependencies {
 
 	// Rate Limiting
 	implementation(libs.bucket4j.core)
+	// Expiring, size-bounded map of rate-limit buckets (version managed by the Spring Boot BOM)
+	implementation("com.github.ben-manes.caffeine:caffeine")
+	// Fetches MCP client metadata documents with an address-checking DNS resolver
+	implementation(libs.httpclient5)
 
 	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)
@@ -99,6 +139,9 @@ kotlin {
 			// Annotations on constructor properties (@JsonProperty, @NotBlank, ...) also land on the
 			// property/field — the Kotlin 2.x future default; opting in now silences the migration warning
 			"-Xannotation-default-target=param-property",
+			// Writes annotations on type arguments to bytecode, so Bean Validation sees element
+			// constraints such as List<@Size(max = 40) String>; without it they are silently dropped
+			"-Xemit-jvm-type-annotations",
 		)
 	}
 }
@@ -143,6 +186,8 @@ tasks.jar {
 
 tasks.test {
 	useJUnitPlatform()
+	// Spring caches one context per test configuration; the default 512m worker heap ran out (2026-10-15)
+	maxHeapSize = "1g"
 	finalizedBy(tasks.jacocoTestReport)
 	// `./gradlew test -PupdateOpenApi=true` rewrites openapi.json instead of failing on a diff
 	systemProperty("openapi.update", providers.gradleProperty("updateOpenApi").getOrElse("false"))

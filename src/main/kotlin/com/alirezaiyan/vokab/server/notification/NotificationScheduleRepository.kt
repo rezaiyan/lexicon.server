@@ -29,6 +29,28 @@ interface NotificationScheduleRepository : JpaRepository<NotificationSchedule, L
     fun findUsersToNotifyAtHour(hour: Int): List<NotificationSchedule>
 
     /**
+     * Learners a comeback rescue could actually reach today: active, with a push token, notifications
+     * on and not suppressed, sending no earlier than [minSendHour] (UTC). Earliest send hour first: if
+     * a slow batch is ever cut short, the soonest pushes are the ones already planned.
+     */
+    @Query("""
+        SELECT ns FROM NotificationSchedule ns JOIN FETCH ns.user u
+        WHERE u.active = true
+          AND ns.optimalSendHour >= :minSendHour
+          AND (ns.suppressedUntil IS NULL OR ns.suppressedUntil < CURRENT_DATE)
+          AND EXISTS (SELECT pt FROM PushToken pt WHERE pt.user = u AND pt.active = true)
+          AND EXISTS (
+            SELECT us FROM UserSettings us
+            WHERE us.user = ns.user
+              AND us.notificationsEnabled = true
+              AND us.notificationFrequency <> 'OFF'
+          )
+        ORDER BY ns.optimalSendHour
+    """)
+    // JOIN FETCH: see findUsersToNotifyAtHour
+    fun findRescuePlanningCandidates(@Param("minSendHour") minSendHour: Int): List<NotificationSchedule>
+
+    /**
      * Streak holders in the given UTC offsets who may get a push today. Unlike
      * [findUsersToNotifyAtHour] it ignores lastSentDate: an earlier push today doesn't rule out
      * the evening streak saver. The caller still checks today's activity.

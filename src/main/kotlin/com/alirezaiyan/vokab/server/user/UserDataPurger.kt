@@ -35,10 +35,13 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "review_events" to "DELETE FROM review_events WHERE user_id = :userId",
             "study_sessions" to "DELETE FROM study_sessions WHERE user_id = :userId",
             "words" to "DELETE FROM words WHERE user_id = :userId",
+            "deleted_words" to "DELETE FROM deleted_words WHERE user_id = :userId",
             "tags" to "DELETE FROM tags WHERE user_id = :userId",
             "word_rush_games" to "DELETE FROM word_rush_games WHERE user_id = :userId",
             "listening_session_words" to "DELETE FROM listening_session_words WHERE user_id = :userId",
             "listening_sessions" to "DELETE FROM listening_sessions WHERE user_id = :userId",
+            // support_messages go with their thread (ON DELETE CASCADE)
+            "support_threads" to "DELETE FROM support_threads WHERE user_id = :userId",
             "refresh_tokens" to "DELETE FROM refresh_tokens WHERE user_id = :userId",
             "push_tokens" to "DELETE FROM push_tokens WHERE user_id = :userId",
             "daily_insights" to "DELETE FROM daily_insights WHERE user_id = :userId",
@@ -49,9 +52,20 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             "user_settings" to "DELETE FROM user_settings WHERE user_id = :userId",
             "user_platforms" to "DELETE FROM user_platforms WHERE user_id = :userId",
             "notification_schedule" to "DELETE FROM notification_schedule WHERE user_id = :userId",
+            "comeback_rescue" to "DELETE FROM comeback_rescue WHERE user_id = :userId",
+            "rescue_copy_rating" to """
+                DELETE FROM rescue_copy_rating
+                WHERE preview_id IN (SELECT id FROM rescue_preview WHERE user_id = :userId)
+            """.trimIndent(),
+            "rescue_preview" to "DELETE FROM rescue_preview WHERE user_id = :userId",
             "notification_log" to "DELETE FROM notification_log WHERE user_id = :userId",
             "email_subscriptions" to "DELETE FROM email_subscriptions WHERE user_id = :userId",
             "email_log" to "UPDATE email_log SET user_id = NULL WHERE user_id = :userId",
+            // MCP grants: keyed by principal_name (the user id as text), no FK to users
+            "oauth2_authorization" to
+                "DELETE FROM oauth2_authorization WHERE principal_name = CAST(:userId AS varchar)",
+            "oauth2_authorization_consent" to
+                "DELETE FROM oauth2_authorization_consent WHERE principal_name = CAST(:userId AS varchar)",
         )
     }
 }

@@ -31,7 +31,10 @@ RUN --mount=type=cache,target=/app/.gradle/caches \
  && java -Djarmode=tools -jar build/libs/app.jar extract --layers --launcher --destination extracted
 
 # Stage 2: Runtime
-FROM eclipse-temurin:21-jre-alpine
+# Java 25, though we compile for 21: since Java 24 (JEP 491) a virtual thread blocked in a
+# `synchronized` block no longer pins its carrier. On 21, a burst of cold-start requests building
+# Jackson serializers pinned every carrier and froze all requests (seen in McpConcurrentCallsTest).
+FROM eclipse-temurin:25-jre-alpine
 
 # Set by CI (docker/metadata-action); shown by `docker inspect` to tell which commit is running
 ARG GIT_SHA=unknown

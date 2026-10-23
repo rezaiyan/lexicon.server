@@ -23,6 +23,17 @@
         "required" : [ "accuracyPercent", "correctCount", "level", "totalReviews" ],
         "type" : "object"
       },
+      "AdminSupportReplyRequest" : {
+        "properties" : {
+          "body" : {
+            "maxLength" : 4000,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "body" ],
+        "type" : "object"
+      },
       "ApiResponseAppConfigDto" : {
         "properties" : {
           "code" : {
@@ -580,6 +591,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListLong" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListMasteredWordResponse" : {
         "properties" : {
           "code" : {
@@ -588,6 +621,27 @@
           "data" : {
             "items" : {
               "$ref" : "#/components/schemas/MasteredWordResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListMcpConnectionDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/McpConnectionDto"
             },
             "type" : [ "array", "null" ]
           },
@@ -664,6 +718,69 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListRescueFunnelRow" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescueFunnelRow"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListRescuePlanView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescuePlanView"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListRescuePreviewView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescuePreviewView"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListResponseTimeTrendResponse" : {
         "properties" : {
           "code" : {
@@ -714,6 +831,27 @@
           "data" : {
             "items" : {
               "$ref" : "#/components/schemas/StudySessionResponse"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseListSupportThreadSummaryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportThreadSummaryDto"
             },
             "type" : [ "array", "null" ]
           },
@@ -987,6 +1125,28 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseRescueAutopilotView" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/RescueAutopilotView"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseSettingsDto" : {
         "properties" : {
           "code" : {
@@ -1075,6 +1235,94 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseSupportMessageDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportMessagesDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportMessagesDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportThreadDetailDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportThreadDetailDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseSupportThreadSummaryDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/SupportThreadSummaryDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseSyncAnalyticsResponse" : {
         "properties" : {
           "code" : {
@@ -1149,6 +1397,28 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/TagDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponseTasteScore" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TasteScore"
             }, {
               "type" : "null"
             } ]
@@ -1367,6 +1637,9 @@
           "idToken" : {
             "minLength" : 1,
             "type" : "string"
+          },
+          "nonce" : {
+            "type" : [ "string", "null" ]
           }
         },
         "required" : [ "idToken" ],
@@ -1473,9 +1746,13 @@
             "type" : "array"
           },
           "sourceLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "targetLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           }
         },
@@ -1834,6 +2111,7 @@
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -1843,6 +2121,13 @@
       },
       "ExtractWordsRequest" : {
         "properties" : {
+          "focus" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/VocabularyFocus"
+            }, {
+              "type" : "null"
+            } ]
+          },
           "imageBase64" : {
             "minLength" : 1,
             "type" : "string"
@@ -1850,11 +2135,18 @@
           "includePhrases" : {
             "type" : "boolean"
           },
+          "instructions" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
           "learningLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -2365,6 +2657,31 @@
         "required" : [ "caption", "demotedThisWeek", "levels", "promotedThisWeek" ],
         "type" : "object"
       },
+      "McpConnectionDto" : {
+        "properties" : {
+          "clientName" : {
+            "type" : "string"
+          },
+          "connectedAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "scopes" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "website" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "clientName", "connectedAt", "id", "scopes" ],
+        "type" : "object"
+      },
       "MetricDto" : {
         "properties" : {
           "previous" : {
@@ -2473,7 +2790,7 @@
             "type" : "integer"
           },
           "job" : {
-            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS", "COMEBACK_RESCUE_PLANNING" ],
             "type" : "string"
           },
           "startedAt" : {
@@ -2685,20 +3002,27 @@
       "OnboardingPreferencesRequest" : {
         "properties" : {
           "currentLevel" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "interests" : {
             "items" : {
+              "maxLength" : 40,
+              "minLength" : 0,
               "type" : "string"
             },
+            "maxItems" : 10,
+            "minItems" : 0,
             "type" : "array"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           }
@@ -2791,6 +3115,8 @@
         "properties" : {
           "count" : {
             "format" : "int32",
+            "maximum" : 1000,
+            "minimum" : 0,
             "type" : "integer"
           }
         },
@@ -2833,6 +3159,240 @@
           }
         },
         "required" : [ "name" ],
+        "type" : "object"
+      },
+      "RescueAutopilotView" : {
+        "properties" : {
+          "changedAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "pausedUntil" : {
+            "format" : "date",
+            "type" : [ "string", "null" ]
+          },
+          "reason" : {
+            "type" : [ "string", "null" ]
+          },
+          "sendEnabled" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "changedAt", "sendEnabled" ],
+        "type" : "object"
+      },
+      "RescueCandidateView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "chosen" : {
+            "type" : "boolean"
+          },
+          "factIds" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "index" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "judgePass" : {
+            "type" : [ "boolean", "null" ]
+          },
+          "judgeReason" : {
+            "type" : [ "string", "null" ]
+          },
+          "note" : {
+            "type" : [ "string", "null" ]
+          },
+          "rank" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "rating" : {
+            "enum" : [ "UP", "DOWN" ],
+            "type" : [ "string", "null" ]
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "violations" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "angle", "body", "chosen", "factIds", "index", "rank", "title", "violations" ],
+        "type" : "object"
+      },
+      "RescueFunnelRow" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "arm" : {
+            "enum" : [ "TREATED", "HOLDOUT" ],
+            "type" : "string"
+          },
+          "completed" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "opened" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "planned" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "returned24h" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "sent" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "angle", "arm", "completed", "opened", "planned", "returned24h", "sent", "source" ],
+        "type" : "object"
+      },
+      "RescuePlanView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "completedAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "outroSoft" : {
+            "type" : [ "string", "null" ]
+          },
+          "outroWin" : {
+            "type" : [ "string", "null" ]
+          },
+          "plannedFor" : {
+            "format" : "date",
+            "type" : "string"
+          },
+          "sentAt" : {
+            "format" : "date-time",
+            "type" : [ "string", "null" ]
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "PLANNED", "HOLDOUT", "SENT", "COMPLETED", "EXPIRED" ],
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordCount" : {
+            "format" : "int32",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "angle", "body", "id", "plannedFor", "source", "status", "title", "userId", "wordCount" ],
+        "type" : "object"
+      },
+      "RescuePreviewView" : {
+        "properties" : {
+          "angle" : {
+            "type" : "string"
+          },
+          "body" : {
+            "type" : "string"
+          },
+          "candidates" : {
+            "items" : {
+              "$ref" : "#/components/schemas/RescueCandidateView"
+            },
+            "type" : "array"
+          },
+          "createdAt" : {
+            "format" : "date-time",
+            "type" : "string"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "outroSoft" : {
+            "type" : [ "string", "null" ]
+          },
+          "outroWin" : {
+            "type" : [ "string", "null" ]
+          },
+          "promptVersion" : {
+            "type" : "string"
+          },
+          "source" : {
+            "enum" : [ "AI", "AI_PICKS_TEMPLATE_COPY", "FALLBACK" ],
+            "type" : "string"
+          },
+          "title" : {
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "wordIds" : {
+            "items" : {
+              "format" : "int64",
+              "type" : "integer"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "angle", "body", "candidates", "createdAt", "id", "promptVersion", "source", "title", "userId", "wordIds" ],
+        "type" : "object"
+      },
+      "RescueRatingRequest" : {
+        "properties" : {
+          "candidateIndex" : {
+            "format" : "int32",
+            "minimum" : 0,
+            "type" : "integer"
+          },
+          "note" : {
+            "maxLength" : 500,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
+          "rating" : {
+            "enum" : [ "UP", "DOWN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "candidateIndex", "rating" ],
         "type" : "object"
       },
       "ResponseTimeTrendResponse" : {
@@ -2909,6 +3469,22 @@
         "required" : [ "body", "title" ],
         "type" : "object"
       },
+      "SendSupportMessageRequest" : {
+        "properties" : {
+          "body" : {
+            "maxLength" : 4000,
+            "minLength" : 0,
+            "type" : "string"
+          },
+          "clientMessageId" : {
+            "maxLength" : 64,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "body" ],
+        "type" : "object"
+      },
       "SettingsDto" : {
         "properties" : {
           "dailyReminderTime" : {
@@ -2927,6 +3503,8 @@
             } ]
           },
           "languageCode" : {
+            "maxLength" : 8,
+            "minLength" : 0,
             "type" : "string"
           },
           "notificationFrequency" : {
@@ -2944,9 +3522,13 @@
             "type" : "boolean"
           },
           "themeMode" : {
+            "maxLength" : 16,
+            "minLength" : 0,
             "type" : "string"
           },
           "timezone" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           }
         },
@@ -3070,11 +3652,26 @@
       "SuggestVocabularyRequest" : {
         "properties" : {
           "currentLevel" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
+          "focus" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/VocabularyFocus"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "instructions" : {
+            "maxLength" : 300,
+            "minLength" : 0,
+            "type" : [ "string", "null" ]
+          },
           "interests" : {
             "items" : {
+              "maxLength" : 40,
+              "minLength" : 0,
               "type" : "string"
             },
             "maxItems" : 10,
@@ -3082,10 +3679,12 @@
             "type" : "array"
           },
           "nativeLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
@@ -3117,6 +3716,103 @@
           }
         },
         "required" : [ "currentLevel", "items", "nativeLanguage", "targetLanguage" ],
+        "type" : "object"
+      },
+      "SupportMessageDto" : {
+        "properties" : {
+          "body" : {
+            "type" : "string"
+          },
+          "clientMessageId" : {
+            "type" : [ "string", "null" ]
+          },
+          "createdAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "sender" : {
+            "enum" : [ "USER", "ADMIN" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "body", "createdAt", "id", "sender" ],
+        "type" : "object"
+      },
+      "SupportMessagesDto" : {
+        "properties" : {
+          "messages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            },
+            "type" : "array"
+          },
+          "unreadCount" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "messages", "unreadCount" ],
+        "type" : "object"
+      },
+      "SupportStatusRequest" : {
+        "properties" : {
+          "status" : {
+            "enum" : [ "OPEN", "CLOSED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "status" ],
+        "type" : "object"
+      },
+      "SupportThreadDetailDto" : {
+        "properties" : {
+          "messages" : {
+            "items" : {
+              "$ref" : "#/components/schemas/SupportMessageDto"
+            },
+            "type" : "array"
+          },
+          "thread" : {
+            "$ref" : "#/components/schemas/SupportThreadSummaryDto"
+          }
+        },
+        "required" : [ "messages", "thread" ],
+        "type" : "object"
+      },
+      "SupportThreadSummaryDto" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessageAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastMessagePreview" : {
+            "type" : [ "string", "null" ]
+          },
+          "lastSender" : {
+            "enum" : [ "USER", "ADMIN" ],
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "OPEN", "CLOSED" ],
+            "type" : "string"
+          },
+          "userId" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userLabel" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "lastMessageAt", "status", "userId", "userLabel" ],
         "type" : "object"
       },
       "SuppressedUsersDto" : {
@@ -3196,7 +3892,8 @@
       "SyncListeningSessionRequest" : {
         "properties" : {
           "clientSessionId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -3217,7 +3914,8 @@
             "type" : "integer"
           },
           "order" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "pauseCount" : {
@@ -3237,14 +3935,18 @@
           },
           "repeatCount" : {
             "format" : "int32",
+            "maximum" : 100,
             "minimum" : 1,
             "type" : "integer"
           },
           "source" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "sourceDetail" : {
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "speechRate" : {
@@ -3284,11 +3986,13 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "targetLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordId" : {
@@ -3328,9 +4032,13 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "targetLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordId" : {
@@ -3338,9 +4046,13 @@
             "type" : "integer"
           },
           "wordText" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "wordTranslation" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3350,7 +4062,8 @@
       "SyncSessionRequest" : {
         "properties" : {
           "clientSessionId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -3384,10 +4097,13 @@
             "type" : "integer"
           },
           "reviewType" : {
-            "minLength" : 1,
+            "maxLength" : 32,
+            "minLength" : 0,
             "type" : "string"
           },
           "sourceLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "startedAt" : {
@@ -3395,6 +4111,8 @@
             "type" : "integer"
           },
           "targetLanguage" : {
+            "maxLength" : 20,
+            "minLength" : 0,
             "type" : [ "string", "null" ]
           },
           "totalCards" : {
@@ -3403,6 +4121,8 @@
             "type" : "integer"
           },
           "triggerSource" : {
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3413,16 +4133,19 @@
         "properties" : {
           "avgResponseMs" : {
             "format" : "int64",
+            "maximum" : 86400000,
             "minimum" : 0,
             "type" : "integer"
           },
           "bestStreak" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           },
           "clientGameId" : {
-            "minLength" : 1,
+            "maxLength" : 128,
+            "minLength" : 0,
             "type" : "string"
           },
           "completedNormally" : {
@@ -3430,34 +4153,41 @@
           },
           "correctCount" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           },
           "durationMs" : {
             "format" : "int64",
+            "maximum" : 86400000,
             "minimum" : 0,
             "type" : "integer"
           },
           "grade" : {
-            "minLength" : 1,
+            "maxLength" : 4,
+            "minLength" : 0,
             "type" : "string"
           },
           "livesRemaining" : {
             "format" : "int32",
+            "maximum" : 100,
             "minimum" : 0,
             "type" : "integer"
           },
           "playedAt" : {
             "format" : "int64",
+            "minimum" : 0,
             "type" : "integer"
           },
           "score" : {
             "format" : "int32",
+            "maximum" : 1000000,
             "minimum" : 0,
             "type" : "integer"
           },
           "totalQuestions" : {
             "format" : "int32",
+            "maximum" : 10000,
             "minimum" : 0,
             "type" : "integer"
           }
@@ -3516,6 +4246,106 @@
         "required" : [ "createdAt", "id", "name", "updatedAt", "wordCount" ],
         "type" : "object"
       },
+      "TasteScore" : {
+        "properties" : {
+          "allRated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allUp" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "allUpRate" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          },
+          "rated" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "target" : {
+            "format" : "double",
+            "type" : "number"
+          },
+          "up" : {
+            "format" : "int32",
+            "type" : "integer"
+          },
+          "upRate" : {
+            "format" : "double",
+            "type" : [ "number", "null" ]
+          }
+        },
+        "required" : [ "allRated", "allUp", "rated", "target", "up" ],
+        "type" : "object"
+      },
+      "TelegramChat" : {
+        "properties" : {
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "id" ],
+        "type" : "object"
+      },
+      "TelegramMessage" : {
+        "properties" : {
+          "chat" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramChat"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "from" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramUser"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "reply_to_message" : {
+            "$ref" : "#/components/schemas/TelegramMessage"
+          },
+          "text" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "message_id" ],
+        "type" : "object"
+      },
+      "TelegramUpdate" : {
+        "properties" : {
+          "message" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/TelegramMessage"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "update_id" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        },
+        "required" : [ "update_id" ],
+        "type" : "object"
+      },
+      "TelegramUser" : {
+        "properties" : {
+          "is_bot" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "is_bot" ],
+        "type" : "object"
+      },
       "TrackEventRequest" : {
         "properties" : {
           "appVersion" : {
@@ -3550,10 +4380,12 @@
       "TranslateTextRequest" : {
         "properties" : {
           "targetLanguage" : {
+            "maxLength" : 40,
             "minLength" : 1,
             "type" : "string"
           },
           "text" : {
+            "maxLength" : 1000,
             "minLength" : 1,
             "type" : "string"
           }
@@ -3609,7 +4441,8 @@
       "UpdateTimezoneRequest" : {
         "properties" : {
           "timezone" : {
-            "minLength" : 1,
+            "maxLength" : 64,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3619,6 +4452,8 @@
       "UpdateWordRequest" : {
         "properties" : {
           "description" : {
+            "maxLength" : 5000,
+            "minLength" : 0,
             "type" : "string"
           },
           "easeFactor" : {
@@ -3642,7 +4477,8 @@
             "type" : "integer"
           },
           "originalWord" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "repetitions" : {
@@ -3650,7 +4486,8 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "tagIds" : {
@@ -3658,14 +4495,18 @@
               "format" : "int64",
               "type" : "integer"
             },
+            "maxItems" : 50,
+            "minItems" : 0,
             "type" : "array"
           },
           "targetLanguage" : {
-            "minLength" : 1,
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "translation" : {
-            "minLength" : 1,
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           }
         },
@@ -3775,6 +4616,39 @@
         "required" : [ "extractedText", "wordCount" ],
         "type" : "object"
       },
+      "VocabularyFocus" : {
+        "properties" : {
+          "grammarNotes" : {
+            "type" : "boolean"
+          },
+          "markedOnly" : {
+            "type" : "boolean"
+          },
+          "noteStyle" : {
+            "enum" : [ "EXAMPLE", "GRAMMAR" ],
+            "type" : [ "string", "null" ]
+          },
+          "register" : {
+            "enum" : [ "FORMAL", "EVERYDAY", "SLANG" ],
+            "type" : [ "string", "null" ]
+          },
+          "skipNames" : {
+            "type" : "boolean"
+          },
+          "wordTypes" : {
+            "items" : {
+              "enum" : [ "NOUN", "VERB", "ADJECTIVE", "ADVERB", "PHRASE", "IDIOM" ],
+              "type" : "string"
+            },
+            "maxItems" : 6,
+            "minItems" : 0,
+            "type" : "array",
+            "uniqueItems" : true
+          }
+        },
+        "required" : [ "grammarNotes", "markedOnly", "skipNames", "wordTypes" ],
+        "type" : "object"
+      },
       "WeekdayAccuracyDto" : {
         "properties" : {
           "accuracyPct" : {
@@ -3873,6 +4747,8 @@
       "WordDto" : {
         "properties" : {
           "description" : {
+            "maxLength" : 5000,
+            "minLength" : 0,
             "type" : "string"
           },
           "easeFactor" : {
@@ -3900,6 +4776,8 @@
             "type" : "integer"
           },
           "originalWord" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "repetitions" : {
@@ -3907,6 +4785,8 @@
             "type" : "integer"
           },
           "sourceLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "tagIds" : {
@@ -3914,12 +4794,18 @@
               "format" : "int64",
               "type" : "integer"
             },
+            "maxItems" : 50,
+            "minItems" : 0,
             "type" : "array"
           },
           "targetLanguage" : {
+            "maxLength" : 10,
+            "minLength" : 0,
             "type" : "string"
           },
           "translation" : {
+            "maxLength" : 500,
+            "minLength" : 0,
             "type" : "string"
           },
           "updatedAt" : {
@@ -4074,7 +4960,7 @@
   "paths" : {
     "/admin/config" : {
       "get" : {
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "responses" : {
           "200" : {
             "content" : {
@@ -4369,7 +5255,7 @@
           "name" : "job",
           "required" : true,
           "schema" : {
-            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS" ],
+            "enum" : [ "SMART_DISPATCH", "STREAK_SAVERS", "REVIEW_REMINDERS", "REFRESH_SCHEDULES", "REFRESH_SEGMENTS", "COMEBACK_RESCUE_PLANNING" ],
             "type" : "string"
           }
         } ],
@@ -4557,6 +5443,207 @@
         "tags" : [ "notification-admin-controller" ]
       }
     },
+    "/admin/rescue/autopilot" : {
+      "get" : {
+        "operationId" : "autopilot",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseRescueAutopilotView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/eval.jsonl" : {
+      "get" : {
+        "operationId" : "evalSet",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "text/plain" : {
+                "schema" : {
+                  "type" : "string"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/funnel" : {
+      "get" : {
+        "operationId" : "funnel",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "days",
+          "required" : false,
+          "schema" : {
+            "default" : 14,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescueFunnelRow"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/plans" : {
+      "get" : {
+        "operationId" : "plans",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePlanView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/previews" : {
+      "get" : {
+        "operationId" : "previews",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 50,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePreviewView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      },
+      "post" : {
+        "operationId" : "generatePreviews",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "count",
+          "required" : false,
+          "schema" : {
+            "default" : 20,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListRescuePreviewView"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/previews/{previewId}/ratings" : {
+      "post" : {
+        "operationId" : "rate",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "previewId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RescueRatingRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTasteScore"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
+    "/admin/rescue/taste" : {
+      "get" : {
+        "operationId" : "taste",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseTasteScore"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "rescue-admin-controller" ]
+      }
+    },
     "/admin/subscriptions/reconcile" : {
       "post" : {
         "operationId" : "reconcile",
@@ -4593,6 +5680,125 @@
           }
         },
         "tags" : [ "subscription-admin-controller" ]
+      }
+    },
+    "/admin/support/threads" : {
+      "get" : {
+        "operationId" : "listThreads",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListSupportThreadSummaryDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}" : {
+      "get" : {
+        "operationId" : "getThread",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportThreadDetailDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}/messages" : {
+      "post" : {
+        "operationId" : "reply",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/AdminSupportReplyRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessageDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
+      }
+    },
+    "/admin/support/threads/{threadId}/status" : {
+      "post" : {
+        "operationId" : "setStatus",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "threadId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SupportStatusRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportThreadSummaryDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-admin-controller" ]
       }
     },
     "/api/v1/ai/extract-vocabulary" : {
@@ -5616,6 +6822,44 @@
         "tags" : [ "listening-controller" ]
       }
     },
+    "/api/v1/mcp/connections" : {
+      "get" : {
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListMcpConnectionDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "mcp-connections-controller" ]
+      }
+    },
+    "/api/v1/mcp/connections/{id}" : {
+      "delete" : {
+        "operationId" : "disconnect",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : { },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "mcp-connections-controller" ]
+      }
+    },
     "/api/v1/notifications/register-token" : {
       "post" : {
         "operationId" : "registerPushToken",
@@ -5642,6 +6886,33 @@
           }
         },
         "tags" : [ "push-notification-controller" ]
+      }
+    },
+    "/api/v1/notifications/rescue/{rescueId}/complete" : {
+      "post" : {
+        "operationId" : "complete",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "rescueId",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "comeback-rescue-controller" ]
       }
     },
     "/api/v1/notifications/send" : {
@@ -5920,6 +7191,93 @@
           }
         },
         "tags" : [ "subscription-controller" ]
+      }
+    },
+    "/api/v1/support/messages" : {
+      "get" : {
+        "operationId" : "getMessages",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "after",
+          "required" : false,
+          "schema" : {
+            "default" : 0,
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessagesDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
+      },
+      "post" : {
+        "operationId" : "sendMessage",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/SendSupportMessageRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseSupportMessageDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
+      }
+    },
+    "/api/v1/support/read" : {
+      "post" : {
+        "operationId" : "markRead",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "support-controller" ]
       }
     },
     "/api/v1/tags" : {
@@ -6295,6 +7653,36 @@
         "tags" : [ "webhook-controller" ]
       }
     },
+    "/api/v1/webhooks/telegram" : {
+      "post" : {
+        "operationId" : "onUpdate",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Telegram-Bot-Api-Secret-Token",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/TelegramUpdate"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : { },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "telegram-webhook-controller" ]
+      }
+    },
     "/api/v1/word-rush/history" : {
       "get" : {
         "operationId" : "getHistory",
@@ -6487,6 +7875,33 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/ApiResponseBatchUpdateLanguagesResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "word-controller" ]
+      }
+    },
+    "/api/v1/words/deleted" : {
+      "get" : {
+        "operationId" : "deleted",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "since",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListLong"
                 }
               }
             },

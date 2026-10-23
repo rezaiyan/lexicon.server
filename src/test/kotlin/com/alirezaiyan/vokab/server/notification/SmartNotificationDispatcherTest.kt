@@ -30,6 +30,7 @@ class SmartNotificationDispatcherTest {
     private val milestoneDetector: MilestoneDetector = mockk()
     private val notificationEngagementService: NotificationEngagementService = mockk()
     private val dailyInsightService: com.alirezaiyan.vokab.server.ai.DailyInsightService = mockk(relaxed = true)
+    private val comebackRescueService: com.alirezaiyan.vokab.server.notification.rescue.ComebackRescueService = mockk()
     private val meterRegistry = SimpleMeterRegistry()
 
     private lateinit var dispatcher: SmartNotificationDispatcher
@@ -37,6 +38,8 @@ class SmartNotificationDispatcherTest {
     @BeforeEach
     fun setUp() {
         every { notificationTypeSelector.studiedToday(any()) } returns false
+        every { comebackRescueService.sendablePlan(any()) } returns null
+        justRun { comebackRescueService.markSent(any(), any()) }
         dispatcher = dispatcherAt(TEST_NOW)
     }
 
@@ -48,6 +51,7 @@ class SmartNotificationDispatcherTest {
         milestoneDetector,
         notificationEngagementService,
         dailyInsightService,
+        comebackRescueService,
         clock = fixedClock(now),
         meterRegistry = meterRegistry,
     )
@@ -144,6 +148,28 @@ class SmartNotificationDispatcherTest {
         dispatcher.dispatchForCurrentHour()
 
         verify(exactly = 1) { milestoneDetector.recordMilestoneSnapshot(user) }
+    }
+
+    @Test
+    fun `a milestone push that fell back to an insight is recorded as the requested type without a snapshot`() {
+        val user     = testUser(id = 5L)
+        val schedule = testSchedule(user)
+        val payload  = testPayload(type = NotificationType.DAILY_INSIGHT)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.PROGRESS_MILESTONE
+        every { notificationContentBuilder.build(user, NotificationType.PROGRESS_MILESTONE, null) } returns payload
+        every { pushNotificationService.sendNotificationToUser(userId = 5L, title = any(), body = any(), data = any()) } returns listOf(
+            NotificationResponse(success = true)
+        )
+        justRun { notificationEngagementService.recordSend(any(), any(), any()) }
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 77L
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 1) { notificationEngagementService.saveLog(5L, NotificationType.PROGRESS_MILESTONE.name, any(), any(), any()) }
+        verify(exactly = 1) { notificationEngagementService.recordSend(schedule, NotificationType.PROGRESS_MILESTONE.name, any()) }
+        verify(exactly = 0) { milestoneDetector.recordMilestoneSnapshot(any()) }
     }
 
     @Test
@@ -467,6 +493,67 @@ class SmartNotificationDispatcherTest {
     }
 
     // ── Factories ─────────────────────────────────────────────────────────────────
+
+    // ── Comeback rescue ───────────────────────────────────────────────────────────
+
+    private fun plannedRescue(userId: Long) = com.alirezaiyan.vokab.server.notification.rescue.ComebackRescue(
+        id = 42L, userId = userId, plannedFor = com.alirezaiyan.vokab.server.TEST_TODAY,
+        wordIds = "[5,1,20]", title = "Gewitter, round 3", body = "8 words, about 3 min.", angle = "rematch",
+        source = com.alirezaiyan.vokab.server.notification.rescue.RescueSource.AI,
+        status = com.alirezaiyan.vokab.server.notification.rescue.RescueStatus.PLANNED,
+    )
+
+    @Test
+    fun `should send today's comeback rescue before any other push`() {
+        val user     = testUser(id = 5L)
+        val schedule = testSchedule(user)
+        val data     = slot<Map<String, String>>()
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { comebackRescueService.sendablePlan(5L) } returns plannedRescue(5L)
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 88L
+        every { pushNotificationService.sendNotificationToUser(userId = 5L, title = "Gewitter, round 3", body = any(), data = capture(data)) } returns
+            listOf(NotificationResponse(success = true))
+        justRun { notificationEngagementService.recordSend(schedule, NotificationType.COMEBACK_RESCUE.name, 88L) }
+
+        dispatcher.dispatchForCurrentHour()
+
+        assertEquals("vokab://review/rescue?ids=5,1,20&rid=42", data.captured["deep_link"])
+        verify(exactly = 1) { comebackRescueService.markSent(42L, 88L) }
+        verify(exactly = 0) { notificationTypeSelector.selectType(any(), any()) }
+    }
+
+    @Test
+    fun `should not send a rescue to a learner who studied today`() {
+        val user     = testUser(id = 6L)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { notificationTypeSelector.studiedToday(user) } returns true
+        every { notificationTypeSelector.selectType(user, schedule) } returns NotificationType.NONE
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 0) { comebackRescueService.sendablePlan(any()) }
+        verify(exactly = 0) { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun `should not mark a rescue sent when delivery fails`() {
+        val user     = testUser(id = 7L)
+        val schedule = testSchedule(user)
+
+        every { notificationScheduleRepository.findUsersToNotifyAtHour(any()) } returns listOf(schedule)
+        every { comebackRescueService.sendablePlan(7L) } returns plannedRescue(7L)
+        every { notificationEngagementService.saveLog(any(), any(), any(), any(), any()) } returns 89L
+        every { pushNotificationService.sendNotificationToUser(any(), any(), any(), any()) } returns
+            listOf(NotificationResponse(success = false))
+        justRun { notificationEngagementService.deleteLog(89L) }
+
+        dispatcher.dispatchForCurrentHour()
+
+        verify(exactly = 0) { comebackRescueService.markSent(any(), any()) }
+    }
 
     private fun testUser(
         id: Long = 1L,

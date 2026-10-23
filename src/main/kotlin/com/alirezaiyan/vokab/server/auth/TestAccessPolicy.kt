@@ -12,6 +12,7 @@ import java.time.Instant
 private val logger = KotlinLogging.logger {}
 
 private const val GRANT_REASON_TEST_EMAIL = "test_email"
+private const val GRANT_REASON_CI_TEST = "ci_test"
 private const val TEST_GRANT_SECONDS = 100L * 365 * 24 * 60 * 60
 
 /** Premium access for accounts on the admin-managed test-email list, and for CI tests. */
@@ -38,6 +39,16 @@ class TestAccessPolicy(
             return withGrant(user, null, null)
         }
         return user
+    }
+
+    /**
+     * Premium for premium CI tests, whether or not the CI email is on the test-email list (which
+     * admins edit for real testers). `applyTo` leaves a `ci_test` grant alone; [stripPremium]
+     * clears it for non-premium runs.
+     */
+    fun grantForCi(user: User): User {
+        logger.info { "Granting premium access for CI test: userId=${user.id}" }
+        return withGrant(user, Instant.now(clock).plusSeconds(TEST_GRANT_SECONDS), GRANT_REASON_CI_TEST)
     }
 
     /**

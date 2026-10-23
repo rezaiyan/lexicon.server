@@ -37,7 +37,7 @@ All secrets + env-specific values injected via env vars. Without `DATABASE_URL` 
 | `CI_TEST_AUTH_ENABLED` | `false` | Enable CI-only auth bypass |
 | `CI_TEST_SECRET` | — | CI auth secret |
 | `CI_TEST_EMAIL` | `ci-maestro@test.vokab.dev` | CI test user email |
-| `TEST_EMAILS` | — | Comma-separated emails that bypass `active` check |
+| `TEST_EMAILS` | — | Unused (no longer bypasses the `active` check) |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenRouter base URL |
 
 ## AppProperties (Kotlin)
@@ -48,7 +48,7 @@ Structured config via `@ConfigurationProperties`:
 - `app.features.push-notifications-enabled` → reported to the app in `/users/feature-flags` (via `FeatureAccessService`)
 - `app.cors.allowed-origins` → CORS
 - `app.ci-auth.*` → CI test auth
-- `app.security.testEmails` → bypass active-user check
+- `app.security.testEmails` → unused; deactivated users are always rejected
 
 ## Local Development
 
@@ -62,6 +62,4 @@ Tests (`./gradlew test`) run on PostgreSQL 17 via Testcontainers with the real F
 
 Scripts:
 - `scripts/start-dev.sh` — local dev
-- `scripts/start-prod.sh` — prod mode with PostgreSQL
 - `scripts/test-endpoints.sh` — smoke test API
-- `scripts/setup-db.sh` — initialize DB

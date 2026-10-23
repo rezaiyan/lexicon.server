@@ -1,6 +1,6 @@
 [versions]
 kotlin = "2.3.10"
-spring-boot = "3.5.6"
+spring-boot = "3.5.16"
 spring-dependency-management = "1.1.7"
 flyway = "11.8.0"
 jjwt = "0.13.0"
@@ -13,6 +13,8 @@ detekt = "1.23.8"
 springdoc = "2.8.17"
 spring-modulith = "1.4.13"
 konsist = "0.17.3"
+# 1.1.x is the Spring Boot 3.5 line; 2.x needs Boot 4
+spring-ai = "1.1.8"
 
 [libraries]
 # Versions managed by the Spring Boot BOM
@@ -26,6 +28,8 @@ spring-boot-starter-mail = { module = "org.springframework.boot:spring-boot-star
 micrometer-registry-prometheus = { module = "io.micrometer:micrometer-registry-prometheus" }
 spring-boot-starter-test = { module = "org.springframework.boot:spring-boot-starter-test" }
 spring-security-crypto = { module = "org.springframework.security:spring-security-crypto" }
+spring-security-oauth2-authorization-server = { module = "org.springframework.security:spring-security-oauth2-authorization-server" }
+spring-security-oauth2-resource-server = { module = "org.springframework.security:spring-security-oauth2-resource-server" }
 spring-security-test = { module = "org.springframework.security:spring-security-test" }
 kotlin-reflect = { module = "org.jetbrains.kotlin:kotlin-reflect" }
 kotlin-test-junit5 = { module = "org.jetbrains.kotlin:kotlin-test-junit5" }
@@ -43,12 +47,16 @@ jjwt-impl = { module = "io.jsonwebtoken:jjwt-impl", version.ref = "jjwt" }
 jjwt-jackson = { module = "io.jsonwebtoken:jjwt-jackson", version.ref = "jjwt" }
 firebase-admin = { module = "com.google.firebase:firebase-admin", version.ref = "firebase-admin" }
 bucket4j-core = { module = "com.bucket4j:bucket4j-core", version.ref = "bucket4j" }
+# Version managed by the Spring Boot BOM (pinned via httpclient5.version in build.gradle.kts)
+httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5" }
 geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 spring-modulith-starter-jdbc = { module = "org.springframework.modulith:spring-modulith-starter-jdbc", version.ref = "spring-modulith" }
-spring-modulith-starter-test = { module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
+spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }
+spring-ai-starter-mcp-server-webmvc = { module = "org.springframework.ai:spring-ai-starter-mcp-server-webmvc" }
+spring-modulith-starter-test ={ module = "org.springframework.modulith:spring-modulith-starter-test", version.ref = "spring-modulith" }
 
 [plugins]
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }

@@ -1,5 +1,7 @@
 package com.alirezaiyan.vokab.server.ai
 
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedInstruction
+import com.alirezaiyan.vokab.server.ai.instructions.ScreenedIntent
 import com.alirezaiyan.vokab.server.study.ProgressStatsDto
 import com.alirezaiyan.vokab.server.fixedClock
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
@@ -36,7 +38,6 @@ class AiServiceTest {
     private val service = AiService(
         OpenRouterClient(builder, appProperties(), meterRegistry, AiCallTracker(fixedClock())) { _, _, _ -> },
         PromptTemplates(),
-        appProperties(),
     )
 
     // ── extractVocabularyFromImage ────────────────────────────────────────────
@@ -150,7 +151,7 @@ class AiServiceTest {
     fun `generateVocabularyFromPreferences parses lines and skips entries without a translation`() {
         expectChat().andRespond(answer("Hallo,hello,a greeting\nkaputt\nBrot,bread,\n\ndanke,thank you"))
 
-        val items = service.generateVocabularyFromPreferences("German", "beginner", "English")
+        val items = service.generateVocabularyFromPreferences("German", "beginner", "English", count = 50)
 
         assertEquals(listOf("Hallo", "Brot", "danke"), items.map { it.originalWord })
         assertEquals("a greeting", items.first().description)
@@ -163,7 +164,17 @@ class AiServiceTest {
             .andExpect(promptContains("travel, food"))
             .andRespond(answer("Hallo,hello"))
 
-        service.generateVocabularyFromPreferences("German", "beginner", "English", listOf("travel", "food"))
+        service.generateVocabularyFromPreferences("German", "beginner", "English", listOf("travel", "food"), count = 50)
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences asks for a small count with a little headroom`() {
+        expectChat()
+            .andExpect(promptContains("Generate exactly 8 vocabulary items"))
+            .andRespond(answer("Hallo,hello"))
+
+        service.generateVocabularyFromPreferences("German", "beginner", "English", count = 5)
         server.verify()
     }
 
@@ -171,10 +182,79 @@ class AiServiceTest {
     fun `generateVocabularyFromPreferences reports an empty answer to the user`() {
         expectChat().andRespond(answer("  "))
 
-        assertThrows<UserFacingException> { service.generateVocabularyFromPreferences("German", "beginner", "English") }
+        assertThrows<UserFacingException> { service.generateVocabularyFromPreferences("German", "beginner", "English", count = 50) }
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences puts quick picks and the screened request ahead of the balanced mix`() {
+        expectChat()
+            .andExpect(promptContains("The learner request below comes first"))
+            .andExpect(promptContains("Only include these kinds of items: verbs."))
+            .andExpect(promptContains("<learner_request>"))
+            .andExpect(promptContains("Hospital job interview"))
+            .andRespond(answer("Bewerbung,application"))
+
+        service.generateVocabularyFromPreferences(
+            "German", "beginner", "English",
+            preferences = LearnerPreferences(
+                VocabularyFocus(wordTypes = setOf(WordType.VERB)),
+                ScreenedInstruction(ScreenedIntent("Hospital job interview")),
+            ),
+            count = 50,
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences leaves the learner blocks out when nothing was asked`() {
+        expectChat()
+            .andExpect(content().string(not(containsString("learner_request"))))
+            .andExpect(content().string(not(containsString("Learner focus"))))
+            .andRespond(answer("Hallo,hello"))
+
+        service.generateVocabularyFromPreferences("German", "beginner", "English", count = 50)
+        server.verify()
     }
 
     // ── extractWordsFromImage (v2) ────────────────────────────────────────────
+
+    @Test
+    fun `extractWordsFromImage adds quick picks and the screened request before the output format`() {
+        expectChat()
+            .andExpect(promptContains("Only take items that are visibly marked"))
+            .andExpect(promptContains("<learner_request>"))
+            .andExpect(promptContains("Verbs only"))
+            .andRespond(answer("{\"items\":[]}"))
+
+        service.extractWordsFromImage(
+            "AAAA", "German", "English",
+            preferences = LearnerPreferences(VocabularyFocus(markedOnly = true), ScreenedInstruction(ScreenedIntent("Verbs only"))),
+        )
+        server.verify()
+    }
+
+    @Test
+    fun `extractWordsFromImage limits the answer to the number of items the learner asked for`() {
+        expectChat()
+            .andExpect(promptContains("Return at most 2 items"))
+            .andRespond(
+                answer(
+                    "{\"items\":[{\"term\":\"gehen\",\"translation\":\"to go\"}," +
+                        "{\"term\":\"Haus\",\"translation\":\"house\"}," +
+                        "{\"term\":\"Baum\",\"translation\":\"tree\"}]}",
+                ),
+            )
+
+        val items = service.extractWordsFromImage(
+            "AAAA", "German", "English",
+            preferences = LearnerPreferences(
+                instruction = ScreenedInstruction(ScreenedIntent("The marked words"), itemCount = 2),
+            ),
+        )
+
+        assertEquals(listOf("gehen", "Haus"), items.map { it.term })
+        server.verify()
+    }
 
     @Test
     fun `extractWordsFromImage returns clean de-duplicated items from the JSON answer`() {

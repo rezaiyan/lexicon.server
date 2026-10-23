@@ -62,6 +62,8 @@ class TagService(
         val user = userRepository.getReferenceById(userId)
         val tag = tagRepository.findByIdAndUser(id, user)
             ?: throw NoSuchElementException("Tag not found")
+        // Before the delete drops the word_tags rows: the words lose this tag, so they count as changed
+        tagRepository.touchWordsByTagIdAndUserId(id, userId, Instant.now(clock))
         tagRepository.delete(tag)
         logger.info { "Deleted tag ${tag.id} for user ${user.id}" }
     }

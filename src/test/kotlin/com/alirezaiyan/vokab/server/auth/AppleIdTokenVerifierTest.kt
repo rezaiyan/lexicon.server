@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.time.Instant
 import java.util.Date
 
@@ -64,12 +65,12 @@ class AppleIdTokenVerifierTest {
     @Test
     fun `verify rejects a token signed with a different key`() {
         val otherKey = KeyPairGenerator.getInstance("RSA").apply { initialize(2048) }.generateKeyPair()
-        assertNull(verifier.verify(token(signingKey = otherKey)))
+        assertNull(verifier.verify(token(key = SigningKey(KID, otherKey))))
     }
 
     @Test
     fun `verify rejects a token with an unknown key id`() {
-        assertNull(verifier.verify(token(kid = "unknown")))
+        assertNull(verifier.verify(token(key = SigningKey("unknown", keyPair))))
     }
 
     @Test
@@ -89,24 +90,58 @@ class AppleIdTokenVerifierTest {
         assertNull(verifier.verify("not-a-jwt"))
     }
 
+    @Test
+    fun `verify accepts a token whose nonce is the SHA-256 hex of the raw nonce`() {
+        val claims = verifier.verify(token(nonce = sha256Hex("raw-nonce")), rawNonce = "raw-nonce")
+
+        assertEquals("sub-123", claims?.subject)
+    }
+
+    @Test
+    fun `verify rejects a token whose nonce does not match the raw nonce`() {
+        assertNull(verifier.verify(token(nonce = sha256Hex("other-nonce")), rawNonce = "raw-nonce"))
+    }
+
+    @Test
+    fun `verify rejects a token without nonce when the client sent one`() {
+        assertNull(verifier.verify(token(nonce = null), rawNonce = "raw-nonce"))
+    }
+
+    @Test
+    fun `verify rejects a token carrying the raw nonce instead of its hash`() {
+        assertNull(verifier.verify(token(nonce = "raw-nonce"), rawNonce = "raw-nonce"))
+    }
+
+    @Test
+    fun `verify skips the nonce check when the client sent none`() {
+        assertEquals("sub-123", verifier.verify(token(nonce = sha256Hex("anything")))?.subject)
+    }
+
+    private fun sha256Hex(value: String): String =
+        MessageDigest.getInstance("SHA-256").digest(value.toByteArray()).joinToString("") { "%02x".format(it) }
+
     private fun token(
         subject: String? = "sub-123",
         email: String? = "user@example.com",
+        nonce: String? = null,
         audience: String = BUNDLE_ID,
         issuer: String = "https://appleid.apple.com",
         expiresAt: Instant = Instant.now().plusSeconds(600),
-        kid: String = KID,
-        signingKey: KeyPair = keyPair,
+        key: SigningKey = SigningKey(KID, keyPair),
     ): String = Jwts.builder()
-        .header().keyId(kid).and()
+        .header().keyId(key.kid).and()
         .issuer(issuer)
         .audience().add(audience).and()
         .apply { subject?.let { subject(it) } }
         .apply { email?.let { claim("email", it) } }
+        .apply { nonce?.let { claim("nonce", it) } }
         .issuedAt(Date())
         .expiration(Date.from(expiresAt))
-        .signWith(signingKey.private, Jwts.SIG.RS256)
+        .signWith(key.keyPair.private, Jwts.SIG.RS256)
         .compact()
+
+    /** The key a test token is signed with, and the `kid` its header names. */
+    private data class SigningKey(val kid: String, val keyPair: KeyPair)
 
     private companion object {
         const val KID = "test-kid"

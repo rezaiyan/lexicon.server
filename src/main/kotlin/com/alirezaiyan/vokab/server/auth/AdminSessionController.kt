@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.shared.ApiResponse
 import com.alirezaiyan.vokab.server.shared.RateLimitConfig
+import com.alirezaiyan.vokab.server.shared.clientAddress
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.swagger.v3.oas.annotations.Hidden
 import jakarta.servlet.http.HttpServletRequest
@@ -51,11 +52,13 @@ class AdminSessionController(
         @RequestHeader(ADMIN_REQUEST_HEADER, required = false) adminRequest: String?,
         request: HttpServletRequest,
     ): ResponseEntity<ApiResponse<AdminSessionDto>> {
-        val ip = AdminAuthenticationFilter.clientIp(request)
+        val ip = request.clientAddress()
         val bucket = rateLimitConfig.getAdminAuthBucket(ip)
-        refusal(adminRequest, bucket.availableTokens)?.let { return it }
+        val globalBucket = rateLimitConfig.getAdminAuthGlobalBucket()
+        refusal(adminRequest, minOf(bucket.availableTokens, globalBucket.availableTokens))?.let { return it }
         if (!adminSessionTokens.keyMatches(body.key)) {
             bucket.tryConsume(1)
+            globalBucket.tryConsume(1)
             logger.warn { "Rejected admin dashboard sign-in from $ip" }
             return failure(HttpStatus.UNAUTHORIZED, "Invalid admin key")
         }

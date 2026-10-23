@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.auth
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.scheduling.annotation.Async
 import org.springframework.stereotype.Service
@@ -10,6 +11,7 @@ private val logger = KotlinLogging.logger {}
 class AuditLogService(
     private val auditLogRepository: AuditLogRepository
 ) {
+    private val metadataJson = ObjectMapper()
 
     @Async
     fun logLogin(userId: Long, email: String, provider: String, ipAddress: String?, userAgent: String?) {
@@ -37,15 +39,19 @@ class AuditLogService(
         )
     }
 
+    /**
+     * @param tokenLookupHash the refresh token's lookup hash (never the plaintext token); only a short
+     *   prefix is stored, enough to correlate with the refresh_tokens row.
+     */
     @Async
-    fun logLogout(userId: Long, email: String, refreshToken: String, ipAddress: String?) {
+    fun logLogout(userId: Long, email: String, tokenLookupHash: String, ipAddress: String?) {
         logger.info { "AUDIT: LOGOUT userId=$userId ip=$ipAddress" }
         save(
             eventType = AuditEventType.LOGOUT,
             userId = userId,
             email = email,
             ipAddress = ipAddress,
-            metadata = """{"tokenPrefix":"${refreshToken.take(8)}"}"""
+            metadata = metadataJson.writeValueAsString(mapOf("tokenHashPrefix" to tokenLookupHash.take(8)))
         )
     }
 
@@ -90,6 +96,21 @@ class AuditLogService(
             userId = userId,
             email = email,
             ipAddress = ipAddress
+        )
+    }
+
+    /**
+     * Not @Async: cheap, and the record must exist by the time the tool answers. Holds word ids,
+     * never word text, so it reveals nothing after the account (and its words) are deleted.
+     */
+    fun logMcpWrite(userId: Long, clientId: String, tool: String, wordIds: List<Long>) {
+        logger.info { "AUDIT: MCP_WRITE userId=$userId tool=$tool words=${wordIds.size}" }
+        save(
+            eventType = AuditEventType.MCP_WRITE,
+            userId = userId,
+            metadata = metadataJson.writeValueAsString(
+                mapOf("client" to clientId, "tool" to tool, "wordIds" to wordIds)
+            ),
         )
     }
 

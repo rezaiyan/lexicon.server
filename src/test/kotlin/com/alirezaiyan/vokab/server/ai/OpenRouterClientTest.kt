@@ -57,6 +57,26 @@ class OpenRouterClientTest {
     }
 
     @Test
+    fun `short answers are capped at the configured default max_tokens`() {
+        expectChat()
+            .andExpect(jsonPath("$.max_tokens").value(1024))
+            .andRespond(answer("Hallo"))
+
+        client.complete("Translate", AiOperation.TRANSLATION)
+        server.verify()
+    }
+
+    @Test
+    fun `list answers get their own larger max_tokens cap`() {
+        expectChat()
+            .andExpect(jsonPath("$.max_tokens").value(8192))
+            .andRespond(answer("Hallo,hello"))
+
+        client.complete("Suggest", AiOperation.SUGGEST_VOCABULARY)
+        server.verify()
+    }
+
+    @Test
     fun `an image is sent as a JPEG data URL before the prompt`() {
         expectChat()
             .andExpect(jsonPath("$.messages[0].content[0].type").value("image_url"))
@@ -161,9 +181,36 @@ class OpenRouterClientTest {
         assertEquals(emptyList<Any>(), recorded)
     }
 
-    private fun client(builder: RestClient.Builder, model: String) = OpenRouterClient(
+    @Test
+    fun `a judging call uses the judge model when one is set, other calls keep the main model`() {
+        val custom = RestClient.builder()
+        val customServer = MockRestServiceServer.bindTo(custom).build()
+        val judged = client(custom, "anthropic/writer", judgeModel = "anthropic/judge")
+        customServer.expect(requestTo(chatUrl)).andExpect(jsonPath("$.model").value("anthropic/judge")).andRespond(answer("ok"))
+        customServer.expect(requestTo(chatUrl)).andExpect(jsonPath("$.model").value("anthropic/writer")).andRespond(answer("ok"))
+
+        judged.complete("Judge", AiOperation.COMEBACK_RESCUE_JUDGE)
+        judged.complete("Write", AiOperation.COMEBACK_RESCUE)
+
+        customServer.verify()
+    }
+
+    @Test
+    fun `without a judge model a judging call uses the main model`() {
+        expectChat().andExpect(jsonPath("$.model").value("anthropic/claude-haiku-4.5")).andRespond(answer("ok"))
+
+        client.complete("Judge", AiOperation.COMEBACK_RESCUE_JUDGE)
+
+        server.verify()
+    }
+
+    private fun client(builder: RestClient.Builder, model: String, judgeModel: String = "") = OpenRouterClient(
         builder,
-        AppProperties(openrouter = OpenRouterConfig(apiKey = "test-api-key", baseUrl = "https://openrouter.ai/api/v1", model = model)),
+        AppProperties(
+            openrouter = OpenRouterConfig(
+                apiKey = "test-api-key", baseUrl = "https://openrouter.ai/api/v1", model = model, judgeModel = judgeModel,
+            )
+        ),
         meterRegistry,
         AiCallTracker(fixedClock()),
         { operation, model, usage -> recorded += Triple(operation, model, usage) },

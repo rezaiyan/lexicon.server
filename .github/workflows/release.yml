@@ -1,15 +1,50 @@
 name: Release
 
+# Releases only a commit CI already passed on main: the tag must point at a commit whose
+# ghcr.io/<repo>:sha-<commit> image exists, which CI publishes only after build, tests, detekt,
+# coverage and the image scan pass. Tag after main's CI is green (re-run this workflow if not).
+
 on:
   push:
     tags:
       - 'v*'
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
+  verify:
+    name: Verify CI passed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      packages: read
+    outputs:
+      source: ${{ steps.image.outputs.source }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Find the CI image for this commit
+        id: image
+        run: |
+          source="$IMAGE:sha-${GITHUB_SHA::7}"
+          if ! docker buildx imagetools inspect "$source" > /dev/null; then
+            echo "::error::$source not found: CI hasn't passed on main for $GITHUB_SHA. Tag a green main commit, or re-run once CI finishes."
+            exit 1
+          fi
+          echo "source=$source" >> "$GITHUB_OUTPUT"
+
   release:
     name: Build & Release
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    needs: verify
 
     permissions:
       contents: write
@@ -31,8 +66,9 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
+      # Tests already passed in CI for this exact commit (the verify job)
       - name: Build JAR
-        run: ./gradlew bootJar -x test --stacktrace
+        run: ./gradlew bootJar --stacktrace
 
       - name: Rename JAR
         run: |
@@ -70,20 +106,16 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
 
   image:
-    # Versioned image (ghcr.io/<repo>:1.2.3 and :v1.2.3), deployable with the Deploy workflow
+    # Versioned image (ghcr.io/<repo>:1.2.3 and :v1.2.3), deployable with the Deploy workflow.
+    # Re-tags the image CI built and scanned for this commit instead of rebuilding it.
     name: Release Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
+    needs: verify
     permissions:
       contents: read
       packages: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -91,21 +123,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Image tags
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=raw,value=${{ github.ref_name }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          build-args: GIT_SHA=${{ github.sha }}
-          cache-from: type=gha
+      - name: Tag the CI image
+        env:
+          SOURCE: ${{ needs.verify.outputs.source }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          docker buildx imagetools create -t "$IMAGE:$version" -t "$IMAGE:$GITHUB_REF_NAME" "$SOURCE"
+          echo "Tagged $SOURCE as $version and $GITHUB_REF_NAME"

@@ -33,7 +33,7 @@ src/main/kotlin/com/alirezaiyan/vokab/server/
 
 src/main/resources/
 ├── application.yml
-└── db/migration/    # Flyway V1–V31
+└── db/migration/    # Flyway migrations (V1, V2, ...)
 ```
 
 ## Key Features
@@ -60,7 +60,7 @@ See `.claude/` for deeper docs:
 |------|---------|
 | Run locally (H2) | `./gradlew bootRun` |
 | Run tests | `./gradlew test` |
-| Lint | `./gradlew ktlintCheck` |
+| Lint (detekt) | `./gradlew detekt` |
 | Build | `./gradlew build` |
 | Coverage | `./gradlew jacocoTestReport` |
 

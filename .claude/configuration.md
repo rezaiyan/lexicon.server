@@ -62,6 +62,4 @@ Tests (`./gradlew test`) run on PostgreSQL 17 via Testcontainers with the real F
 
 Scripts:
 - `scripts/start-dev.sh` — local dev
-- `scripts/start-prod.sh` — prod mode with PostgreSQL
 - `scripts/test-endpoints.sh` — smoke test API
-- `scripts/setup-db.sh` — initialize DB

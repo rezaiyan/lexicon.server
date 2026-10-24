@@ -156,7 +156,9 @@ data class AiInstructionsConfig(
 data class CiAuthConfig(
     var enabled: Boolean = false,
     var secret: String = "",
-    var testEmail: String = "ci-maestro@test.vokab.dev"
+    var testEmail: String = "ci-maestro@test.vokab.dev",
+    /** Account for marketing screenshots and recordings, kept apart from the CI user's test data. */
+    var showcaseEmail: String = "showcase@test.vokab.dev",
 )
 
 data class NotificationsConfig(

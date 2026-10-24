@@ -95,12 +95,12 @@ class UserProvisioning(
     }
 
     /**
-     * The dedicated CI account, with premium granted or explicitly stripped.
+     * A dedicated CI account (test or showcase), with premium granted or explicitly stripped.
      *
      * @throws AuthRejectedException if the CI email belongs to a real (Google/Apple) account, so a
-     *   misconfigured CI_TEST_EMAIL can never hand out tokens for a real user
+     *   misconfigured CI_TEST_EMAIL or CI_SHOWCASE_EMAIL can never hand out tokens for a real user
      */
-    fun ciUser(email: String, premium: Boolean): ProvisionedUser {
+    fun ciUser(email: String, premium: Boolean, name: String = "CI Test User"): ProvisionedUser {
         val now = Instant.now(clock)
         val existing = userRepository.findByEmail(email).orElse(null)
         if (existing != null && (existing.googleId != null || existing.appleId != null)) {
@@ -109,7 +109,7 @@ class UserProvisioning(
         }
         val user = existing
             ?.also { it.recordLogin(now) }
-            ?: User(email = email, name = "CI Test User", lastLoginAt = now)
+            ?: User(email = email, name = name, lastLoginAt = now)
                 .also { logger.info { "Creating new CI test user" } }
         return save(if (premium) testAccessPolicy.grantForCi(user) else testAccessPolicy.stripPremium(user))
     }

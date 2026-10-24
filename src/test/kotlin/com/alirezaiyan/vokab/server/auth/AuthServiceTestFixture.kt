@@ -71,7 +71,12 @@ abstract class AuthServiceTestFixture {
 
         appProperties = AppProperties(
             jwt = JwtConfig(refreshExpirationMs = 7_776_000_000L, refreshTokenGracePeriodMs = 30_000L),
-            ciAuth = CiAuthConfig(enabled = true, secret = "ci-secret", testEmail = "ci@test.vokab.dev"),
+            ciAuth = CiAuthConfig(
+                enabled = true,
+                secret = "ci-secret",
+                testEmail = "ci@test.vokab.dev",
+                showcaseEmail = "showcase@test.vokab.dev",
+            ),
             security = SecurityConfig(testEmails = "")
         )
 

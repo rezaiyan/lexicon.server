@@ -6450,6 +6450,14 @@
             "default" : true,
             "type" : "boolean"
           }
+        }, {
+          "in" : "query",
+          "name" : "showcase",
+          "required" : false,
+          "schema" : {
+            "default" : false,
+            "type" : "boolean"
+          }
         } ],
         "responses" : {
           "200" : {

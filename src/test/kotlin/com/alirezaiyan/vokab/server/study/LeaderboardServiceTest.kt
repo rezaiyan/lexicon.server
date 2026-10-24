@@ -30,7 +30,7 @@ class LeaderboardServiceTest {
         userRepository = mockk<UserRepository>().answerReferences(knownUsers)
         wordRepository = mockk()
         aliasGenerator = AliasGenerator()
-        leaderboardService = LeaderboardService(userRepository, wordRepository, aliasGenerator, "")
+        leaderboardService = LeaderboardService(userRepository, wordRepository, aliasGenerator, "", "")
     }
 
     @Test
@@ -132,7 +132,7 @@ class LeaderboardServiceTest {
     @Test
     fun `getLeaderboard excludes CI test user from leaderboard`() {
         val ciEmail = "ci-maestro@test.vokab.dev"
-        val serviceWithCiEmail = LeaderboardService(userRepository, wordRepository, aliasGenerator, ciEmail)
+        val serviceWithCiEmail = LeaderboardService(userRepository, wordRepository, aliasGenerator, ciEmail, "")
         val regularUser = createUser(id = 1L, currentStreak = 5, longestStreak = 10)
 
         every { userRepository.findTopUsersByScore(any(), listOf(ciEmail)) } returns listOf(regularUser)
@@ -141,6 +141,21 @@ class LeaderboardServiceTest {
         serviceWithCiEmail.getLeaderboard(regularUser.requireId())
 
         verify { userRepository.findTopUsersByScore(any(), listOf(ciEmail)) }
+    }
+
+    @Test
+    fun `getLeaderboard excludes the showcase user alongside the CI user`() {
+        val ciEmail = "ci-maestro@test.vokab.dev"
+        val showcaseEmail = "showcase@test.vokab.dev"
+        val service = LeaderboardService(userRepository, wordRepository, aliasGenerator, ciEmail, showcaseEmail)
+        val regularUser = createUser(id = 1L, currentStreak = 5, longestStreak = 10)
+
+        every { userRepository.findTopUsersByScore(any(), listOf(ciEmail, showcaseEmail)) } returns listOf(regularUser)
+        every { wordRepository.countMasteredWordsByUserIds(listOf(1L)) } returns emptyList()
+
+        service.getLeaderboard(regularUser.requireId())
+
+        verify { userRepository.findTopUsersByScore(any(), listOf(ciEmail, showcaseEmail)) }
     }
 
     @Test

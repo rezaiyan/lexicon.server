@@ -67,6 +67,7 @@ class AuthController(
         @RequestHeader("X-Platform", required = false) platform: String?,
         @RequestHeader("X-App-Version", required = false) appVersion: String?,
         @RequestParam("premium", defaultValue = "true") premium: Boolean,
+        @RequestParam("showcase", defaultValue = "false") showcase: Boolean,
         httpRequest: HttpServletRequest,
     ): ResponseEntity<ApiResponse<AuthResponse>> {
         if (!appProperties.ciAuth.enabled) {
@@ -81,7 +82,12 @@ class AuthController(
                 .body(ApiResponse(success = false, message = "Unauthorized"))
         }
 
-        val response = authService.authenticateForCi(premium = premium, platform = platform, appVersion = appVersion)
+        val response = authService.authenticateForCi(
+            premium = premium,
+            platform = platform,
+            appVersion = appVersion,
+            showcase = showcase,
+        )
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }
 

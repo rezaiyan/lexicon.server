@@ -15,6 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate
 
 private val logger = KotlinLogging.logger {}
 
+private const val SHOWCASE_USER_NAME = "Alex"
+
 /**
  * Sign-in (Google via Firebase, Sign in with Apple, CI): verifies the identity, provisions the
  * account through [UserProvisioning] and issues tokens through [TokenService].
@@ -114,11 +116,22 @@ class AuthService(
      *
      * @param premium true (default) applies the test-user premium grant (the CI email must be on
      *   the test-email list); false clears grant and subscription so non-premium gating can be tested.
+     * @param showcase true signs in the showcase account (marketing screenshots and recordings)
+     *   instead of the CI user, so curated demo data never mixes with CI test data.
      */
     @Transactional
-    fun authenticateForCi(premium: Boolean = true, platform: String? = null, appVersion: String? = null): AuthResponse {
-        logger.info { "CI authentication for test user (premium=$premium)" }
-        val (user, userId) = userProvisioning.ciUser(appProperties.ciAuth.testEmail, premium)
+    fun authenticateForCi(
+        premium: Boolean = true,
+        platform: String? = null,
+        appVersion: String? = null,
+        showcase: Boolean = false,
+    ): AuthResponse {
+        logger.info { "CI authentication for ${if (showcase) "showcase" else "test"} user (premium=$premium)" }
+        val (user, userId) = if (showcase) {
+            userProvisioning.ciUser(appProperties.ciAuth.showcaseEmail, premium, name = SHOWCASE_USER_NAME)
+        } else {
+            userProvisioning.ciUser(appProperties.ciAuth.testEmail, premium)
+        }
         userProvisioning.recordPlatform(userId, platform, appVersion)
         val response = tokenService.issue(user, userId)
 

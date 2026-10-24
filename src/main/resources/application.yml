@@ -212,6 +212,7 @@ app:
     enabled: ${CI_TEST_AUTH_ENABLED:false}
     secret: ${CI_TEST_SECRET:}
     test-email: ${CI_TEST_EMAIL:ci-maestro@test.vokab.dev}
+    showcase-email: ${CI_SHOWCASE_EMAIL:showcase@test.vokab.dev}
 
   notifications:
     admin:

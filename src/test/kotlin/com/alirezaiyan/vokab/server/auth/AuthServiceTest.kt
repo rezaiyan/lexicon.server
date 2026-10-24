@@ -90,6 +90,32 @@ class AuthServiceTest : AuthServiceTestFixture() {
     }
 
     @Test
+    fun `authenticateForCi with showcase signs in the showcase user instead of the CI user`() {
+        val showcaseUser = createUser(id = 70L, email = "showcase@test.vokab.dev", name = "Alex")
+        every { userRepository.findByEmail("showcase@test.vokab.dev") } returns Optional.of(showcaseUser)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(showcaseUser)
+
+        val result = authService.authenticateForCi(showcase = true)
+
+        assertEquals("showcase@test.vokab.dev", result.user.email)
+        verify(exactly = 0) { userRepository.findByEmail("ci@test.vokab.dev") }
+    }
+
+    @Test
+    fun `authenticateForCi with showcase creates the showcase user named Alex`() {
+        every { userRepository.findByEmail("showcase@test.vokab.dev") } returns Optional.empty()
+        var saved: User? = null
+        every { userRepository.save(any()) } answers { firstArg<User>().also { saved = it }.withAssignedId(71L) }
+        stubTokenGeneration(createUser(id = 71L, email = "showcase@test.vokab.dev", name = "Alex"))
+
+        authService.authenticateForCi(showcase = true)
+
+        assertEquals("showcase@test.vokab.dev", saved?.email)
+        assertEquals("Alex", saved?.name)
+    }
+
+    @Test
     fun `authenticateForCi should return user DTO with correct fields`() {
         // Arrange
         val existingUser = createUser(id = 5L, email = "ci@test.vokab.dev", name = "CI User")

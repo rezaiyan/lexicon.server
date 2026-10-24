@@ -17,9 +17,11 @@ class LeaderboardService(
     private val userRepository: UserRepository,
     private val wordRepository: WordRepository,
     private val aliasGenerator: AliasGenerator,
-    @Value("\${app.ci-auth.test-email:}") private val ciTestEmail: String,
+    @Value("\${app.ci-auth.test-email:}") ciTestEmail: String,
+    @Value("\${app.ci-auth.showcase-email:}") showcaseEmail: String,
 ) {
-    private val excludedEmails = listOf(ciTestEmail)
+    // Never empty: the query's NOT IN breaks on an empty list.
+    private val excludedEmails = listOf(ciTestEmail, showcaseEmail).filter { it.isNotBlank() }.ifEmpty { listOf("") }
 
     @Transactional(readOnly = true)
     fun getLeaderboard(requestingUserId: Long, limit: Int = 20): LeaderboardResponse {

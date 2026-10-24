@@ -93,16 +93,33 @@ internal class McpRegisteredClientRepository(
     override fun findByClientId(clientId: String): RegisteredClient? {
         val url = metadataDocumentUrl(clientId) ?: return stored.findByClientId(clientId)?.withCurrentScopes()
         val known = stored.findByClientId(clientId)?.withCurrentScopes()
-        val fresh = known?.clientIdIssuedAt?.isAfter(Instant.now(clock).minus(refreshAfter)) == true
-        if ((known != null && fresh) || recentlyFailed(clientId)) return known
+        if ((known != null && isFresh(known)) || recentlyFailed(clientId)) return known
         val fetched = fetcher.fetch(url)?.let { parse(clientId, it, known?.id) }
         if (fetched == null) {
             rememberFailure(clientId)
         } else {
             synchronized(failedFetches) { failedFetches.remove(clientId) }
             stored.save(fetched)
+            synchronized(refreshes) { refreshes[clientId] = Instant.now(clock) }
         }
         return fetched ?: known
+    }
+
+    /**
+     * Fetched within [refreshAfter]. SAS's JDBC update never rewrites client_id_issued_at, so the
+     * row only says when the client was first stored; later refreshes are remembered here. Without
+     * that, a client a day old was fetched and saved on every lookup, including inside read-only
+     * transactions, where the save fails.
+     */
+    private fun isFresh(client: RegisteredClient): Boolean {
+        val refreshed = synchronized(refreshes) { refreshes[client.clientId] }
+        val lastFetched = listOfNotNull(client.clientIdIssuedAt, refreshed).maxOrNull() ?: return false
+        return lastFetched.isAfter(Instant.now(clock).minus(refreshAfter))
+    }
+
+    /** When each metadata-document client was last fetched successfully. Bounded: oldest entries go first. */
+    private val refreshes = object : LinkedHashMap<String, Instant>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Instant>?) = size > MAX_REFRESHES
     }
 
     /**
@@ -183,6 +200,7 @@ internal class McpRegisteredClientRepository(
         const val DEFAULT_REFRESH_HOURS = 24L
         const val DEFAULT_FAILURE_BACKOFF_MINUTES = 10L
         const val MAX_FAILED_FETCHES = 1000
+        const val MAX_REFRESHES = 1000
         const val HTTPS_PORT = 443
 
         /**

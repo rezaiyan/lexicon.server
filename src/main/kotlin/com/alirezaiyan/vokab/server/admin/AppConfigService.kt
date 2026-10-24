@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.admin
 
+import com.alirezaiyan.vokab.server.shared.normalizeEmail
 import io.github.oshai.kotlinlogging.KotlinLogging
 import java.time.Clock
 import org.springframework.stereotype.Service
@@ -94,7 +95,7 @@ class AppConfigService(
     fun getTestEmails(): Set<String> =
         get("testing", "test_emails")
             ?.split(",")
-            ?.map { it.trim() }
+            ?.map { normalizeEmail(it) }
             ?.filter { it.isNotEmpty() }
             ?.toSet()
             ?: emptySet()

@@ -18,7 +18,9 @@ interface UserAccessView {
 
 interface UserRepository : JpaRepository<User, Long> {
     fun findAccessById(id: Long): UserAccessView?
-    fun findByEmail(email: String): Optional<User>
+    /** Finds the user whatever case or padding [email] arrives in (stored emails are normalized). */
+    @Query("SELECT u FROM User u WHERE u.email = LOWER(TRIM(:email))")
+    fun findByEmail(@Param("email") email: String): Optional<User>
     fun findByGoogleId(googleId: String): Optional<User>
     fun findByAppleId(appleId: String): Optional<User>
     fun findByRevenueCatUserId(revenueCatUserId: String): Optional<User>

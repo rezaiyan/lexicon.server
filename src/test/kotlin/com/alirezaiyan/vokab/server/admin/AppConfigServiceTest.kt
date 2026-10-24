@@ -56,6 +56,16 @@ class AppConfigServiceTest {
         verify(exactly = 1) { appConfigRepository.findByNamespaceAndKeyAndEnabledTrue("ns", "k") }
     }
 
+    @Test
+    fun `getTestEmails normalizes the listed addresses`() {
+        val config = testConfig(namespace = "testing", key = "test_emails", value = " QA@Example.com ,beta@example.com,")
+        every { appConfigRepository.findByNamespaceAndKeyAndEnabledTrue("testing", "test_emails") } returns config
+
+        val result = service.getTestEmails()
+
+        assertEquals(setOf("qa@example.com", "beta@example.com"), result)
+    }
+
     // ── find ──────────────────────────────────────────────────────────────────
 
     @Test

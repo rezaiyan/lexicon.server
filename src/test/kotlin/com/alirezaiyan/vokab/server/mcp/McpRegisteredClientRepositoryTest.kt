@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test
 import org.springframework.security.oauth2.core.AuthorizationGrantType
 import org.springframework.security.oauth2.server.authorization.client.InMemoryRegisteredClientRepository
 import org.springframework.security.oauth2.server.authorization.client.RegisteredClient
+import org.springframework.security.oauth2.server.authorization.client.RegisteredClientRepository
 import java.net.InetAddress
 import java.net.URI
 import java.time.Clock
@@ -139,6 +140,25 @@ class McpRegisteredClientRepositoryTest {
     }
 
     @Test
+    fun `a refreshed client is not fetched again on every lookup when storage keeps its first issue time`() {
+        val repository = McpRegisteredClientRepository(
+            stored = KeepsFirstIssueTime(InMemoryRegisteredClientRepository(placeholder())),
+            fetcher = { url -> fetches++; documents[url] },
+            defaults = McpClientDefaults(AppProperties()),
+            objectMapper = objectMapper,
+            clock = clock,
+        )
+        documents[URI(CLIENT)] = document()
+        repository.findByClientId(CLIENT)
+        now = now.plus(Duration.ofDays(2))
+        repository.findByClientId(CLIENT)
+
+        repeat(3) { repository.findByClientId(CLIENT) }
+
+        assertEquals(2, fetches)
+    }
+
+    @Test
     fun `when a refresh fails the known client keeps working`() {
         documents[URI(CLIENT)] = document()
         repository.findByClientId(CLIENT)
@@ -214,6 +234,21 @@ class McpRegisteredClientRepositoryTest {
     ): String = objectMapper.writeValueAsString(
         mapOf("client_id" to clientId, "client_name" to name, "redirect_uris" to redirects) + extra
     )
+
+    /** Like JdbcRegisteredClientRepository: an update leaves client_id_issued_at as first saved. */
+    private class KeepsFirstIssueTime(private val delegate: RegisteredClientRepository) : RegisteredClientRepository {
+        override fun save(registeredClient: RegisteredClient) {
+            val issuedAt = delegate.findById(registeredClient.id)?.clientIdIssuedAt
+            delegate.save(
+                if (issuedAt == null) registeredClient
+                else RegisteredClient.from(registeredClient).clientIdIssuedAt(issuedAt).build()
+            )
+        }
+
+        override fun findById(id: String): RegisteredClient? = delegate.findById(id)
+
+        override fun findByClientId(clientId: String): RegisteredClient? = delegate.findByClientId(clientId)
+    }
 
     /** InMemoryRegisteredClientRepository needs at least one client to start with. */
     private fun placeholder() = RegisteredClient.withId("placeholder")

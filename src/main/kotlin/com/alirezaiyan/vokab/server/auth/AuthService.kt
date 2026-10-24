@@ -18,16 +18,18 @@ private val logger = KotlinLogging.logger {}
 private const val SHOWCASE_USER_NAME = "Alex"
 
 /**
- * Sign-in (Google via Firebase, Sign in with Apple, CI): verifies the identity, provisions the
+ * Sign-in (Google via Firebase, Sign in with Apple, passkey, CI): verifies the identity, provisions the
  * account through [UserProvisioning] and issues tokens through [TokenService].
  *
  * Google and Apple verify the ID token before opening a transaction (it may fetch signing keys), then
  * provision and issue tokens in one transaction, retried once if it loses a race to create the user.
  */
 @Service
+@Suppress("LongParameterList") // Spring-injected collaborators, one per sign-in concern
 class AuthService(
     private val firebaseIdTokenVerifier: FirebaseIdTokenVerifier,
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
+    private val passkeyService: PasskeyService,
     private val userProvisioning: UserProvisioning,
     private val tokenService: TokenService,
     private val appProperties: AppProperties,
@@ -49,6 +51,7 @@ class AuthService(
     private enum class SignInProvider(val auditName: String, val eventName: String) {
         GOOGLE("Google", "google"),
         APPLE("Apple", "apple"),
+        PASSKEY("Passkey", "passkey"),
     }
 
     /**
@@ -108,6 +111,26 @@ class AuthService(
             val provisioned = userProvisioning.appleUser(claims.subject, claims.email, claims.emailVerified, fullName)
             completeSignIn(provisioned, ctx)
         }
+    }
+
+    /**
+     * Authenticates with a passkey the user created earlier (see [PasskeyService]). Never creates
+     * an account: a passkey only exists for an account made with Google or Apple.
+     *
+     * @throws AuthRejectedException if the passkey response doesn't verify or the account is deactivated
+     */
+    fun authenticateWithPasskey(
+        responseJson: String,
+        platform: String? = null,
+        appVersion: String? = null,
+        ipAddress: String? = null,
+    ): AuthResponse {
+        val ctx = SignInContext(SignInProvider.PASSKEY, platform, appVersion, ipAddress)
+        return requireNotNull(
+            transactionTemplate.execute {
+                completeSignIn(userProvisioning.passkeyUser(passkeyService.verifySignIn(responseJson)), ctx)
+            }
+        )
     }
 
     /**

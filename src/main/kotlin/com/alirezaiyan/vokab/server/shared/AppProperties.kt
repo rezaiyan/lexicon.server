@@ -22,7 +22,26 @@ data class AppProperties(
     var rateLimit: RateLimitProperties = RateLimitProperties(),
     var aiInstructions: AiInstructionsConfig = AiInstructionsConfig(),
     var mcp: McpConfig = McpConfig(),
+    var passkey: PasskeyConfig = PasskeyConfig(),
 )
+
+/** Passkey (WebAuthn) relying party. Changing [rpId] orphans every passkey already created. */
+data class PasskeyConfig(
+    /** The domain passkeys belong to; its well-known files list the apps allowed to use them. */
+    var rpId: String = "alirezaiyan.com",
+    /** Shown by some credential providers next to the account. */
+    var rpName: String = "Lexicon",
+    /**
+     * Origins a response may come from (comma-separated): `https://<rpId>` for iOS and the web, and
+     * `android:apk-key-hash:<base64url SHA-256 of the signing cert>` per Android signing key.
+     */
+    var origins: String = "https://alirezaiyan.com",
+    /** How long a sign-up or sign-in challenge stays valid. */
+    var challengeTtlSeconds: Long = 300,
+) {
+    val originSet: Set<String>
+        get() = origins.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+}
 
 /** OAuth for MCP clients; only read while `spring.ai.mcp.server.enabled` is true. */
 data class McpConfig(

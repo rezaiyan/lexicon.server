@@ -13,6 +13,8 @@ detekt = "1.23.8"
 springdoc = "3.1.1"
 spring-modulith = "2.1.2"
 konsist = "0.18.1"
+webauthn4j = "0.30.0.RELEASE"
+passki = "0.1.0-alpha03"
 # 2.x is the Spring Boot 4 line
 spring-ai = "2.0.2"
 
@@ -59,6 +61,9 @@ httpclient5 = { module = "org.apache.httpcomponents.client5:httpclient5" }
 geoip2 = { module = "com.maxmind.geoip2:geoip2", version.ref = "geoip2" }
 kotlin-logging = { module = "io.github.oshai:kotlin-logging-jvm", version.ref = "kotlin-logging" }
 mockk = { module = "io.mockk:mockk", version.ref = "mockk" }
+webauthn4j-core = { module = "com.webauthn4j:webauthn4j-core", version.ref = "webauthn4j" }
+# Signs real WebAuthn responses in tests (FakePasskeys)
+passki-test = { module = "com.alirezaiyan.passki:passki-test", version.ref = "passki" }
 konsist = { module = "com.lemonappdev:konsist", version.ref = "konsist" }
 spring-modulith-starter-jdbc = { module = "org.springframework.modulith:spring-modulith-starter-jdbc", version.ref = "spring-modulith" }
 spring-ai-bom = { module = "org.springframework.ai:spring-ai-bom", version.ref = "spring-ai" }

@@ -43,6 +43,7 @@ class UserDataPurger(private val jdbc: NamedParameterJdbcTemplate) {
             // support_messages go with their thread (ON DELETE CASCADE)
             "support_threads" to "DELETE FROM support_threads WHERE user_id = :userId",
             "refresh_tokens" to "DELETE FROM refresh_tokens WHERE user_id = :userId",
+            "passkeys" to "DELETE FROM passkeys WHERE user_id = :userId",
             "push_tokens" to "DELETE FROM push_tokens WHERE user_id = :userId",
             "daily_insights" to "DELETE FROM daily_insights WHERE user_id = :userId",
             "daily_activities" to "DELETE FROM daily_activities WHERE user_id = :userId",

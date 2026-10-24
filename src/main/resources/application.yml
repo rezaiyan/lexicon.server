@@ -208,6 +208,12 @@ app:
     smtp-user: ${EMAIL_USER:}
     smtp-password: ${EMAIL_PASSWORD:}
 
+  passkey:
+    rp-id: ${PASSKEY_RP_ID:alirezaiyan.com}
+    # iOS + web, then one android:apk-key-hash per Android signing key (debug key of the dev Mac;
+    # add the Play app signing key's hash through PASSKEY_ORIGINS on the VPS)
+    origins: ${PASSKEY_ORIGINS:https://alirezaiyan.com,android:apk-key-hash:yWQPamiQr2wmSdy7q5R5I5Nc_BCL3wMgeARgXFt5SQM}
+
   ci-auth:
     enabled: ${CI_TEST_AUTH_ENABLED:false}
     secret: ${CI_TEST_SECRET:}

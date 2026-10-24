@@ -95,6 +95,22 @@ class UserProvisioning(
     }
 
     /**
+     * The owner of a verified passkey. Unlike Google and Apple, a passkey doesn't reactivate a
+     * deactivated account: deactivation means Apple consent was revoked, and only signing in with
+     * Apple again renews it.
+     *
+     * @throws AuthRejectedException if the account is deactivated
+     */
+    fun passkeyUser(user: User): ProvisionedUser {
+        if (!user.active) {
+            logger.warn { "Passkey sign-in rejected: account userId=${user.id} is deactivated" }
+            throw AuthRejectedException("User account is deactivated")
+        }
+        user.recordLogin(Instant.now(clock))
+        return save(testAccessPolicy.applyTo(user))
+    }
+
+    /**
      * A dedicated CI account (test or showcase), with premium granted or explicitly stripped.
      *
      * @throws AuthRejectedException if the CI email belongs to a real (Google/Apple) account, so a

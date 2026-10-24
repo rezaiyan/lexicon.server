@@ -102,6 +102,9 @@ dependencies {
 	// RestClient.Builder auto-configuration (RestClientBuilderConfigurer), see HttpClientConfig
 	implementation(libs.spring.boot.starter.restclient)
 
+	// Passkeys: verifies WebAuthn registration and sign-in responses
+	implementation(libs.webauthn4j.core)
+
 	// BCrypt + SHA-256 refresh token hashing
 	implementation(libs.spring.security.crypto)
 
@@ -126,6 +129,9 @@ dependencies {
 	testImplementation(libs.spring.modulith.starter.test)
 	// Integration tests run on real PostgreSQL (same major as prod) with the Flyway migrations
 	testImplementation(libs.testcontainers.postgresql)
+	testImplementation(libs.passki.test)
+	// FakePasskeys is suspend (version managed by the Spring Boot BOM)
+	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-core")
 	testRuntimeOnly(libs.junit.platform.launcher)
 }
 

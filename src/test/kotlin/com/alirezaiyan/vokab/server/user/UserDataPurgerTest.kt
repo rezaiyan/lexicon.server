@@ -71,7 +71,7 @@ class UserDataPurgerTest {
     /** The tables [seedUserWithData] fills — fixed here, not derived from the code under test. */
     private fun ownedTables(): List<String> = listOf(
         "review_events", "study_sessions", "words", "tags", "word_rush_games", "listening_sessions",
-        "listening_session_words", "refresh_tokens",
+        "listening_session_words", "refresh_tokens", "passkeys",
         "push_tokens", "daily_insights", "daily_activities", "subscriptions", "user_settings",
         "user_platforms", "notification_schedule", "notification_log", "email_subscriptions",
         "credit_wallets", "credit_transactions",
@@ -117,6 +117,7 @@ class UserDataPurgerTest {
             listeningId, id, wordId,
         )
         jdbc.update(INSERT_REFRESH_TOKEN, "hash-$email", id, "family-$email")
+        seedPasskey(id, email)
         jdbc.update("INSERT INTO push_tokens (user_id, token, platform) VALUES (?, ?, 'IOS')", id, "push-$email")
         jdbc.update("INSERT INTO daily_insights (user_id, insight_text, generated_at, date) VALUES (?, 'hi', CURRENT_TIMESTAMP, '2026-10-02')", id)
         jdbc.update("INSERT INTO daily_activities (user_id, activity_date) VALUES (?, DATE '2026-10-02')", id)
@@ -149,6 +150,14 @@ class UserDataPurgerTest {
             id.toString(),
         )
         return id
+    }
+
+    private fun seedPasskey(userId: Long, email: String) {
+        jdbc.update(
+            "INSERT INTO passkeys (user_id, credential_id, user_handle, attested_credential_data, uv_initialized, " +
+                "backup_eligible, backup_state, created_at) VALUES (?, ?, 'handle', ?, true, true, true, CURRENT_TIMESTAMP)",
+            userId, "passkey-$email", byteArrayOf(1),
+        )
     }
 
     private companion object {

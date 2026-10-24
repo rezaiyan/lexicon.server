@@ -128,6 +128,7 @@ abstract class AuthServiceTestFixture {
     protected fun buildServiceWith(properties: AppProperties): AuthService = AuthService(
         firebaseIdTokenVerifier = firebaseIdTokenVerifier,
         appleIdTokenVerifier = appleIdTokenVerifier,
+        passkeyService = mockk(),
         userProvisioning = UserProvisioning(
             userRepository = userRepository,
             userPlatformRepository = userPlatformRepository,

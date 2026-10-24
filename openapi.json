@@ -718,6 +718,27 @@
         "required" : [ "success" ],
         "type" : "object"
       },
+      "ApiResponseListPasskeyDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PasskeyDto"
+            },
+            "type" : [ "array", "null" ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
       "ApiResponseListRescueFunnelRow" : {
         "properties" : {
           "code" : {
@@ -1067,6 +1088,72 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/NotificationUserDetailDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponsePasskeyCreationOptions" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/PasskeyCreationOptions"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponsePasskeyDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/PasskeyDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponsePasskeyRequestOptions" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/PasskeyRequestOptions"
             }, {
               "type" : "null"
             } ]
@@ -1676,6 +1763,21 @@
         "required" : [ "accessToken", "expiresIn", "refreshToken", "tokenType", "user" ],
         "type" : "object"
       },
+      "AuthenticatorSelection" : {
+        "properties" : {
+          "requireResidentKey" : {
+            "type" : "boolean"
+          },
+          "residentKey" : {
+            "type" : "string"
+          },
+          "userVerification" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "requireResidentKey", "residentKey", "userVerification" ],
+        "type" : "object"
+      },
       "AvatarResponse" : {
         "properties" : {
           "profileImageUrl" : {
@@ -1892,6 +1994,37 @@
           }
         },
         "required" : [ "name" ],
+        "type" : "object"
+      },
+      "CredentialDescriptor" : {
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "transports" : {
+            "items" : {
+              "type" : "string"
+            },
+            "type" : "array"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "transports", "type" ],
+        "type" : "object"
+      },
+      "CredentialParameter" : {
+        "properties" : {
+          "alg" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "type" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "alg", "type" ],
         "type" : "object"
       },
       "CreditBalanceResponse" : {
@@ -3030,6 +3163,115 @@
         "required" : [ "currentLevel", "interests", "nativeLanguage", "targetLanguage" ],
         "type" : "object"
       },
+      "PasskeyCreationOptions" : {
+        "properties" : {
+          "attestation" : {
+            "type" : "string"
+          },
+          "authenticatorSelection" : {
+            "$ref" : "#/components/schemas/AuthenticatorSelection"
+          },
+          "challenge" : {
+            "type" : "string"
+          },
+          "excludeCredentials" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CredentialDescriptor"
+            },
+            "type" : "array"
+          },
+          "pubKeyCredParams" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CredentialParameter"
+            },
+            "type" : "array"
+          },
+          "rp" : {
+            "$ref" : "#/components/schemas/RelyingParty"
+          },
+          "timeout" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "user" : {
+            "$ref" : "#/components/schemas/PasskeyUser"
+          }
+        },
+        "required" : [ "attestation", "authenticatorSelection", "challenge", "excludeCredentials", "pubKeyCredParams", "rp", "timeout", "user" ],
+        "type" : "object"
+      },
+      "PasskeyDto" : {
+        "properties" : {
+          "createdAt" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "id" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "lastUsedAt" : {
+            "format" : "int64",
+            "type" : [ "integer", "null" ]
+          },
+          "synced" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "createdAt", "id", "synced" ],
+        "type" : "object"
+      },
+      "PasskeyRequestOptions" : {
+        "properties" : {
+          "allowCredentials" : {
+            "items" : {
+              "$ref" : "#/components/schemas/CredentialDescriptor"
+            },
+            "type" : "array"
+          },
+          "challenge" : {
+            "type" : "string"
+          },
+          "rpId" : {
+            "type" : "string"
+          },
+          "timeout" : {
+            "format" : "int64",
+            "type" : "integer"
+          },
+          "userVerification" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "allowCredentials", "challenge", "rpId", "timeout", "userVerification" ],
+        "type" : "object"
+      },
+      "PasskeyResponseRequest" : {
+        "properties" : {
+          "responseJson" : {
+            "maxLength" : 65536,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "required" : [ "responseJson" ],
+        "type" : "object"
+      },
+      "PasskeyUser" : {
+        "properties" : {
+          "displayName" : {
+            "type" : "string"
+          },
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "displayName", "id", "name" ],
+        "type" : "object"
+      },
       "ProfileStatsResponse" : {
         "properties" : {
           "currentStreak" : {
@@ -3148,6 +3390,18 @@
           }
         },
         "required" : [ "platform", "token" ],
+        "type" : "object"
+      },
+      "RelyingParty" : {
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "id", "name" ],
         "type" : "object"
       },
       "RenameTagRequest" : {
@@ -4961,7 +5215,7 @@
   "paths" : {
     "/admin/config" : {
       "get" : {
-        "operationId" : "list_3",
+        "operationId" : "list_4",
         "responses" : {
           "200" : {
             "content" : {
@@ -6600,6 +6854,156 @@
         "tags" : [ "auth-controller" ]
       }
     },
+    "/api/v1/auth/passkeys" : {
+      "get" : {
+        "operationId" : "list_2",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseListPasskeyDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      },
+      "post" : {
+        "operationId" : "register",
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasskeyResponseRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePasskeyDto"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      }
+    },
+    "/api/v1/auth/passkeys/registration-options" : {
+      "post" : {
+        "operationId" : "registrationOptions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePasskeyCreationOptions"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      }
+    },
+    "/api/v1/auth/passkeys/sign-in" : {
+      "post" : {
+        "operationId" : "signIn",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-Platform",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "in" : "header",
+          "name" : "X-App-Version",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PasskeyResponseRequest"
+              }
+            }
+          },
+          "required" : true
+        },
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseAuthResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      }
+    },
+    "/api/v1/auth/passkeys/sign-in-options" : {
+      "post" : {
+        "operationId" : "signInOptions",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponsePasskeyRequestOptions"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      }
+    },
+    "/api/v1/auth/passkeys/{id}" : {
+      "delete" : {
+        "operationId" : "delete_2",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "int64",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ApiResponseUnit"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-controller" ]
+      }
+    },
     "/api/v1/auth/refresh" : {
       "post" : {
         "operationId" : "refreshToken",
@@ -6833,7 +7237,7 @@
     },
     "/api/v1/mcp/connections" : {
       "get" : {
-        "operationId" : "list_2",
+        "operationId" : "list_3",
         "responses" : {
           "200" : {
             "content" : {

@@ -29,6 +29,13 @@ class PasskeyAccountNameTest {
     }
 
     @Test
+    fun `an address on Apple's newer relay domain is hidden too`() {
+        val user = User(email = "q9w8e7@private.icloud.com", name = "").apply { displayAlias = "Sam" }
+
+        assertEquals(PasskeyAccountName(name = "Sam (Apple ID)", displayName = "Sam"), user.passkeyAccountName())
+    }
+
+    @Test
     fun `an Apple account with no email and no name is still labelled`() {
         val user = User(email = "apple_001_abc@apple.hidden", name = "apple_001_abc")
 

@@ -1,6 +1,8 @@
 package com.alirezaiyan.vokab.server.auth
 
 import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.isHiddenAppleEmail
+import com.alirezaiyan.vokab.server.user.ownName
 
 /** How the device's passkey picker labels an account, so someone with several can tell them apart. */
 data class PasskeyAccountName(val name: String, val displayName: String)
@@ -10,13 +12,8 @@ data class PasskeyAccountName(val name: String, val displayName: String)
  * nothing to them, so those accounts show their name with "Apple ID" instead.
  */
 fun User.passkeyAccountName(): PasskeyAccountName {
-    // UserProvisioning.newAppleUser names an account Apple shared no name for after its address
-    val ownName = name.takeUnless { it.isBlank() || it == email.substringBefore("@") }
     val personName = ownName ?: displayAlias?.takeIf { it.isNotBlank() }
-    if (email.substringAfter("@") !in HIDDEN_EMAIL_DOMAINS) return PasskeyAccountName(email, personName ?: email)
+    if (!isHiddenAppleEmail(email)) return PasskeyAccountName(email, personName ?: email)
     val label = personName?.let { "$it (Apple ID)" } ?: "Apple ID"
     return PasskeyAccountName(label, personName ?: label)
 }
-
-/** Apple's relay, and the placeholder UserProvisioning stores when Apple shares no email. */
-private val HIDDEN_EMAIL_DOMAINS = setOf("privaterelay.appleid.com", "apple.hidden")

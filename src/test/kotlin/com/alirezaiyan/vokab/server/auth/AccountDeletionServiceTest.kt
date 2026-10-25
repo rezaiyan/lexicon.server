@@ -66,6 +66,43 @@ class AccountDeletionServiceTest : AuthServiceTestFixture() {
     }
 
     @Test
+    fun `deleteAccount revokes the Apple token kept from sign-in`() {
+        val userId = 34L
+        val user = createUser(id = userId, appleId = "sub-34")
+            .apply { appleRefreshToken = "apple-refresh-34"; appleTokenClientId = "com.alirezaiyan.vokab" }
+        stubDeleteAccount(userId, user)
+
+        accountDeletionService.deleteAccount(userId)
+
+        verify(exactly = 1) { appleTokenClient.revoke("apple-refresh-34", "com.alirezaiyan.vokab") }
+        verify(exactly = 1) { userRepository.delete(user) }
+    }
+
+    @Test
+    fun `deleteAccount still deletes when Apple refuses the revocation`() {
+        val userId = 35L
+        val user = createUser(id = userId, appleId = "sub-35")
+            .apply { appleRefreshToken = "apple-refresh-35"; appleTokenClientId = "com.alirezaiyan.vokab" }
+        stubDeleteAccount(userId, user)
+        every { appleTokenClient.revoke(any(), any()) } returns false
+
+        accountDeletionService.deleteAccount(userId)
+
+        verify(exactly = 1) { userRepository.delete(user) }
+    }
+
+    @Test
+    fun `deleteAccount makes no Apple call without a kept token`() {
+        val userId = 36L
+        val user = createUser(id = userId, appleId = "sub-36")
+        stubDeleteAccount(userId, user)
+
+        accountDeletionService.deleteAccount(userId)
+
+        verify(exactly = 0) { appleTokenClient.revoke(any(), any()) }
+    }
+
+    @Test
     fun `deleteAccount should throw when user is not found`() {
         // Arrange
         val userId = 999L

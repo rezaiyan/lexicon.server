@@ -56,7 +56,8 @@ class AuthController(
             platform,
             appVersion,
             ipAddress,
-            request.nonce
+            request.nonce,
+            request.authorizationCode,
         )
         return ResponseEntity.ok(ApiResponse(success = true, data = response))
     }

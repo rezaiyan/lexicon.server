@@ -3,6 +3,7 @@ package com.alirezaiyan.vokab.server.support
 import com.alirezaiyan.vokab.server.notification.PushNotificationService
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.personName
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Service
 import org.springframework.transaction.PlatformTransactionManager
@@ -212,7 +213,7 @@ internal fun formatUserMessage(threadId: Long, user: User, client: SupportClient
 }
 
 /** Display name and masked email: all the admin side ever sees of the user. */
-internal fun User.supportLabel(): String = "${displayAlias?.takeIf { it.isNotBlank() } ?: name} (${maskEmail(email)})"
+internal fun User.supportLabel(): String = "${personName ?: "No name"} (${maskEmail(email)})"
 
 /** `alireza@gmail.com` → `al***@gmail.com`. */
 internal fun maskEmail(email: String): String {

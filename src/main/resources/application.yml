@@ -124,6 +124,11 @@ app:
   apple:
     # Accepted `aud` values for Apple ID tokens (iOS bundle id; add a Services ID if web sign-in ships).
     client-ids: ${APPLE_CLIENT_IDS:com.alirezaiyan.vokab}
+    # Sign in with Apple key, used to revoke a user's Apple tokens when they delete their account.
+    # Unset: sign-in still works, but deletion can't unlink the app from the user's Apple ID.
+    team-id: ${APPLE_TEAM_ID:}
+    key-id: ${APPLE_SIGN_IN_KEY_ID:}
+    private-key: ${APPLE_SIGN_IN_PRIVATE_KEY:}
 
   vocabulary:
     # How many vocabulary items to ask the AI to generate

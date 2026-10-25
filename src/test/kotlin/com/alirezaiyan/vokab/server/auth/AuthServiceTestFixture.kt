@@ -34,6 +34,7 @@ abstract class AuthServiceTestFixture {
     protected lateinit var appleIdTokenVerifier: AppleIdTokenVerifier
     protected lateinit var firebaseIdTokenVerifier: FirebaseIdTokenVerifier
     protected lateinit var revenueCatClient: RevenueCatClient
+    protected lateinit var appleTokenClient: AppleTokenClient
     protected lateinit var userPlatformRepository: UserPlatformRepository
     protected lateinit var userDataPurger: UserDataPurger
     protected lateinit var pushNotificationService: PushNotificationService
@@ -58,6 +59,7 @@ abstract class AuthServiceTestFixture {
         appleIdTokenVerifier = mockk()
         firebaseIdTokenVerifier = mockk()
         revenueCatClient = mockk(relaxed = true)
+        appleTokenClient = mockk(relaxed = true)
         userPlatformRepository = mockk(relaxed = true)
         userDataPurger = mockk()
         pushNotificationService = mockk()
@@ -86,6 +88,7 @@ abstract class AuthServiceTestFixture {
             userRepository = userRepository,
             userDataPurger = userDataPurger,
             revenueCatClient = revenueCatClient,
+            appleTokenClient = appleTokenClient,
             deviceDataWipe = DeviceDataWipe(pushNotificationService),
             auditLogService = auditLogService,
             userAccessCache = mockk(relaxed = true),
@@ -128,6 +131,7 @@ abstract class AuthServiceTestFixture {
     protected fun buildServiceWith(properties: AppProperties): AuthService = AuthService(
         firebaseIdTokenVerifier = firebaseIdTokenVerifier,
         appleIdTokenVerifier = appleIdTokenVerifier,
+        appleTokenClient = appleTokenClient,
         passkeyService = mockk(),
         userProvisioning = UserProvisioning(
             userRepository = userRepository,

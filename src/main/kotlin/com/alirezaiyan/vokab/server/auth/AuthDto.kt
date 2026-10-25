@@ -12,6 +12,7 @@ data class GoogleAuthRequest(
 data class AppleAuthRequest(
     @field:NotBlank(message = "ID token is required")
     val idToken: String,
+    /** The sign-in's one-time code; exchanged for the user's Apple refresh token (see AppleTokenClient). */
     val authorizationCode: String? = null,
     val fullName: String? = null,
     val appleUserId: String? = null,

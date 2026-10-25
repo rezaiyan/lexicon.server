@@ -127,6 +127,14 @@ class User(
     var tokensValidAfter: Instant? = null
         protected set
 
+    /** Sign in with Apple refresh token, kept so account deletion can revoke it (see AppleTokenClient). */
+    @Column(name = "apple_refresh_token", length = 1024)
+    var appleRefreshToken: String? = null
+
+    /** The client id (app bundle or Services ID) [appleRefreshToken] was issued to; revoking needs it. */
+    @Column(name = "apple_token_client_id")
+    var appleTokenClientId: String? = null
+
     /** Reflects a UserRepository.updateTokensValidAfter write. */
     fun mirrorTokensValidAfter(cutoff: Instant) {
         tokensValidAfter = cutoff

@@ -2,6 +2,7 @@ package com.alirezaiyan.vokab.server.ai
 
 import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.personName
 import com.alirezaiyan.vokab.server.study.DailyActivityRepository
 import com.alirezaiyan.vokab.server.notification.NotificationScheduleRepository
 import com.alirezaiyan.vokab.server.user.UserRepository
@@ -50,7 +51,7 @@ class DailyInsightService(
         logger.info { "Generating new daily insight for userId=$userId" }
         val ctx = AiService.DailyInsightContext(
             stats = userProgressService.calculateProgressStats(userId),
-            userName = user.name,
+            userName = user.personName,
             optimalStudyHour = null,
             accuracyTrend = null,
             topDifficultWord = null,
@@ -89,7 +90,7 @@ class DailyInsightService(
         return try {
             val stats = userProgressService.calculateProgressStats(user.requireId())
             val insightText = if (hasActivityToday) {
-                aiService.generateCelebrationInsight(stats, user.name)
+                aiService.generateCelebrationInsight(stats, user.personName)
             } else {
                 val ctx = buildInsightContext(user, stats)
                 aiService.generateDailyInsight(ctx)
@@ -141,7 +142,7 @@ class DailyInsightService(
 
         return AiService.DailyInsightContext(
             stats = stats,
-            userName = user.name,
+            userName = user.personName,
             optimalStudyHour = optimalStudyHour,
             accuracyTrend = accuracyTrend,
             topDifficultWord = topDifficultWord,

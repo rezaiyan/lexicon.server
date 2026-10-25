@@ -174,7 +174,7 @@ class AiService(
 
     fun generateStreakReminderMessage(
         currentStreak: Int,
-        userName: String,
+        userName: String?,
         progressStats: ProgressStatsDto? = null
     ): String {
         val progressLines = progressStats?.let {
@@ -188,7 +188,7 @@ class AiService(
         val prompt = promptTemplates.render(
             Prompt.STREAK_REMINDER,
             mapOf(
-                "userName" to userName,
+                "userName" to (userName ?: "a learner"),
                 "currentStreak" to currentStreak,
                 "progressLines" to progressLines,
                 "dueCardsRequirement" to dueCardsRequirement,

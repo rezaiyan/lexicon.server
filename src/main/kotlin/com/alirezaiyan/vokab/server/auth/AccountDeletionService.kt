@@ -16,16 +16,20 @@ class AccountDeletionService(
     private val userRepository: UserRepository,
     private val userDataPurger: UserDataPurger,
     private val revenueCatClient: RevenueCatClient,
+    private val appleTokenClient: AppleTokenClient,
     private val deviceDataWipe: DeviceDataWipe,
     private val auditLogService: AuditLogService,
     private val userAccessCache: UserAccessCache,
 ) {
 
     /**
-     * Deletes third-party identities (Firebase, RevenueCat), tells devices to clear local data, then
-     * deletes every owned row and finally the user row.
+     * Deletes third-party identities (Firebase, RevenueCat), revokes the user's Apple tokens, tells
+     * devices to clear local data, then deletes every owned row and finally the user row.
      *
-     * Apple needs no call here — Apple notifies us via webhook when a user revokes consent.
+     * Revoking the Apple token is what App Review requires of account deletion, and it unlinks the app
+     * from the user's Apple ID, so signing up again shares name and email again. Only possible for a
+     * token kept from a sign-in (see [AppleTokenClient]); without one the user can still unlink the
+     * app in their Apple ID settings.
      *
      * @throws IllegalArgumentException if the user doesn't exist
      */
@@ -47,6 +51,16 @@ class AccountDeletionService(
             if (revenueCatClient.deleteSubscriber(rcUserId)) {
                 logger.info { "✅ RevenueCat subscriber deleted for: $userId" }
             }
+        }
+
+        val appleToken = user.appleRefreshToken
+        val appleClientId = user.appleTokenClientId
+        if (appleToken != null && appleClientId != null) {
+            if (appleTokenClient.revoke(appleToken, appleClientId)) {
+                logger.info { "✅ Apple tokens revoked for: $userId" }
+            }
+        } else if (user.appleId != null) {
+            logger.info { "No Apple token kept for userId=$userId; Apple sign-in stays linked to the app" }
         }
 
         deviceDataWipe.notify(

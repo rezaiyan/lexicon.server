@@ -549,6 +549,149 @@ class AuthServiceTest : AuthServiceTestFixture() {
         verify(exactly = 0) { userRepository.findByEmail(any()) }
     }
 
+    @Test
+    fun `authenticateWithApple keeps the Apple refresh token its authorization code exchanges for`() {
+        val existing = createUser(id = 24L, email = "a24@example.com", appleId = "sub-24")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-24", email = null, clientId = "com.alirezaiyan.vokab")
+        every { appleTokenClient.refreshTokenFor("code-24", "com.alirezaiyan.vokab") } returns "apple-refresh-24"
+        every { userRepository.findByAppleId("sub-24") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithApple("token", null, null, authorizationCode = "code-24")
+
+        verify {
+            userRepository.save(match {
+                it.appleRefreshToken == "apple-refresh-24" && it.appleTokenClientId == "com.alirezaiyan.vokab"
+            })
+        }
+    }
+
+    @Test
+    fun `authenticateWithApple still signs in when the authorization code exchange fails`() {
+        val existing = createUser(id = 25L, email = "a25@example.com", appleId = "sub-25")
+            .apply { appleRefreshToken = "older-token"; appleTokenClientId = "com.alirezaiyan.vokab" }
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-25", email = null, clientId = "com.alirezaiyan.vokab")
+        every { appleTokenClient.refreshTokenFor(any(), any()) } returns null
+        every { userRepository.findByAppleId("sub-25") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, null, authorizationCode = "expired")
+
+        assertEquals(25L, result.user.id)
+        assertEquals("older-token", existing.appleRefreshToken)
+    }
+
+    @Test
+    fun `authenticateWithApple without an authorization code makes no call to Apple`() {
+        val existing = createUser(id = 26L, email = "a26@example.com", appleId = "sub-26")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-26", email = null, clientId = "com.alirezaiyan.vokab")
+        every { userRepository.findByAppleId("sub-26") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithApple("token", null, null)
+
+        verify(exactly = 0) { appleTokenClient.refreshTokenFor(any(), any()) }
+    }
+
+    @Test
+    fun `authenticateWithApple leaves a new account unnamed when Apple shares no name`() {
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-27", email = "x7k2@private.icloud.com", emailVerified = true)
+        every { userRepository.findByAppleId("sub-27") } returns Optional.empty()
+        every { userRepository.findByEmail("x7k2@private.icloud.com") } returns Optional.empty()
+        every { userRepository.save(any()) } answers { firstArg<User>().withAssignedId(27L) }
+        every { jwtTokenProvider.generateAccessToken(27L, "x7k2@private.icloud.com", any()) } returns "access-token"
+        every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
+        every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
+        every { refreshTokenRepository.save(any()) } answers { firstArg() }
+        every { jwtTokenProvider.getExpirationTime() } returns 86400L
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("", result.user.name)
+    }
+
+    @Test
+    fun `authenticateWithApple gives a returning unnamed account the name Apple shares again`() {
+        val existing = createUser(id = 28L, email = "x@privaterelay.appleid.com", name = "x", appleId = "sub-28")
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "sub-28", email = null)
+        every { userRepository.findByAppleId("sub-28") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithApple("token", "Jane Doe", null)
+
+        assertEquals("Jane Doe", existing.name)
+    }
+
+    @Test
+    fun `authenticateWithApple never overwrites a returning account's name`() {
+        val existing = createUser(id = 29L, email = "a29@example.com", name = "Jane", appleId = "sub-29")
+        every { appleIdTokenVerifier.verify("token") } returns AppleIdClaims(subject = "sub-29", email = null)
+        every { userRepository.findByAppleId("sub-29") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        authService.authenticateWithApple("token", "Jane Apple", null)
+
+        assertEquals("Jane", existing.name)
+    }
+
+    @Test
+    fun `authenticateWithApple replaces a stand-in address with the verified one Apple shares`() {
+        val existing = createUser(id = 30L, email = "apple_sub-30@apple.hidden", appleId = "sub-30")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-30", email = "jane@example.com", emailVerified = true)
+        every { userRepository.findByAppleId("sub-30") } returns Optional.of(existing)
+        every { userRepository.findByEmail("jane@example.com") } returns Optional.empty()
+        every { userRepository.save(any()) } answers { firstArg() }
+        every { jwtTokenProvider.generateAccessToken(30L, "jane@example.com", any()) } returns "access-token"
+        every { refreshTokenHashService.generateSecureToken(32) } returns "refresh-token"
+        every { refreshTokenHashService.createLookupHash("refresh-token") } returns "lookup-hash"
+        every { refreshTokenRepository.save(any()) } answers { firstArg() }
+        every { jwtTokenProvider.getExpirationTime() } returns 86400L
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("jane@example.com", result.user.email)
+    }
+
+    @Test
+    fun `authenticateWithApple keeps the stand-in address when another account uses the shared one`() {
+        val existing = createUser(id = 31L, email = "apple_sub-31@apple.hidden", appleId = "sub-31")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-31", email = "taken@example.com", emailVerified = true)
+        every { userRepository.findByAppleId("sub-31") } returns Optional.of(existing)
+        every { userRepository.findByEmail("taken@example.com") } returns
+            Optional.of(createUser(id = 99L, email = "taken@example.com"))
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("apple_sub-31@apple.hidden", result.user.email)
+    }
+
+    @Test
+    fun `authenticateWithApple keeps a returning account's relay address`() {
+        val existing = createUser(id = 32L, email = "old@privaterelay.appleid.com", appleId = "sub-32")
+        every { appleIdTokenVerifier.verify("token") } returns
+            AppleIdClaims(subject = "sub-32", email = "new@example.com", emailVerified = true)
+        every { userRepository.findByAppleId("sub-32") } returns Optional.of(existing)
+        every { userRepository.save(any()) } answers { firstArg() }
+        stubTokenGeneration(existing)
+
+        val result = authService.authenticateWithApple("token", null, null)
+
+        assertEquals("old@privaterelay.appleid.com", result.user.email)
+    }
+
     // ── TestAccessPolicy (test-email list, applied on interactive sign-in) ────
 
     private fun policy() = TestAccessPolicy(userRepository, appConfigService, fixedClock())

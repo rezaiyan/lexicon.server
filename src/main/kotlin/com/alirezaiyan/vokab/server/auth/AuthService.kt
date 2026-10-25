@@ -29,6 +29,7 @@ private const val SHOWCASE_USER_NAME = "Alex"
 class AuthService(
     private val firebaseIdTokenVerifier: FirebaseIdTokenVerifier,
     private val appleIdTokenVerifier: AppleIdTokenVerifier,
+    private val appleTokenClient: AppleTokenClient,
     private val passkeyService: PasskeyService,
     private val userProvisioning: UserProvisioning,
     private val tokenService: TokenService,
@@ -87,6 +88,8 @@ class AuthService(
      * @param fullName only sent by Apple on the very first sign-in
      * @param nonce the raw nonce the client generated for this sign-in (see [AppleAuthRequest.nonce]);
      *   when present the token's `nonce` claim must be its SHA-256 hex. Optional until clients send it.
+     * @param authorizationCode the sign-in's one-time code; exchanged for the user's Apple refresh
+     *   token, which account deletion revokes. A failed exchange never fails the sign-in.
      * @throws AuthRejectedException if the token is invalid or doesn't match [appleUserId] / [nonce]
      */
     fun authenticateWithApple(
@@ -97,6 +100,7 @@ class AuthService(
         appVersion: String? = null,
         ipAddress: String? = null,
         nonce: String? = null,
+        authorizationCode: String? = null,
     ): AuthResponse {
         val claims = appleIdTokenVerifier.verify(idToken, rawNonce = nonce)
             ?: throw AuthRejectedException("Invalid Apple ID token")
@@ -106,9 +110,17 @@ class AuthService(
         }
 
         logger.info { "Authenticating user with Apple: appleId=${claims.subject}" }
+        // A call to Apple, so outside the transaction
+        val appleToken = claims.clientId?.let { clientId ->
+            authorizationCode?.takeIf { it.isNotBlank() }
+                ?.let { appleTokenClient.refreshTokenFor(it, clientId) }
+                ?.let { AppleTokenGrant(it, clientId) }
+        }
         val ctx = SignInContext(SignInProvider.APPLE, platform, appVersion, ipAddress)
         return inSignInTransaction {
-            val provisioned = userProvisioning.appleUser(claims.subject, claims.email, claims.emailVerified, fullName)
+            val provisioned = userProvisioning.appleUser(
+                claims.subject, claims.email, claims.emailVerified, fullName, appleToken,
+            )
             completeSignIn(provisioned, ctx)
         }
     }

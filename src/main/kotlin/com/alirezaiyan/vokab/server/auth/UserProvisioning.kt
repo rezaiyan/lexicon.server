@@ -4,7 +4,10 @@ import com.alirezaiyan.vokab.server.shared.AuthRejectedException
 import com.alirezaiyan.vokab.server.user.Platform
 import com.alirezaiyan.vokab.server.user.User
 import com.alirezaiyan.vokab.server.user.UserPlatformRepository
+import com.alirezaiyan.vokab.server.user.APPLE_PLACEHOLDER_EMAIL_DOMAIN
 import com.alirezaiyan.vokab.server.user.UserRepository
+import com.alirezaiyan.vokab.server.user.isApplePlaceholderEmail
+import com.alirezaiyan.vokab.server.user.ownName
 import com.alirezaiyan.vokab.server.user.requireId
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.stereotype.Component
@@ -71,27 +74,63 @@ class UserProvisioning(
      * Apple id is the primary key for lookup. Email linking only happens when Apple shared the real
      * address and marked it verified — a fallback or unverified address must never match another
      * account, so an unverified [email] is treated as absent. A returning user keeps their stored
-     * email: Apple omitting the claim must not replace a real address with the fallback.
+     * email: Apple omitting the claim must not replace a real address with the fallback. What Apple
+     * shares again later (after the user unlinked the app) only fills in what the account lacks.
+     *
+     * @param appleToken the user's Apple refresh token from this sign-in, kept for revocation
      */
-    fun appleUser(appleId: String, email: String?, emailVerified: Boolean, fullName: String?): ProvisionedUser {
+    fun appleUser(
+        appleId: String,
+        email: String?,
+        emailVerified: Boolean,
+        fullName: String?,
+        appleToken: AppleTokenGrant? = null,
+    ): ProvisionedUser {
         val now = Instant.now(clock)
         val trustedEmail = email?.takeIf { emailVerified }
         if (email != null && trustedEmail == null) {
             logger.warn { "Apple sign-in: email not marked verified; not using it for linking" }
         }
+        val sharedName = fullName?.trim()?.takeIf { it.isNotEmpty() }
         val user = userRepository.findByAppleId(appleId).orElse(null)
-            ?.also { it.recordLogin(now) }
+            ?.also {
+                it.recordLogin(now)
+                it.fillInFromApple(trustedEmail, sharedName)
+            }
             ?: trustedEmail?.let { userRepository.findByEmail(it).orElse(null) }?.let { existing ->
                 logger.info { "Linking Apple account to userId=${existing.id}" }
                 existing.also {
                     it.appleId = appleId
-                    if (fullName != null) it.name = fullName
+                    if (sharedName != null) it.name = sharedName
                     it.recordLogin(now)
                 }
             }
-            ?: newAppleUser(appleId, trustedEmail, fullName, now)
+            ?: newAppleUser(appleId, trustedEmail, sharedName, now)
+        appleToken?.let {
+            user.appleRefreshToken = it.refreshToken
+            user.appleTokenClientId = it.clientId
+        }
         val reactivated = user.reactivate()
         return save(testAccessPolicy.applyTo(user), reactivated)
+    }
+
+    /**
+     * A name for an account that has none, and a real address for one stored with a stand-in. Never
+     * overwrites what the user has, and never takes an address another account already uses.
+     */
+    private fun User.fillInFromApple(trustedEmail: String?, sharedName: String?) {
+        if (sharedName != null && ownName == null) {
+            logger.info { "Apple shared a name for userId=$id, which had none" }
+            name = sharedName
+        }
+        if (trustedEmail != null && isApplePlaceholderEmail(email)) {
+            if (userRepository.findByEmail(trustedEmail).isPresent) {
+                logger.warn { "Apple shared an address for userId=$id that another account uses; keeping the stand-in" }
+            } else {
+                logger.info { "Apple shared an address for userId=$id, which had none" }
+                email = trustedEmail
+            }
+        }
     }
 
     /**
@@ -150,12 +189,13 @@ class UserProvisioning(
             .onFailure { logger.warn(it) { "Failed to record platform '$platformEnum' for userId=$userId" } }
     }
 
+    /** Without a name from Apple the name stays blank, so the app asks for one instead of using the address. */
     private fun newAppleUser(appleId: String, email: String?, fullName: String?, now: Instant): User {
         val address = email ?: hiddenAppleEmail(appleId)
-        logger.info { "Creating new user with Apple (emailHidden=${email == null})" }
+        logger.info { "Creating new user with Apple (emailHidden=${email == null}, named=${fullName != null})" }
         return User(
             email = address,
-            name = fullName ?: address.substringBefore("@"),
+            name = fullName.orEmpty(),
             appleId = appleId,
             lastLoginAt = now,
         )
@@ -183,5 +223,5 @@ class UserProvisioning(
     }
 
     private fun hiddenAppleEmail(appleId: String): String =
-        "apple_${appleId.replace(".", "_").replace(" ", "_")}@apple.hidden"
+        "apple_${appleId.replace(".", "_").replace(" ", "_")}@$APPLE_PLACEHOLDER_EMAIL_DOMAIN"
 }

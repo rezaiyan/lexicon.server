@@ -117,10 +117,19 @@ data class OpenRouterConfig(
 
 data class AppleConfig(
     /** Bundle / Services IDs accepted as the `aud` of Apple ID tokens (comma-separated). */
-    var clientIds: String = "com.alirezaiyan.vokab"
+    var clientIds: String = "com.alirezaiyan.vokab",
+    /** Apple Developer team id: issuer of the client secret Apple's token endpoints require. */
+    var teamId: String = "",
+    /** Id of the Sign in with Apple key (.p8) that signs the client secret. */
+    var keyId: String = "",
+    /** That key's PKCS#8 PEM. Without team, key id and key, Apple tokens are never stored or revoked. */
+    var privateKey: String = "",
 ) {
     val clientIdSet: Set<String>
         get() = clientIds.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+
+    val canCallTokenApi: Boolean
+        get() = teamId.isNotBlank() && keyId.isNotBlank() && privateKey.isNotBlank()
 }
 
 data class RevenueCatConfig(

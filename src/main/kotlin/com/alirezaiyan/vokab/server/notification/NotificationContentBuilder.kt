@@ -4,6 +4,7 @@ import com.alirezaiyan.vokab.server.shared.bestEffort
 import com.alirezaiyan.vokab.server.user.requireId
 import com.alirezaiyan.vokab.server.shared.UpstreamServiceException
 import com.alirezaiyan.vokab.server.user.User
+import com.alirezaiyan.vokab.server.user.personName
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType
 import com.alirezaiyan.vokab.server.notification.NotificationTypeSelector.NotificationType.*
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -88,7 +89,7 @@ class NotificationContentBuilder(
         val deadline = streakDeadline(Instant.now(clock))
         val fallback = "Your ${user.currentStreak}-day streak resets $deadline. One short review keeps it alive! 🔥"
         val body = aiCopyOr(fallback) {
-            aiService.generateStreakReminderMessage(user.currentStreak, user.name, stats)
+            aiService.generateStreakReminderMessage(user.currentStreak, user.personName, stats)
         }
         return NotificationPayload(
             title = "Your ${user.currentStreak}-day streak resets $deadline 🔥",
@@ -186,7 +187,7 @@ class NotificationContentBuilder(
         val milestone = milestoneDetector.getPendingMilestone(user)
             ?: return buildFallbackInsight()
         val body = aiCopyOr("You hit a new milestone: ${milestone.description}! 🏆") {
-            aiService.generateMilestoneMessage(milestone, user.name)
+            aiService.generateMilestoneMessage(milestone, user.personName)
         }
         return NotificationPayload(
             title = milestone.title,

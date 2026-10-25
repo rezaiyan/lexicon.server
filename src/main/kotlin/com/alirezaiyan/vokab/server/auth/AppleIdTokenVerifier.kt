@@ -24,6 +24,8 @@ data class AppleIdClaims(
     val email: String?,
     /** `email_verified`; Apple sends it as a boolean or as the string "true". */
     val emailVerified: Boolean = false,
+    /** The client id of ours the token was minted for (`aud`); Apple's token endpoints need it. */
+    val clientId: String? = null,
 )
 
 /**
@@ -73,6 +75,7 @@ class AppleIdTokenVerifier(
                 is String -> verified.equals("true", ignoreCase = true)
                 else -> false
             },
+            clientId = claims.audience.orEmpty().firstOrNull { it in appProperties.apple.clientIdSet },
         )
     }
 

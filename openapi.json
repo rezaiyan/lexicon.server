@@ -718,27 +718,6 @@
         "required" : [ "success" ],
         "type" : "object"
       },
-      "ApiResponseListPasskeyDto" : {
-        "properties" : {
-          "code" : {
-            "type" : [ "string", "null" ]
-          },
-          "data" : {
-            "items" : {
-              "$ref" : "#/components/schemas/PasskeyDto"
-            },
-            "type" : [ "array", "null" ]
-          },
-          "message" : {
-            "type" : [ "string", "null" ]
-          },
-          "success" : {
-            "type" : "boolean"
-          }
-        },
-        "required" : [ "success" ],
-        "type" : "object"
-      },
       "ApiResponseListRescueFunnelRow" : {
         "properties" : {
           "code" : {
@@ -1132,6 +1111,28 @@
           "data" : {
             "oneOf" : [ {
               "$ref" : "#/components/schemas/PasskeyDto"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "success" : {
+            "type" : "boolean"
+          }
+        },
+        "required" : [ "success" ],
+        "type" : "object"
+      },
+      "ApiResponsePasskeyListDto" : {
+        "properties" : {
+          "code" : {
+            "type" : [ "string", "null" ]
+          },
+          "data" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/PasskeyListDto"
             }, {
               "type" : "null"
             } ]
@@ -3206,6 +3207,9 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "credentialId" : {
+            "type" : "string"
+          },
           "id" : {
             "format" : "int64",
             "type" : "integer"
@@ -3218,7 +3222,25 @@
             "type" : "boolean"
           }
         },
-        "required" : [ "createdAt", "id", "synced" ],
+        "required" : [ "createdAt", "credentialId", "id", "synced" ],
+        "type" : "object"
+      },
+      "PasskeyListDto" : {
+        "properties" : {
+          "passkeys" : {
+            "items" : {
+              "$ref" : "#/components/schemas/PasskeyDto"
+            },
+            "type" : "array"
+          },
+          "rpId" : {
+            "type" : "string"
+          },
+          "userHandle" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "passkeys", "rpId" ],
         "type" : "object"
       },
       "PasskeyRequestOptions" : {
@@ -6903,7 +6925,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/ApiResponseListPasskeyDto"
+                  "$ref" : "#/components/schemas/ApiResponsePasskeyListDto"
                 }
               }
             },

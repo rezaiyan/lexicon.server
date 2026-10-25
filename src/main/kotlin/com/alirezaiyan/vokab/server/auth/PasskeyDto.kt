@@ -47,9 +47,22 @@ data class PasskeyRequestOptions(
 
 data class CredentialDescriptor(val id: String, val transports: List<String>, val type: String = "public-key")
 
+/**
+ * The user's passkeys, with what the app needs to tell the device's credential provider which ones
+ * still exist (WebAuthn signals), so deleted passkeys stop showing up in the sign-in sheet.
+ */
+data class PasskeyListDto(
+    val rpId: String,
+    /** Base64url user handle shared by all of the user's passkeys; null when they have none. */
+    val userHandle: String?,
+    val passkeys: List<PasskeyDto>,
+)
+
 /** A passkey as the account screen lists it. */
 data class PasskeyDto(
     val id: Long,
+    /** Base64url WebAuthn credential id, as the device knows the passkey. */
+    val credentialId: String,
     /** Epoch millis. */
     val createdAt: Long,
     /** Epoch millis; null until the passkey is first used to sign in. */
@@ -60,6 +73,7 @@ data class PasskeyDto(
 
 internal fun Passkey.toDto() = PasskeyDto(
     id = requireNotNull(id),
+    credentialId = credentialId,
     createdAt = createdAt.toEpochMilli(),
     lastUsedAt = lastUsedAt?.toEpochMilli(),
     synced = backupState,

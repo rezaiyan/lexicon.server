@@ -134,7 +134,9 @@ class PasskeyService(
      *
      * @return the account the passkey belongs to
      * @throws AuthRejectedException if the response is malformed, its challenge is unknown, used or
-     *   expired, the passkey is unknown (deleted on another device) or the signature doesn't verify
+     *   expired, or the signature doesn't verify
+     * @throws NoSuchElementException if the passkey is unknown (deleted): the app then tells the
+     *   device to forget it, so it answers 404 instead of a plain rejection
      */
     fun verifySignIn(responseJson: String): User {
         val assertion = parse("sign-in") { webAuthn.parseAuthenticationResponseJSON(responseJson) }
@@ -144,7 +146,7 @@ class PasskeyService(
 
         val credentialId = assertion.credentialId.orReject("Invalid passkey response")
         val passkey = passkeyRepository.findByCredentialIdWithUser(base64Url(credentialId))
-            .orReject("This passkey is no longer linked to an account")
+            ?: throw NoSuchElementException("Passkey not found")
         val userHandle = assertion.userHandle
         rejectUnless(userHandle == null || base64Url(userHandle) == passkey.userHandle, "Invalid passkey response") {
             "Passkey sign-in rejected: user handle does not match passkey ${passkey.id}"
@@ -167,11 +169,18 @@ class PasskeyService(
     }
 
     @Transactional(readOnly = true)
-    fun list(userId: Long): List<PasskeyDto> = passkeyRepository.findAllByUserId(userId).map { it.toDto() }
+    fun list(userId: Long): PasskeyListDto {
+        val passkeys = passkeyRepository.findAllByUserId(userId)
+        return PasskeyListDto(
+            rpId = config.rpId,
+            userHandle = passkeys.firstOrNull()?.userHandle,
+            passkeys = passkeys.map { it.toDto() },
+        )
+    }
 
     /**
-     * Deletes one of [userId]'s passkeys. The copy in the credential provider stays until the user
-     * removes it there; signing in with it then fails as unknown.
+     * Deletes one of [userId]'s passkeys. The copy in the credential provider stays until the app
+     * signals the deletion (or the user removes it there); signing in with it fails as unknown.
      *
      * @throws NoSuchElementException if [userId] has no passkey [passkeyId]
      */

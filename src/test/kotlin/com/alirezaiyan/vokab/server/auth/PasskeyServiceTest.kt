@@ -10,6 +10,7 @@ import jakarta.persistence.EntityManager
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -60,7 +61,7 @@ class PasskeyServiceTest {
 
         assertEquals(user.requireId(), auth.user.id)
         assertTrue(auth.accessToken.isNotBlank() && auth.refreshToken.isNotBlank())
-        val listed = passkeyService.list(user.requireId()).single()
+        val listed = passkeyService.list(user.requireId()).passkeys.single()
         assertEquals(passkey.id, listed.id)
         assertNotNull(listed.lastUsedAt)
     }
@@ -84,7 +85,7 @@ class PasskeyServiceTest {
         }
 
         assertThrows<IllegalArgumentException> { passkeyService.register(other.requireId(), response) }
-        assertTrue(passkeyService.list(other.requireId()).isEmpty())
+        assertTrue(passkeyService.list(other.requireId()).passkeys.isEmpty())
     }
 
     @Test
@@ -100,17 +101,32 @@ class PasskeyServiceTest {
 
         assertEquals(first.user.id, next.user.id)
         assertEquals(1, next.excludeCredentials.size)
-        assertEquals(created.id, passkeyService.list(user.requireId()).single().id)
+        assertEquals(created.id, passkeyService.list(user.requireId()).passkeys.single().id)
     }
 
     @Test
-    fun `a deleted passkey no longer signs in`() {
+    fun `a deleted passkey no longer signs in and is reported as unknown`() {
         val user = newUser()
         val passkey = createPasskey(user.requireId())
         passkeyService.delete(user.requireId(), passkey.id)
         em.flush()
 
-        assertThrows<AuthRejectedException> { authService.authenticateWithPasskey(signInResponse()) }
+        assertThrows<NoSuchElementException> { authService.authenticateWithPasskey(signInResponse()) }
+    }
+
+    @Test
+    fun `the list carries what the device needs to forget deleted passkeys`() {
+        val user = newUser()
+        assertNull(passkeyService.list(user.requireId()).userHandle)
+        val options = passkeyService.registrationOptions(user.requireId())
+        val registration = runBlocking { device.register(json(options)).getOrThrow() }
+        passkeyService.register(user.requireId(), registration.json)
+
+        val list = passkeyService.list(user.requireId())
+
+        assertEquals("lexicon.alirezaiyan.com", list.rpId)
+        assertEquals(options.user.id, list.userHandle)
+        assertEquals(registration.credentialId, list.passkeys.single().credentialId)
     }
 
     @Test
@@ -119,7 +135,7 @@ class PasskeyServiceTest {
         val passkey = createPasskey(owner.requireId())
 
         assertThrows<NoSuchElementException> { passkeyService.delete(newUser().requireId(), passkey.id) }
-        assertEquals(1, passkeyService.list(owner.requireId()).size)
+        assertEquals(1, passkeyService.list(owner.requireId()).passkeys.size)
     }
 
     @Test

@@ -49,7 +49,7 @@ class PasskeyController(
     @GetMapping
     fun list(
         @AuthenticationPrincipal user: AuthUser,
-    ): ResponseEntity<ApiResponse<List<PasskeyDto>>> =
+    ): ResponseEntity<ApiResponse<PasskeyListDto>> =
         ResponseEntity.ok(ApiResponse(success = true, data = passkeyService.list(user.id)))
 
     @DeleteMapping("/{id}")
@@ -67,6 +67,7 @@ class PasskeyController(
         return ResponseEntity.ok(ApiResponse(success = true, data = passkeyService.signInOptions()))
     }
 
+    /** 401 for a response that fails verification; 404 for a passkey this server doesn't know (deleted). */
     @PostMapping("/sign-in")
     fun signIn(
         @Valid @RequestBody request: PasskeyResponseRequest,

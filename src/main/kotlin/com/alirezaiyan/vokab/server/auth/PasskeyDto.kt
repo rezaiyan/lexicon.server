@@ -49,12 +49,16 @@ data class CredentialDescriptor(val id: String, val transports: List<String>, va
 
 /**
  * The user's passkeys, with what the app needs to tell the device's credential provider which ones
- * still exist (WebAuthn signals), so deleted passkeys stop showing up in the sign-in sheet.
+ * still exist (WebAuthn signals), so deleted passkeys stop showing up in the sign-in sheet, and
+ * which account label they show.
  */
 data class PasskeyListDto(
     val rpId: String,
     /** Base64url user handle shared by all of the user's passkeys; null when they have none. */
     val userHandle: String?,
+    /** The account label the device's passkey picker shows ([passkeyAccountName]). */
+    val accountName: String,
+    val accountDisplayName: String,
     val passkeys: List<PasskeyDto>,
 )
 

@@ -3227,6 +3227,12 @@
       },
       "PasskeyListDto" : {
         "properties" : {
+          "accountDisplayName" : {
+            "type" : "string"
+          },
+          "accountName" : {
+            "type" : "string"
+          },
           "passkeys" : {
             "items" : {
               "$ref" : "#/components/schemas/PasskeyDto"
@@ -3240,7 +3246,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "passkeys", "rpId" ],
+        "required" : [ "accountDisplayName", "accountName", "passkeys", "rpId" ],
         "type" : "object"
       },
       "PasskeyRequestOptions" : {

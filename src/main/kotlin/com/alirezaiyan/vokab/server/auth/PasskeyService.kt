@@ -66,9 +66,14 @@ class PasskeyService(
         // One handle per user: credential providers then treat a new passkey as the same account
         val userHandle = existing.firstOrNull()?.userHandle
             ?: base64Url(ByteArray(USER_HANDLE_BYTES).also(random::nextBytes))
+        val account = user.passkeyAccountName()
         return PasskeyCreationOptions(
             rp = PasskeyCreationOptions.RelyingParty(id = config.rpId, name = config.rpName),
-            user = PasskeyCreationOptions.PasskeyUser(id = userHandle, name = user.email, displayName = user.name),
+            user = PasskeyCreationOptions.PasskeyUser(
+                id = userHandle,
+                name = account.name,
+                displayName = account.displayName,
+            ),
             challenge = challenges.issue(Ceremony.REGISTRATION, userId, userHandle),
             pubKeyCredParams = SUPPORTED_ALGORITHMS.map { PasskeyCreationOptions.CredentialParameter(alg = it.value) },
             timeout = timeoutMs,
@@ -170,10 +175,14 @@ class PasskeyService(
 
     @Transactional(readOnly = true)
     fun list(userId: Long): PasskeyListDto {
+        val user = userRepository.findById(userId).orElseThrow { NoSuchElementException("User not found") }
         val passkeys = passkeyRepository.findAllByUserId(userId)
+        val account = user.passkeyAccountName()
         return PasskeyListDto(
             rpId = config.rpId,
             userHandle = passkeys.firstOrNull()?.userHandle,
+            accountName = account.name,
+            accountDisplayName = account.displayName,
             passkeys = passkeys.map { it.toDto() },
         )
     }

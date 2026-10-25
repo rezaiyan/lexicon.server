@@ -130,6 +130,19 @@ class PasskeyServiceTest {
     }
 
     @Test
+    fun `passkeys are labelled with the account so a device can tell accounts apart`() {
+        val user = newUser()
+        val expected = user.passkeyAccountName()
+
+        val options = passkeyService.registrationOptions(user.requireId())
+        val list = passkeyService.list(user.requireId())
+
+        assertEquals(expected.name, options.user.name)
+        assertEquals(expected.displayName, options.user.displayName)
+        assertEquals(expected, PasskeyAccountName(list.accountName, list.accountDisplayName))
+    }
+
+    @Test
     fun `a user can't delete another user's passkey`() {
         val owner = newUser()
         val passkey = createPasskey(owner.requireId())

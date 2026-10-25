@@ -35,7 +35,7 @@ class PasskeyServiceTest {
     @Autowired lateinit var em: EntityManager
 
     /** The device: holds the passkeys it created, for the iOS / web origin. */
-    private val device = FakePasskeys(origin = "https://alirezaiyan.com")
+    private val device = FakePasskeys(origin = "https://lexicon.alirezaiyan.com")
 
     private fun newUser(): User =
         userRepository.save(User(email = "passkey-${System.nanoTime()}@example.com", name = "Pat"))

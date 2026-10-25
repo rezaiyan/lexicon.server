@@ -5213,6 +5213,47 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/.well-known/apple-app-site-association" : {
+      "get" : {
+        "operationId" : "appleAppSiteAssociation",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-well-known-controller" ]
+      }
+    },
+    "/.well-known/assetlinks.json" : {
+      "get" : {
+        "operationId" : "assetLinks",
+        "responses" : {
+          "200" : {
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "items" : {
+                    "additionalProperties" : { },
+                    "type" : "object"
+                  },
+                  "type" : "array"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "passkey-well-known-controller" ]
+      }
+    },
     "/admin/config" : {
       "get" : {
         "operationId" : "list_4",

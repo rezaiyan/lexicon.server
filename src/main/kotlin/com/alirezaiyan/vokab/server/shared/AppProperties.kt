@@ -27,20 +27,41 @@ data class AppProperties(
 
 /** Passkey (WebAuthn) relying party. Changing [rpId] orphans every passkey already created. */
 data class PasskeyConfig(
-    /** The domain passkeys belong to; its well-known files list the apps allowed to use them. */
-    var rpId: String = "alirezaiyan.com",
+    /**
+     * The domain passkeys belong to. Its well-known files ([com.alirezaiyan.vokab.server.auth.PasskeyWellKnownController],
+     * routed there by Caddy) list the apps allowed to use them.
+     */
+    var rpId: String = "lexicon.alirezaiyan.com",
     /** Shown by some credential providers next to the account. */
     var rpName: String = "Lexicon",
-    /**
-     * Origins a response may come from (comma-separated): `https://<rpId>` for iOS and the web, and
-     * `android:apk-key-hash:<base64url SHA-256 of the signing cert>` per Android signing key.
-     */
-    var origins: String = "https://alirezaiyan.com",
+    /** Android app allowed to use the passkeys. */
+    var androidPackage: String = "com.alirezaiyan.vokab",
+    /** SHA-256 of each Android signing certificate, `AA:BB:…` as keytool and Play Console print it (comma-separated). */
+    var androidCertFingerprints: String = "",
+    /** iOS apps allowed to use the passkeys, `<Team ID>.<bundle ID>` (comma-separated). */
+    var iosAppIds: String = "VFCFJC7Y5J.com.alirezaiyan.vokab",
+    /** Origins accepted besides `https://<rpId>` and the Android signing keys (comma-separated). */
+    var origins: String = "",
     /** How long a sign-up or sign-in challenge stays valid. */
     var challengeTtlSeconds: Long = 300,
 ) {
+    val androidFingerprintList: List<String> get() = commaSeparated(androidCertFingerprints)
+    val iosAppIdList: List<String> get() = commaSeparated(iosAppIds)
+
+    /** `https://<rpId>` for iOS and the web, one `android:apk-key-hash:` per Android signing key, then [origins]. */
     val originSet: Set<String>
-        get() = origins.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        get() = setOf("https://$rpId") + androidFingerprintList.map(::androidOrigin) + commaSeparated(origins)
+}
+
+private fun commaSeparated(value: String): List<String> = value.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+
+private const val SHA256_BYTES = 32
+
+/** The origin Android puts in a passkey response: base64url (no padding) of the signing certificate's SHA-256. */
+private fun androidOrigin(sha256Fingerprint: String): String {
+    val bytes = sha256Fingerprint.split(":").map { it.toInt(radix = 16).toByte() }.toByteArray()
+    require(bytes.size == SHA256_BYTES) { "Not a SHA-256 fingerprint: $sha256Fingerprint" }
+    return "android:apk-key-hash:" + java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
 }
 
 /** OAuth for MCP clients; only read while `spring.ai.mcp.server.enabled` is true. */

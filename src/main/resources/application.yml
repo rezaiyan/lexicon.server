@@ -209,10 +209,13 @@ app:
     smtp-password: ${EMAIL_PASSWORD:}
 
   passkey:
-    rp-id: ${PASSKEY_RP_ID:alirezaiyan.com}
-    # iOS + web, then one android:apk-key-hash per Android signing key (debug key of the dev Mac;
-    # add the Play app signing key's hash through PASSKEY_ORIGINS on the VPS)
-    origins: ${PASSKEY_ORIGINS:https://alirezaiyan.com,android:apk-key-hash:yWQPamiQr2wmSdy7q5R5I5Nc_BCL3wMgeARgXFt5SQM}
+    rp-id: ${PASSKEY_RP_ID:lexicon.alirezaiyan.com}
+    ios-app-ids: ${PASSKEY_IOS_APP_IDS:VFCFJC7Y5J.com.alirezaiyan.vokab}
+    android-package: ${PASSKEY_ANDROID_PACKAGE:com.alirezaiyan.vokab}
+    # SHA-256 per Android signing key; each one is both listed in assetlinks.json and accepted as an
+    # origin. Default: the dev Mac's debug key. Add the Play app signing key through the env on the VPS.
+    android-cert-fingerprints: "${PASSKEY_ANDROID_CERT_FINGERPRINTS:C9:64:0F:6A:68:90:AF:6C:26:49:DC:BB:AB:94:79:23:93:5C:FC:10:8B:DF:03:20:78:04:60:5C:5B:79:49:03}"
+    origins: ${PASSKEY_ORIGINS:}
 
   ci-auth:
     enabled: ${CI_TEST_AUTH_ENABLED:false}

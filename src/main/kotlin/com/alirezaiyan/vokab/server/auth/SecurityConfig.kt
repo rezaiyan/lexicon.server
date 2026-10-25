@@ -20,6 +20,9 @@ internal val PUBLIC_PATHS = listOf(
     "/api/v1/auth/apple",
     "/api/v1/auth/passkeys/sign-in-options",
     "/api/v1/auth/passkeys/sign-in",
+    // Which apps may use the passkeys (PasskeyWellKnownController)
+    "/.well-known/assetlinks.json",
+    "/.well-known/apple-app-site-association",
     "/api/v1/auth/refresh",
     // The refresh token in the body is the credential, so an expired access token can still log out
     "/api/v1/auth/logout",

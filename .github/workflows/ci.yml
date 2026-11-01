@@ -41,7 +41,7 @@ jobs:
 
       # Caches dependencies and build outputs; PR runs read the cache main writes
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Build and test
         run: ./gradlew build --stacktrace
@@ -250,7 +250,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Submit dependency graph
-        uses: gradle/actions/dependency-submission@v4
+        uses: gradle/actions/dependency-submission@v6
 
   dependency-review:
     # Fails a PR that adds or upgrades to a dependency with a known high/critical vulnerability.

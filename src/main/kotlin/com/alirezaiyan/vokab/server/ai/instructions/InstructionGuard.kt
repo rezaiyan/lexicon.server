@@ -85,8 +85,9 @@ class InstructionGuard(
             call.cancel(true)
             throw InstructionsUnavailableException("Instruction judge timed out", e)
         } catch (e: ExecutionException) {
-            // Whatever went wrong (judge down, unreadable answer, a bug), the guard fails closed
-            throw InstructionsUnavailableException("Instruction judge failed", e)
+            // Whatever went wrong (judge down, unreadable answer, a bug), the guard fails closed;
+            // the judge's own exception is the cause, so the handler's log says what went wrong
+            throw InstructionsUnavailableException("Instruction judge failed", e.cause ?: e)
         }
     }
 

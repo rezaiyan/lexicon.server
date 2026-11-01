@@ -41,7 +41,8 @@ class InstructionExceptionHandler {
 
     @ExceptionHandler(InstructionsUnavailableException::class)
     fun handleUnavailable(ex: InstructionsUnavailableException): ResponseEntity<ApiResponse<Unit>> {
-        logger.warn { "InstructionsUnavailableException: ${ex.message}" }
+        // No message in the cause chain carries instruction text, so the whole chain is logged
+        logger.warn(ex) { "InstructionsUnavailableException: ${ex.message}" }
         return ResponseEntity
             .status(HttpStatus.SERVICE_UNAVAILABLE)
             .body(ApiResponse(

@@ -71,6 +71,36 @@ class InstructionJudgeTest {
     }
 
     @Test
+    fun `judge reads the last answer when the model corrects itself`() {
+        // Haiku 4.5's real answer to "Words for ordering at a café in Vienna" (2026-11-01)
+        answers(
+            "```json\n{\"verdict\":\"ALLOW\",\"intent\":\"Vocabulary for ordering at a café in Vienna\",\"count\":null}\n```\n\n" +
+                "Wait, let me reconsider. The instruction says to leave out \"count\" when they named no number:\n\n" +
+                "```json\n{\"verdict\":\"ALLOW\",\"intent\":\"Ordering at a café in Vienna\"}\n```",
+        )
+
+        assertEquals(InstructionVerdict.Allowed(ScreenedInstruction(ScreenedIntent("Ordering at a café in Vienna"))), judge())
+    }
+
+    @Test
+    fun `judge fails closed when the model changes its verdict`() {
+        listOf(
+            """{"verdict":"INJECTION"} Actually, on reflection: {"verdict":"ALLOW","intent":"Kitchen words"}""",
+            """{"verdict":"ALLOW","intent":"Kitchen words"} No, wait: {"verdict":"OFF_TOPIC"}""",
+        ).forEach { raw ->
+            answers(raw)
+            assertThrows<InstructionsUnavailableException> { judge() }
+        }
+    }
+
+    @Test
+    fun `judge reads braces inside the intent text`() {
+        answers("""{"verdict":"ALLOW","intent":"Words with } and { in them"}""")
+
+        assertEquals("Words with and in them",(judge() as InstructionVerdict.Allowed).instruction.intent.text)
+    }
+
+    @Test
     fun `judge maps each refusal verdict`() {
         answers("""{"verdict":"OFF_TOPIC"}""")
         assertEquals(InstructionVerdict.Refused(InstructionRejection.OFF_TOPIC), judge())
@@ -97,7 +127,7 @@ class InstructionJudgeTest {
 
     @Test
     fun `judge fails closed on an unknown verdict, unreadable answer or no answer`() {
-        listOf("""{"verdict":"MAYBE"}""", "I think it is fine", null).forEach { raw ->
+        listOf("""{"verdict":"MAYBE"}""", "I think it is fine", """{"verdict":"ALLOW",""", null).forEach { raw ->
             answers(raw)
             assertThrows<InstructionsUnavailableException> { judge() }
         }

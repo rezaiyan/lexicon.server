@@ -48,11 +48,23 @@ class InstructionJudge(
         return raw?.let(::parse) ?: throw InstructionsUnavailableException("No usable instruction judge answer")
     }
 
+    /**
+     * The model sometimes answers, then corrects itself in a second JSON object ("Wait, let me
+     * reconsider…"). The last answer counts, unless the answers disagree on the verdict.
+     */
     private fun parse(raw: String): InstructionVerdict? {
-        val start = raw.indexOf('{')
-        val end = raw.lastIndexOf('}')
-        if (start < 0 || end <= start) return null
-        val node = runCatching { objectMapper.readTree(raw.substring(start, end + 1)) }.getOrNull() ?: return null
+        val answers = jsonObjects(raw)
+            .mapNotNull { runCatching { objectMapper.readTree(it) }.getOrNull() }
+            .filter { it.path("verdict").isString }
+        if (answers.isEmpty()) {
+            logger.warn { "Instruction judge answer had no readable verdict: length=${raw.length}" }
+            return null
+        }
+        if (answers.map { it.path("verdict").asString() }.distinct().size > 1) {
+            logger.warn { "Instruction judge changed its verdict within one answer: answers=${answers.size}" }
+            return null
+        }
+        val node = answers.last()
         return when (node.path("verdict").asString()) {
             "ALLOW" -> sanitizeIntent(node.path("intent").asString())?.let { intent ->
                 InstructionVerdict.Allowed(ScreenedInstruction(intent, itemCount(node.path("count"))))
@@ -65,6 +77,26 @@ class InstructionJudge(
                 null
             }
         }
+    }
+
+    /** Each top-level `{…}` in [raw], in order; braces inside JSON strings don't count. */
+    private fun jsonObjects(raw: String): List<String> {
+        val objects = mutableListOf<String>()
+        var depth = 0
+        var start = -1
+        var inString = false
+        var escaped = false
+        raw.forEachIndexed { i, c ->
+            when {
+                escaped -> escaped = false
+                inString && c == '\\' -> escaped = true
+                c == '"' && depth > 0 -> inString = !inString
+                inString -> Unit
+                c == '{' -> if (depth++ == 0) start = i
+                c == '}' && depth > 0 -> if (--depth == 0) objects += raw.substring(start, i + 1)
+            }
+        }
+        return objects
     }
 
     /** The intent ends up inside a fenced prompt block, so nothing that could close or open one survives. */

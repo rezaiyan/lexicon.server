@@ -7,6 +7,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -85,9 +86,13 @@ class InstructionGuardTest {
 
     @Test
     fun `screen turns an unexpected judge failure into unavailable`() {
-        every { judge.judge(any(), any(), any(), any()) } throws IllegalStateException("boom")
+        val boom = IllegalStateException("boom")
+        every { judge.judge(any(), any(), any(), any()) } throws boom
 
-        assertThrows<InstructionsUnavailableException> { screen("only verbs") }
+        val error = assertThrows<InstructionsUnavailableException> { screen("only verbs") }
+
+        // The handler logs the cause, so it must be the judge's own exception, not the executor's wrapper
+        assertSame(boom, error.cause)
     }
 
     @Test

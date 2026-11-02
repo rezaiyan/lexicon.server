@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
 import com.alirezaiyan.vokab.server.notification.NotificationChannel
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Component
@@ -91,7 +92,7 @@ class RescueGuard(
 
     private fun alert(title: String, body: String) {
         logger.warn { "$title: $body" }
-        runCatching { adminChannel.send("⚠️ $title", body) }
+        runCatching { adminChannel.send(AdminTopic.ALERTS, "⚠️ $title", body) }
             .onFailure { e -> logger.warn(e) { "Rescue autopilot alert not delivered" } }
     }
 

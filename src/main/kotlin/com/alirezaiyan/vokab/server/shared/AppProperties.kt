@@ -219,12 +219,44 @@ data class NotificationsConfig(
     )
 }
 
+/**
+ * The admin bot and its forum chat (Ops HQ). Bots, chats and topic ids are registered in
+ * ~/projects/telegram-hub/registry.json; this bot owns the webhook, so nothing else may poll it.
+ */
 data class TelegramConfig(
     var botToken: String = "",
     var chatId: String = "",
     /** Telegram echoes it in `X-Telegram-Bot-Api-Secret-Token`; blank rejects every webhook call. */
-    var webhookSecret: String = ""
+    var webhookSecret: String = "",
+    var topics: TelegramTopics = TelegramTopics(),
 )
+
+/** Message thread id of each admin topic; 0 posts to the chat's General topic (or a plain chat). */
+data class TelegramTopics(
+    var users: Long = 0,
+    var alerts: Long = 0,
+    var digests: Long = 0,
+    var support: Long = 0,
+) {
+    fun threadOf(topic: AdminTopic): Long? = when (topic) {
+        AdminTopic.USERS -> users
+        AdminTopic.ALERTS -> alerts
+        AdminTopic.DIGESTS -> digests
+        AdminTopic.SUPPORT -> support
+    }.takeIf { it > 0 }
+}
+
+/** Where an admin message belongs in the Ops HQ chat. */
+enum class AdminTopic {
+    /** Sign-ups, sign-ins. */
+    USERS,
+    /** Needs attention now. */
+    ALERTS,
+    /** Scheduled summaries. */
+    DIGESTS,
+    /** Support chat; replies there come back through the webhook. */
+    SUPPORT,
+}
 
 data class GeoLocationConfig(
     var databasePath: String = ""

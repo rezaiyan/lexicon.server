@@ -5,7 +5,9 @@ name: Health Check
 # changes: once on going down, once on recovery. A failed run also shows up red in Actions.
 #
 # Needs the repository secrets TELEGRAM_ADMIN_BOT_TOKEN and TELEGRAM_ADMIN_CHAT_ID (the same bot
-# the app uses); without them it still runs and fails, just without messages.
+# and Ops HQ chat the app uses; see ~/projects/telegram-hub/registry.json), and optionally
+# TELEGRAM_TOPIC_ALERTS (the Alerts topic's thread id; unset posts to General). Without the first
+# two it still runs and fails, just without messages.
 # GitHub pauses scheduled workflows after 60 days without repository activity.
 
 on:
@@ -48,6 +50,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BOT_TOKEN: ${{ secrets.TELEGRAM_ADMIN_BOT_TOKEN }}
           CHAT_ID: ${{ secrets.TELEGRAM_ADMIN_CHAT_ID }}
+          THREAD_ID: ${{ secrets.TELEGRAM_TOPIC_ALERTS }}
           UP: ${{ steps.probe.outputs.up }}
           CODE: ${{ steps.probe.outputs.code }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
@@ -69,6 +72,7 @@ jobs:
             if [ -n "$BOT_TOKEN" ] && [ -n "$CHAT_ID" ]; then
               curl -sf -o /dev/null --max-time 20 "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
                 --data-urlencode "chat_id=${CHAT_ID}" --data-urlencode "text=${message}" \
+                ${THREAD_ID:+--data-urlencode "message_thread_id=${THREAD_ID}"} \
                 || echo "::warning::Telegram message failed"
             else
               echo "::warning::TELEGRAM_ADMIN_BOT_TOKEN / TELEGRAM_ADMIN_CHAT_ID not set; no alert sent"

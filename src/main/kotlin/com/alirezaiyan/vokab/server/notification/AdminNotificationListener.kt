@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.UserSignedInEvent
 import com.alirezaiyan.vokab.server.shared.UserSignedUpEvent
@@ -28,6 +29,7 @@ class AdminNotificationListener(
         try {
             val meta = buildMeta(event.platform, event.country)
             notificationChannel.send(
+                topic = AdminTopic.USERS,
                 title = "New Signup",
                 body = "${event.name} joined via ${event.provider}$meta"
             )
@@ -43,6 +45,7 @@ class AdminNotificationListener(
         try {
             val meta = buildMeta(event.platform, event.country)
             notificationChannel.send(
+                topic = AdminTopic.USERS,
                 title = "Login",
                 body = "${event.name} signed in via ${event.provider}$meta"
             )

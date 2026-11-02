@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.describe
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -18,7 +19,7 @@ class TelegramChannel(
 
     private val restClient = restClientBuilder.baseUrl(BASE_URL).build()
 
-    override fun send(title: String, body: String) {
+    override fun send(topic: AdminTopic, title: String, body: String) {
         val config = appProperties.notifications.admin.telegram
         if (config.botToken.isBlank() || config.chatId.isBlank()) {
             logger.debug { "Telegram notification skipped: bot token or chat ID not configured" }
@@ -30,10 +31,16 @@ class TelegramChannel(
                 // Literal path: as a URI variable the token's ':' would be sent percent-encoded.
                 .uri("/bot${config.botToken}/sendMessage")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(mapOf("chat_id" to config.chatId, "text" to "$title\n$body"))
+                .body(
+                    buildMap {
+                        put("chat_id", config.chatId)
+                        config.topics.threadOf(topic)?.let { put("message_thread_id", it) }
+                        put("text", "$title\n$body")
+                    }
+                )
                 .retrieve()
                 .toBodilessEntity()
-            logger.debug { "Telegram admin notification sent" }
+            logger.debug { "Telegram admin notification sent to $topic" }
         } catch (e: RestClientException) {
             // describe(): the request URL contains the bot token, so never log the exception itself.
             logger.warn { "Failed to send Telegram admin notification: ${e.describe()}" }

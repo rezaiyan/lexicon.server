@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -28,7 +29,7 @@ class RescueGuardTest {
     init {
         every { repository.findById(RescueAutopilot.SINGLETON_ID) } returns Optional.of(state)
         every { repository.save(state) } returns state
-        justRun { channel.send(any(), any()) }
+        justRun { channel.send(any(), any(), any()) }
     }
 
     @Test
@@ -38,7 +39,7 @@ class RescueGuardTest {
         guard.evaluate()
 
         assertNull(state.pausedUntil)
-        verify(exactly = 0) { channel.send(any(), any()) }
+        verify(exactly = 0) { channel.send(any(), any(), any()) }
     }
 
     @Test
@@ -50,7 +51,7 @@ class RescueGuardTest {
         assertEquals(TEST_TODAY.plusDays(RescueGuard.PAUSE_DAYS), state.pausedUntil)
         assertEquals(TEST_NOW, state.changedAt)
         assertTrue(guard.paused())
-        verify(exactly = 1) { channel.send(match { "paused" in it }, any()) }
+        verify(exactly = 1) { channel.send(AdminTopic.ALERTS, match { "paused" in it }, any()) }
     }
 
     @Test
@@ -76,7 +77,7 @@ class RescueGuardTest {
 
         assertNull(state.pausedUntil)
         assertFalse(guard.paused())
-        verify(exactly = 1) { channel.send(match { "resumed" in it }, any()) }
+        verify(exactly = 1) { channel.send(AdminTopic.ALERTS, match { "resumed" in it }, any()) }
     }
 
     @Test
@@ -87,13 +88,13 @@ class RescueGuardTest {
 
         assertTrue(guard.paused())
         verify(exactly = 0) { guardQueries.optOutsAfterRescue(any()) }
-        verify(exactly = 0) { channel.send(any(), any()) }
+        verify(exactly = 0) { channel.send(any(), any(), any()) }
     }
 
     @Test
     fun `a failed Telegram alert still keeps the pause`() {
         every { guardQueries.optOutsAfterRescue(any()) } returns RescueGuard.OPT_OUTS_TO_PAUSE
-        every { channel.send(any(), any()) } throws IllegalStateException("telegram down")
+        every { channel.send(any(), any(), any()) } throws IllegalStateException("telegram down")
 
         guard.evaluate()
 

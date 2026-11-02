@@ -235,6 +235,12 @@ app:
         bot-token: ${TELEGRAM_ADMIN_BOT_TOKEN:}
         chat-id: ${TELEGRAM_ADMIN_CHAT_ID:}
         webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+        # Ops HQ forum topic thread ids (telegram-hub registry.json); unset/0 = General topic
+        topics:
+          users: ${TELEGRAM_TOPIC_USERS:0}
+          alerts: ${TELEGRAM_TOPIC_ALERTS:0}
+          digests: ${TELEGRAM_TOPIC_DIGESTS:0}
+          support: ${TELEGRAM_TOPIC_SUPPORT:0}
 
   geolocation:
     database-path: ${GEOLITE2_COUNTRY_DB_PATH:}

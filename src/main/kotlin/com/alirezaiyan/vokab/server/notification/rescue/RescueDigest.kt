@@ -1,6 +1,7 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
 import com.alirezaiyan.vokab.server.notification.NotificationChannel
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
@@ -17,7 +18,7 @@ class RescueDigest(
     private val clock: Clock,
 ) {
     fun send() {
-        adminChannel.send("📬 Comeback rescue, last $DAYS days", body())
+        adminChannel.send(AdminTopic.DIGESTS, "📬 Comeback rescue, last $DAYS days", body())
     }
 
     private fun body(): String {

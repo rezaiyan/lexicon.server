@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification.rescue
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.TEST_NOW
 import com.alirezaiyan.vokab.server.TEST_TODAY
 import com.alirezaiyan.vokab.server.fixedClock
@@ -23,7 +24,7 @@ class RescueDigestTest {
     private val body = slot<String>()
 
     init {
-        justRun { channel.send(any(), capture(body)) }
+        justRun { channel.send(AdminTopic.DIGESTS, any(), capture(body)) }
         every { guardQueries.optOutsAfterRescue(TEST_NOW.minus(Duration.ofDays(7))) } returns 1
         every { guard.state() } returns RescueAutopilot()
     }

@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.support
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.describe
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties
@@ -21,7 +22,7 @@ interface SupportRelay {
     fun acknowledge(messageId: Long)
 }
 
-/** Relays through the admin Telegram bot and chat (`app.notifications.admin.telegram`). */
+/** Relays through the admin Telegram bot into the chat's Support topic (`app.notifications.admin.telegram`). */
 @Component
 class TelegramSupportRelay(
     private val appProperties: AppProperties,
@@ -41,7 +42,13 @@ class TelegramSupportRelay(
                 // Literal path: as a URI variable the token's ':' would be sent percent-encoded.
                 .uri("/bot${config.botToken}/sendMessage")
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(mapOf("chat_id" to config.chatId, "text" to text.take(TELEGRAM_TEXT_LIMIT)))
+                .body(
+                    buildMap {
+                        put("chat_id", config.chatId)
+                        config.topics.threadOf(AdminTopic.SUPPORT)?.let { put("message_thread_id", it) }
+                        put("text", text.take(TELEGRAM_TEXT_LIMIT))
+                    }
+                )
                 .retrieve()
                 .body(SendMessageResponse::class.java)
                 ?.result

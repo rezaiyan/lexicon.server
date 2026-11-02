@@ -83,8 +83,13 @@ The dump drops and recreates its tables, so it restores over an existing schema.
 The **Health Check** workflow probes `https://lexicon.alirezaiyan.com/api/v1/health` every 15
 minutes from GitHub's runners (three tries a minute apart). It messages Telegram once when the
 server goes down and once when it recovers; failed runs also show red under Actions. Add the
-repository secrets `TELEGRAM_ADMIN_BOT_TOKEN` and `TELEGRAM_ADMIN_CHAT_ID` (Settings → Secrets and
-variables → Actions), the same values as in the VPS `.env`. GitHub pauses scheduled workflows
+repository secrets `TELEGRAM_ADMIN_BOT_TOKEN`, `TELEGRAM_ADMIN_CHAT_ID` and `TELEGRAM_TOPIC_ALERTS`
+(Settings → Secrets and variables → Actions), the same values as in the VPS `.env`.
+
+Admin Telegram (bot @lexicon_ops_bot, chat Ops HQ, topics) is registered in `~/projects/telegram-hub`
+(`registry.json`). The server posts by `AdminTopic`: sign-ups/logins → Users, rescue pauses → Alerts,
+weekly digest → Digests, support → Support; thread ids come from `TELEGRAM_TOPIC_*` in the VPS `.env`.
+This bot's updates belong to the server's webhook: never poll it elsewhere (`tg doctor` checks). GitHub pauses scheduled workflows
 after 60 days without repository activity; re-enable it under Actions if that happens.
 
 ## Vulnerability scanning

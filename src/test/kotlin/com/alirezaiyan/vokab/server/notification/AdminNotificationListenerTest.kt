@@ -1,5 +1,6 @@
 package com.alirezaiyan.vokab.server.notification
 
+import com.alirezaiyan.vokab.server.shared.AdminTopic
 import com.alirezaiyan.vokab.server.shared.AppProperties
 import com.alirezaiyan.vokab.server.shared.NotificationsConfig
 import com.alirezaiyan.vokab.server.shared.UserSignedInEvent
@@ -38,6 +39,7 @@ class AdminNotificationListenerTest {
 
         verify(exactly = 1) {
             channel.send(
+                AdminTopic.USERS,
                 match { it.contains("New Signup") },
                 match { it.contains("Ali") && it.contains("google") }
             )
@@ -62,7 +64,7 @@ class AdminNotificationListenerTest {
 
         disabledListener.onUserSignedUp(event)
 
-        verify(exactly = 0) { channel.send(any(), any()) }
+        verify(exactly = 0) { channel.send(any(), any(), any()) }
     }
 
     @Test
@@ -77,7 +79,7 @@ class AdminNotificationListenerTest {
             )
         )
 
-        io.mockk.every { failingChannel.send(any(), any()) } throws RuntimeException("channel down")
+        io.mockk.every { failingChannel.send(any(), any(), any()) } throws RuntimeException("channel down")
 
         val event = UserSignedUpEvent(
             userId = 1L,
@@ -103,6 +105,7 @@ class AdminNotificationListenerTest {
 
         verify(exactly = 1) {
             channel.send(
+                AdminTopic.USERS,
                 match { it.contains("Login") },
                 match { it.contains("Ali") && it.contains("google") }
             )
@@ -124,6 +127,7 @@ class AdminNotificationListenerTest {
 
         verify(exactly = 1) {
             channel.send(
+                AdminTopic.USERS,
                 any(),
                 match { it.contains("android") && it.contains("IR") }
             )
@@ -145,6 +149,7 @@ class AdminNotificationListenerTest {
 
         verify(exactly = 1) {
             channel.send(
+                AdminTopic.USERS,
                 any(),
                 match { it.contains("ios") && it.contains("US") }
             )
@@ -164,6 +169,7 @@ class AdminNotificationListenerTest {
 
         verify(exactly = 1) {
             channel.send(
+                AdminTopic.USERS,
                 any(),
                 match { !it.contains("|") }
             )

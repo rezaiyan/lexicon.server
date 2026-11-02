@@ -94,6 +94,10 @@ services:
       TELEGRAM_ADMIN_BOT_TOKEN: ${TELEGRAM_ADMIN_BOT_TOKEN:-}
       TELEGRAM_ADMIN_CHAT_ID: ${TELEGRAM_ADMIN_CHAT_ID:-}
       TELEGRAM_WEBHOOK_SECRET: ${TELEGRAM_WEBHOOK_SECRET:-}
+      TELEGRAM_TOPIC_USERS: ${TELEGRAM_TOPIC_USERS:-0}
+      TELEGRAM_TOPIC_ALERTS: ${TELEGRAM_TOPIC_ALERTS:-0}
+      TELEGRAM_TOPIC_DIGESTS: ${TELEGRAM_TOPIC_DIGESTS:-0}
+      TELEGRAM_TOPIC_SUPPORT: ${TELEGRAM_TOPIC_SUPPORT:-0}
       ADMIN_NOTIFICATIONS_ENABLED: ${ADMIN_NOTIFICATIONS_ENABLED:-true}
       # X-Admin-Key for /admin/** and the dashboard at /admin-ui/notifications.
       # Empty disables admin access; dashboard sign-in needs 32+ chars (openssl rand -base64 36)

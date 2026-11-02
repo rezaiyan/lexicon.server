@@ -121,7 +121,7 @@ jobs:
 
       # Built into the local Docker daemon first, so the scan sees exactly the image that ships
       - name: Build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           load: true
@@ -153,7 +153,7 @@ jobs:
       # Same build, so every layer comes from the cache: this only tags and uploads
       - name: Push
         if: env.PUBLISH == 'true'
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           push: true

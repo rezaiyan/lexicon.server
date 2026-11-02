@@ -22,6 +22,13 @@ Project rules in `.claude/rules/` — modular, path-scoped. Load only when editi
 - [Tech Stack & Dependencies](.claude/tech-stack.md)
 - [Configuration & Environment](.claude/configuration.md)
 
+## Telegram
+
+Anything Telegram (admin notifications, support relay, webhook, bots, topics, tokens) is governed by the Telegram handbook: `~/projects/telegram-hub/README.md` (registry: `registry.json`, CLI: `tg`). Read it before changing any of it.
+Here: `notification/TelegramChannel.kt` + `AdminTopic` (shared/AppProperties.kt), `support/SupportRelay.kt`,
+`TelegramWebhookController` (the webhook of @lexicon_ops_bot — the only receiver allowed for that bot),
+`.github/workflows/health-check.yml`.
+
 ## Sub-agents
 
 | Agent              | Trigger                                                        |

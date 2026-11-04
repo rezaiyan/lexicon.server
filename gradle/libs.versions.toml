@@ -14,7 +14,7 @@ springdoc = "3.1.1"
 spring-modulith = "2.1.2"
 konsist = "0.18.1"
 webauthn4j = "0.30.0.RELEASE"
-passki = "0.1.0-alpha03"
+passki = "0.1.0-alpha05"
 # 2.x is the Spring Boot 4 line
 spring-ai = "2.0.2"
 

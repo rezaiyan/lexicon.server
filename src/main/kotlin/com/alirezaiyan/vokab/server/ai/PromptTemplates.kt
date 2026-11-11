@@ -14,7 +14,7 @@ enum class Prompt(val resource: String) {
     MILESTONE_MESSAGE("milestone-message.v1"),
     STREAK_REMINDER("streak-reminder.v1"),
     TRANSLATE("translate.v1"),
-    SUGGEST_VOCABULARY("suggest-vocabulary.v2"),
+    SUGGEST_VOCABULARY("suggest-vocabulary.v3"),
     NOTIFICATION_ADVICE("notification-advice.v1"),
     COMEBACK_RESCUE("comeback-rescue.v1"),
     COMEBACK_RESCUE_JUDGE("comeback-rescue-judge.v1"),

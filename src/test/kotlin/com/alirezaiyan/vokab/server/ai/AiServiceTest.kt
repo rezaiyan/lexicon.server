@@ -216,7 +216,56 @@ class AiServiceTest {
         server.verify()
     }
 
-    // ── extractWordsFromImage (v2) ────────────────────────────────────────────
+    @Test
+    fun `generateVocabularyFromPreferences pitches intermediate at B1-B2 and rules out beginner words`() {
+        expectChat()
+            .andExpect(promptContains("Every item must be at CEFR B1-B2 level"))
+            .andExpect(promptContains("Do NOT include A1-A2 vocabulary: no greetings"))
+            .andExpect(promptContains("remove every item a B1-B2 learner would already know"))
+            .andExpect(content().string(not(containsString("Hallo,hello"))))
+            .andExpect(content().string(not(containsString("Guten Morgen"))))
+            .andExpect(content().string(not(containsString("greetings, numbers, time, family"))))
+            .andRespond(answer("die Verantwortung,responsibility"))
+
+        service.generateVocabularyFromPreferences("German", "intermediate", "English", count = 50)
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences pitches advanced at C1-C2 and rules out everything below B2`() {
+        expectChat()
+            .andExpect(promptContains("Every item must be at CEFR C1-C2 level"))
+            .andExpect(promptContains("Do NOT include anything at A1-B2 level"))
+            .andExpect(content().string(not(containsString("Hallo,hello"))))
+            .andRespond(answer("die Nachhaltigkeit,sustainability"))
+
+        service.generateVocabularyFromPreferences("German", "advanced", "English", count = 50)
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences keeps beginner on core A1-A2 vocabulary`() {
+        expectChat()
+            .andExpect(promptContains("Every item must be at CEFR A1-A2 level"))
+            .andExpect(promptContains("greetings, numbers, time, family"))
+            .andRespond(answer("Hallo,hello"))
+
+        service.generateVocabularyFromPreferences("German", "beginner", "English", count = 50)
+        server.verify()
+    }
+
+    @Test
+    fun `generateVocabularyFromPreferences keeps the level when the learner adds interests`() {
+        expectChat()
+            .andExpect(promptContains("Still include some general vocabulary at CEFR B1-B2"))
+            .andExpect(content().string(not(containsString("new learner"))))
+            .andRespond(answer("die Verantwortung,responsibility"))
+
+        service.generateVocabularyFromPreferences("German", "intermediate", "English", listOf("work"), count = 50)
+        server.verify()
+    }
+
+    // ── extractWordsFromImage (v2)────────────────────────────────────────────
 
     @Test
     fun `extractWordsFromImage adds quick picks and the screened request before the output format`() {

@@ -227,16 +227,16 @@ class AiService(
                 "focus=${preferences.focus}, guided=${preferences.isGuided}"
         }
 
+        // An unknown level reads as beginner, which is what every request got before levels were spelled out
+        val level = VocabularyLevel.fromLabel(currentLevel) ?: VocabularyLevel.BEGINNER
         val focusRequirements = if (preferences.isGuided) {
             "4. The learner request below comes first: choose vocabulary that fits it closely, even if " +
-                "that means skipping the balanced mix in rule 3."
+                "that means skipping the topic mix in rule 3, but keep to the level in rule 1."
         } else if (interests.isNotEmpty()) {
             "4. Prioritize vocabulary that is especially relevant to these interests: ${interests.joinToString()}.\n" +
-                "5. Still include some general everyday vocabulary so the set feels balanced for an " +
-                "onboarding experience."
+                "5. Still include some general vocabulary at CEFR ${level.cefr} so the set feels balanced."
         } else {
-            "4. Keep the set balanced for an onboarding experience, covering everyday situations a new " +
-                "learner is likely to face."
+            "4. Keep the set balanced across the topics in rule 3, always at CEFR ${level.cefr}."
         }
         val prompt = promptTemplates.render(
             Prompt.SUGGEST_VOCABULARY,
@@ -244,6 +244,10 @@ class AiService(
                 "requestedCount" to requestedCount,
                 "targetLanguage" to targetLanguage,
                 "currentLevel" to currentLevel,
+                "cefr" to level.cefr,
+                "levelGuidance" to level.guidance,
+                "topicMix" to level.topicMix,
+                "levelExample" to level.example,
                 "nativeLanguage" to nativeLanguage,
                 "interestsLine" to
                     if (interests.isEmpty()) "" else "- Their interests / focus areas: ${interests.joinToString()}",
